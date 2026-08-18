@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: english-reading-postgres
+    environment:
+      POSTGRES_DB: english_reading
+      POSTGRES_USER: english_user
+      POSTGRES_PASSWORD: english_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - english_reading_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U english_user -d english_reading"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  english_reading_data:

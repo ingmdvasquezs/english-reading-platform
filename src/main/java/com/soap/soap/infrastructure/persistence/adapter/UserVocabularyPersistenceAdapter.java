@@ -1,0 +1,43 @@
+package com.soap.soap.infrastructure.persistence.adapter;
+
+import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
+import com.soap.soap.domain.model.UserVocabulary;
+import com.soap.soap.infrastructure.persistence.mapper.UserVocabularyEntityMapper;
+import com.soap.soap.infrastructure.persistence.repository.JpaUserVocabularyRepository;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+@Component
+@RequiredArgsConstructor
+public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositoryPort {
+
+  private final JpaUserVocabularyRepository repository;
+  private final UserVocabularyEntityMapper mapper;
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<UserVocabulary> findByUserIdAndWordId(UUID userId, UUID wordId) {
+    return repository.findByUserIdAndWordId(userId, wordId).map(mapper::toDomain);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<UserVocabulary> findByUserId(UUID userId) {
+    return repository.findByUserIdOrderByFirstSeenAtDesc(userId).stream()
+        .map(mapper::toDomain)
+        .toList();
+  }
+
+  @Override
+  @Transactional
+  public UserVocabulary save(UserVocabulary vocabulary) {
+    var entity = mapper.toEntity(vocabulary);
+    var savedEntity = repository.save(entity);
+
+    return mapper.toDomain(savedEntity);
+  }
+}

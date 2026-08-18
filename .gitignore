@@ -1,0 +1,58 @@
+### Maven ###
+target/
+
+### Maven Wrapper ###
+# Keep Maven Wrapper files versioned:
+# .mvn/wrapper/maven-wrapper.jar
+# .mvn/wrapper/maven-wrapper.properties
+# mvnw
+# mvnw.cmd
+
+### Environment / Secrets ###
+.env
+.env.*
+!.env.example
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse / STS ###
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Build ###
+build/
+
+### Logs ###
+*.log
+logs/
+
+### Operating System ###
+.DS_Store
+Thumbs.db
+
+### Temporary files ###
+*.tmp
+*.temp
+*.swp
+*~
+### Local Maven ###
+.m2/
