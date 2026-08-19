@@ -1,15 +1,21 @@
 package com.soap.soap.application.port.out;
 
+import com.soap.soap.application.model.PageRequest;
+import com.soap.soap.application.model.PageResult;
 import com.soap.soap.domain.model.UserVocabulary;
-import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface UserVocabularyRepositoryPort {
 
   Optional<UserVocabulary> findByUserIdAndWordId(UUID userId, UUID wordId);
 
-  List<UserVocabulary> findByUserId(UUID userId);
+  PageResult<UserVocabulary> findByUserId(UUID userId, PageRequest pageRequest);
+
+  Set<String> findKnownNormalizedValues(
+      UUID userId, String language, Collection<String> normalizedValues);
 
   UserVocabulary save(UserVocabulary vocabulary);
 }

@@ -2,6 +2,7 @@ package com.soap.soap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
@@ -49,7 +50,8 @@ class SoapApplicationTests {
     assertThat(reading.id()).isNotNull();
     assertThat(reading.createdAt()).isNotNull();
     assertThat(readings.findById(reading.id())).contains(reading);
-    assertThat(readings.findByUserId(user.id())).containsExactly(reading);
+    assertThat(readings.findByUserId(user.id(), new PageRequest(0, 10)).content())
+        .containsExactly(reading);
   }
 
   @Test
@@ -73,6 +75,24 @@ class SoapApplicationTests {
             new UserVocabulary(null, user, word, VocabularyStatus.LEARNING, firstSeenAt, null));
 
     assertThat(vocabulary.findByUserIdAndWordId(user.id(), word.id())).contains(saved);
-    assertThat(vocabulary.findByUserId(user.id())).containsExactly(saved);
+    assertThat(vocabulary.findByUserId(user.id(), new PageRequest(0, 10)).content())
+        .containsExactly(saved);
+  }
+
+  @Test
+  @Transactional
+  void findsKnownWordsInOneLanguageFromABatchOfCandidates() {
+    var known = words.save(new Word(null, "hello", "en"));
+    var learning = words.save(new Word(null, "world", "en"));
+    var french = words.save(new Word(null, "bonjour", "fr"));
+    var now = LocalDateTime.now();
+    vocabulary.save(new UserVocabulary(null, user, known, VocabularyStatus.KNOWN, now, now));
+    vocabulary.save(new UserVocabulary(null, user, learning, VocabularyStatus.LEARNING, now, null));
+    vocabulary.save(new UserVocabulary(null, user, french, VocabularyStatus.KNOWN, now, now));
+
+    assertThat(
+            vocabulary.findKnownNormalizedValues(
+                user.id(), "en", java.util.Set.of("hello", "world", "bonjour", "missing")))
+        .containsExactly("hello");
   }
 }

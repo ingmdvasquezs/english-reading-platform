@@ -8,6 +8,8 @@ public interface UserRepositoryPort {
 
   Optional<User> findById(UUID id);
 
+  boolean existsById(UUID id);
+
   Optional<User> findByEmail(String email);
 
   User save(User user);

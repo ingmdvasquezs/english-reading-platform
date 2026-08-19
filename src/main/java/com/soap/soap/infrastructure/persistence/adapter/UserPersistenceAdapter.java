@@ -25,6 +25,12 @@ public class UserPersistenceAdapter implements UserRepositoryPort {
 
   @Override
   @Transactional(readOnly = true)
+  public boolean existsById(UUID id) {
+    return repository.existsById(id);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public Optional<User> findByEmail(String email) {
     return repository.findByEmail(email).map(mapper::toDomain);
   }

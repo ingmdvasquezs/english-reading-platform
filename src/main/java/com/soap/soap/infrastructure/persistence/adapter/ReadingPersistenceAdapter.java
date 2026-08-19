@@ -1,10 +1,11 @@
 package com.soap.soap.infrastructure.persistence.adapter;
 
+import com.soap.soap.application.model.PageRequest;
+import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.infrastructure.persistence.mapper.ReadingEntityMapper;
 import com.soap.soap.infrastructure.persistence.repository.JpaReadingRepository;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
-
   private final JpaReadingRepository repository;
   private final ReadingEntityMapper mapper;
 
@@ -26,18 +26,21 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
 
   @Override
   @Transactional(readOnly = true)
-  public List<Reading> findByUserId(UUID userId) {
-    return repository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-        .map(mapper::toDomain)
-        .toList();
+  public PageResult<Reading> findByUserId(UUID userId, PageRequest pageRequest) {
+    var page =
+        repository.findByUserIdOrderByCreatedAtDesc(
+            userId,
+            org.springframework.data.domain.PageRequest.of(pageRequest.page(), pageRequest.size()));
+    return new PageResult<>(
+        page.getContent().stream().map(mapper::toDomain).toList(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements());
   }
 
   @Override
   @Transactional
   public Reading save(Reading reading) {
-    var entity = mapper.toEntity(reading);
-    var savedEntity = repository.save(entity);
-
-    return mapper.toDomain(savedEntity);
+    return mapper.toDomain(repository.save(mapper.toEntity(reading)));
   }
 }
