@@ -12,3 +12,6 @@ spring:
 
   flyway:
     enabled: true
+
+  webservices:
+    path: /ws

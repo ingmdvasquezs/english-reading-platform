@@ -88,6 +88,10 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>wsdl4j</groupId>
+			<artifactId>wsdl4j</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-testcontainers</artifactId>
 			<scope>test</scope>
@@ -165,8 +169,33 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>jaxb2-maven-plugin</artifactId>
+				<version>4.1.0</version>
+
+				<executions>
+					<execution>
+						<id>generate-soap-sources</id>
+						<goals>
+							<goal>xjc</goal>
+						</goals>
+					</execution>
+				</executions>
+
+				<configuration>
+					<sources>
+						<source>${project.basedir}/src/main/resources/xsd/readings.xsd</source>
+					</sources>
+
+					<packageName>com.soap.soap.infrastructure.soap.generated</packageName>
+
+					<clearOutputDir>false</clearOutputDir>
+				</configuration>
+			</plugin>
 
 		</plugins>
+
 	</build>
 
 </project>
