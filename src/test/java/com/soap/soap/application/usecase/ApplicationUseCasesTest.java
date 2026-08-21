@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,11 +12,12 @@ import static org.mockito.Mockito.when;
 import com.soap.soap.application.command.AddWordToVocabularyCommand;
 import com.soap.soap.application.command.RegisterReadingCommand;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
-import com.soap.soap.application.exception.ReadingAccessDeniedException;
+import com.soap.soap.application.exception.ReadingNotFoundException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
@@ -34,6 +36,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -52,6 +55,7 @@ class ApplicationUseCasesTest {
   @Mock private WordRepositoryPort words;
   @Mock private ReadingRepositoryPort readings;
   @Mock private UserVocabularyRepositoryPort vocabulary;
+  @Mock private CurrentUserPort currentUser;
 
   private User user;
   private TextWordProcessor processor;
@@ -60,17 +64,18 @@ class ApplicationUseCasesTest {
   void setUp() {
     user = new User(UUID.randomUUID(), "Ada", "ada@example.com");
     processor = new TextWordProcessor();
+    lenient().when(currentUser.requireUserId()).thenReturn(user.id());
   }
 
   @Test
   void registersATrimmedReadingForAnExistingUser() {
     when(users.findById(user.id())).thenReturn(Optional.of(user));
     when(readings.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-    var useCase = new RegisterReadingUseCase(users, readings, new LanguageNormalizer());
+    var useCase =
+        new RegisterReadingUseCase(users, readings, new LanguageNormalizer(), currentUser);
 
     var result =
-        useCase.registerReading(
-            new RegisterReadingCommand(user.id(), "  Title  ", "  Content  ", " EN "));
+        useCase.registerReading(new RegisterReadingCommand("  Title  ", "  Content  ", " EN "));
 
     assertThat(result.title()).isEqualTo("Title");
     assertThat(result.content()).isEqualTo("Content");
@@ -80,12 +85,13 @@ class ApplicationUseCasesTest {
   @Test
   void rejectsRegistrationForAnUnknownUser() {
     var userId = UUID.randomUUID();
+    when(currentUser.requireUserId()).thenReturn(userId);
     when(users.findById(userId)).thenReturn(Optional.empty());
 
     assertThatThrownBy(
             () ->
-                new RegisterReadingUseCase(users, readings, new LanguageNormalizer())
-                    .registerReading(new RegisterReadingCommand(userId, "Title", "Content", "en")))
+                new RegisterReadingUseCase(users, readings, new LanguageNormalizer(), currentUser)
+                    .registerReading(new RegisterReadingCommand("Title", "Content", "en")))
         .isInstanceOf(UserNotFoundException.class);
     verify(readings, never()).save(any());
   }
@@ -99,11 +105,17 @@ class ApplicationUseCasesTest {
     when(vocabulary.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     var useCase =
         new AddWordToVocabularyUseCase(
-            users, vocabulary, processor, new LanguageNormalizer(), new WordResolver(words), CLOCK);
+            users,
+            vocabulary,
+            processor,
+            new LanguageNormalizer(),
+            new WordResolver(words),
+            CLOCK,
+            currentUser);
 
     var result =
         useCase.addWordToVocabulary(
-            new AddWordToVocabularyCommand(user.id(), " DON’T ", "EN", VocabularyStatus.KNOWN));
+            new AddWordToVocabularyCommand(" DON’T ", "EN", VocabularyStatus.KNOWN));
 
     assertThat(result.word()).isEqualTo(word);
     assertThat(result.learnedAt()).isEqualTo(LocalDateTime.now(CLOCK));
@@ -127,10 +139,10 @@ class ApplicationUseCasesTest {
                         processor,
                         new LanguageNormalizer(),
                         new WordResolver(words),
-                        CLOCK)
+                        CLOCK,
+                        currentUser)
                     .addWordToVocabulary(
-                        new AddWordToVocabularyCommand(
-                            user.id(), "hello", "en", VocabularyStatus.NEW)))
+                        new AddWordToVocabularyCommand("hello", "en", VocabularyStatus.NEW)))
         .isInstanceOf(WordAlreadyInVocabularyException.class);
     verify(vocabulary, never()).save(any());
   }
@@ -151,8 +163,8 @@ class ApplicationUseCasesTest {
     when(vocabulary.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
     var changed =
-        new ChangeVocabularyStatusUseCase(users, vocabulary, CLOCK)
-            .changeVocabularyStatus(user.id(), word.id(), VocabularyStatus.LEARNING);
+        new ChangeVocabularyStatusUseCase(users, vocabulary, CLOCK, currentUser)
+            .changeVocabularyStatus(word.id(), VocabularyStatus.LEARNING);
 
     assertThat(changed.status()).isEqualTo(VocabularyStatus.LEARNING);
     assertThat(changed.learnedAt()).isNull();
@@ -165,17 +177,18 @@ class ApplicationUseCasesTest {
             UUID.randomUUID(), user, "Title", "Hello, unknown HELLO!", "en", LocalDateTime.now());
     when(users.existsById(user.id())).thenReturn(true);
     when(readings.findById(reading.id())).thenReturn(Optional.of(reading));
-    when(vocabulary.findKnownNormalizedValues(user.id(), "en", Set.of("hello", "unknown")))
-        .thenReturn(Set.of("hello"));
+    when(vocabulary.findStatusesByNormalizedValues(user.id(), "en", Set.of("hello", "unknown")))
+        .thenReturn(Map.of("hello", VocabularyStatus.KNOWN));
 
     var analysis =
-        new AnalyzeReadingUseCase(users, readings, vocabulary, processor, new ReadingAnalyzer())
-            .analyzeReading(user.id(), reading.id());
+        new AnalyzeReadingUseCase(
+                users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+            .analyzeReading(reading.id());
 
-    assertThat(analysis.totalWords()).isEqualTo(3);
-    assertThat(analysis.knownWords()).isEqualTo(2);
-    assertThat(analysis.comprehensionPercentage()).isCloseTo(66.67, within(0.01));
-    verify(vocabulary).findKnownNormalizedValues(user.id(), "en", Set.of("hello", "unknown"));
+    assertThat(analysis.totalTokens()).isEqualTo(3);
+    assertThat(analysis.knownTokens()).isEqualTo(2);
+    assertThat(analysis.personalizedCoveragePercentage()).isCloseTo(66.67, within(0.01));
+    verify(vocabulary).findStatusesByNormalizedValues(user.id(), "en", Set.of("hello", "unknown"));
   }
 
   @Test
@@ -189,10 +202,10 @@ class ApplicationUseCasesTest {
     assertThatThrownBy(
             () ->
                 new AnalyzeReadingUseCase(
-                        users, readings, vocabulary, processor, new ReadingAnalyzer())
-                    .analyzeReading(user.id(), reading.id()))
-        .isInstanceOf(ReadingAccessDeniedException.class);
-    verify(vocabulary, never()).findKnownNormalizedValues(any(), any(), any());
+                        users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+                    .analyzeReading(reading.id()))
+        .isInstanceOf(ReadingNotFoundException.class);
+    verify(vocabulary, never()).findStatusesByNormalizedValues(any(), any(), any());
   }
 
   @Test
@@ -202,7 +215,7 @@ class ApplicationUseCasesTest {
     when(users.existsById(user.id())).thenReturn(true);
     when(readings.findByUserId(user.id(), request)).thenReturn(expected);
 
-    assertThat(new ListUserReadingsUseCase(users, readings).listUserReadings(user.id(), request))
+    assertThat(new ListUserReadingsUseCase(users, readings, currentUser).listUserReadings(request))
         .isEqualTo(expected);
   }
 
@@ -213,8 +226,8 @@ class ApplicationUseCasesTest {
     assertThatThrownBy(
             () ->
                 new AnalyzeReadingUseCase(
-                        users, readings, vocabulary, processor, new ReadingAnalyzer())
-                    .analyzeReading(user.id(), UUID.randomUUID()))
+                        users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+                    .analyzeReading(UUID.randomUUID()))
         .isInstanceOf(UserNotFoundException.class);
     verify(users, never()).findById(any());
     verify(readings, never()).findById(any());
@@ -228,19 +241,19 @@ class ApplicationUseCasesTest {
     when(readings.findById(reading.id())).thenReturn(Optional.of(reading));
 
     var analysis =
-        new AnalyzeReadingUseCase(users, readings, vocabulary, processor, new ReadingAnalyzer())
-            .analyzeReading(user.id(), reading.id());
+        new AnalyzeReadingUseCase(
+                users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+            .analyzeReading(reading.id());
 
     assertThat(analysis.words()).isEmpty();
-    verify(vocabulary, never()).findKnownNormalizedValues(any(), any(), any());
+    verify(vocabulary, never()).findStatusesByNormalizedValues(any(), any(), any());
   }
 
   @Test
   void commandsRejectStructurallyInvalidArgumentsWithApplicationException() {
-    assertThatThrownBy(() -> new RegisterReadingCommand(null, "Title", "Content", "en"))
+    assertThatThrownBy(() -> new RegisterReadingCommand(null, "Content", "en"))
         .isInstanceOf(InvalidApplicationArgumentException.class);
-    assertThatThrownBy(
-            () -> new AddWordToVocabularyCommand(user.id(), " ", "en", VocabularyStatus.LEARNING))
+    assertThatThrownBy(() -> new AddWordToVocabularyCommand(" ", "en", VocabularyStatus.LEARNING))
         .isInstanceOf(InvalidApplicationArgumentException.class);
   }
 }

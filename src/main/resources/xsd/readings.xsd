@@ -6,10 +6,38 @@
         targetNamespace="http://soap.com/english-reading/readings"
         elementFormDefault="qualified">
 
+    <xs:element name="registerUserRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="email" type="xs:string"/>
+            <xs:element name="password" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="registerUserResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="userId" type="xs:string"/>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="email" type="xs:string"/>
+            <xs:element name="createdAt" type="xs:dateTime"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="loginRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="email" type="xs:string"/>
+            <xs:element name="password" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="loginResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="accessToken" type="xs:string"/>
+            <xs:element name="tokenType" type="xs:string"/>
+            <xs:element name="expiresIn" type="xs:long"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
     <xs:element name="registerReadingRequest">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="userId" type="xs:string"/>
                 <xs:element name="title" type="xs:string"/>
                 <xs:element name="content" type="xs:string"/>
                 <xs:element name="language" type="xs:string"/>
@@ -25,6 +53,156 @@
                 <xs:element name="createdAt" type="xs:dateTime"/>
             </xs:sequence>
         </xs:complexType>
+    </xs:element>
+
+    <xs:simpleType name="vocabularyStatusType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="NEW"/>
+            <xs:enumeration value="LEARNING"/>
+            <xs:enumeration value="KNOWN"/>
+            <xs:enumeration value="IGNORED"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="pageType">
+        <xs:sequence>
+            <xs:element name="page" type="xs:int"/>
+            <xs:element name="size" type="xs:int"/>
+            <xs:element name="totalElements" type="xs:long"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="readingType">
+        <xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="userId" type="xs:string"/>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="content" type="xs:string"/>
+            <xs:element name="language" type="xs:string"/>
+            <xs:element name="createdAt" type="xs:dateTime" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="vocabularyEntryType">
+        <xs:sequence>
+            <xs:element name="entryId" type="xs:string" minOccurs="0"/>
+            <xs:element name="userId" type="xs:string"/>
+            <xs:element name="wordId" type="xs:string"/>
+            <xs:element name="word" type="xs:string"/>
+            <xs:element name="language" type="xs:string"/>
+            <xs:element name="status" type="tns:vocabularyStatusType"/>
+            <xs:element name="firstSeenAt" type="xs:dateTime"/>
+            <xs:element name="learnedAt" type="xs:dateTime" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="getReadingRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="getReadingResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="reading" type="tns:readingType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="listUserReadingsRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="page" type="xs:int"/>
+            <xs:element name="size" type="xs:int"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="listUserReadingsResponse">
+        <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
+            <xs:element name="readings" type="tns:readingType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
+    </xs:element>
+
+    <xs:element name="addWordToVocabularyRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="word" type="xs:string"/>
+            <xs:element name="language" type="xs:string"/>
+            <xs:element name="initialStatus" type="tns:vocabularyStatusType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="addWordToVocabularyResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="entry" type="tns:vocabularyEntryType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="changeVocabularyStatusRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="wordId" type="xs:string"/>
+            <xs:element name="status" type="tns:vocabularyStatusType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="changeVocabularyStatusResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="entry" type="tns:vocabularyEntryType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="listUserVocabularyRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="page" type="xs:int"/>
+            <xs:element name="size" type="xs:int"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="listUserVocabularyResponse">
+        <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
+            <xs:element name="entries" type="tns:vocabularyEntryType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
+    </xs:element>
+
+    <xs:element name="analyzeReadingRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="analyzeReadingResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="totalTokens" type="xs:int"/>
+            <xs:element name="uniqueWords" type="xs:long"/>
+            <xs:element name="knownTokens" type="xs:long"/>
+            <xs:element name="knownWords" type="xs:long"/>
+            <xs:element name="learningTokens" type="xs:long"/>
+            <xs:element name="learningWords" type="xs:long"/>
+            <xs:element name="unknownTokens" type="xs:long"/>
+            <xs:element name="unknownWords" type="xs:long"/>
+            <xs:element name="ignoredTokens" type="xs:long"/>
+            <xs:element name="ignoredWords" type="xs:long"/>
+            <xs:element name="personalizedCoveragePercentage" type="xs:double"/>
+            <xs:element name="unknownWordFrequencies" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType><xs:sequence>
+                    <xs:element name="normalizedValue" type="xs:string"/>
+                    <xs:element name="count" type="xs:long"/>
+                </xs:sequence></xs:complexType>
+            </xs:element>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="getInitialVocabularyTestRequest"><xs:complexType/></xs:element>
+    <xs:element name="getInitialVocabularyTestResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="testId" type="xs:string"/>
+            <xs:element name="text" type="xs:string"/>
+            <xs:element name="selectableWords" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="completeInitialVocabularyTestRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="testId" type="xs:string"/>
+            <xs:element name="knownWords" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="completeInitialVocabularyTestResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="confirmedWordCount" type="xs:int"/>
+            <xs:element name="knownWords" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="markedPercentage" type="xs:double"/>
+        </xs:sequence></xs:complexType>
     </xs:element>
 
 </xs:schema>

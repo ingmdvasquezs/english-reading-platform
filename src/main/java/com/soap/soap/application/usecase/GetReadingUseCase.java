@@ -3,6 +3,7 @@ package com.soap.soap.application.usecase;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.ReadingNotFoundException;
 import com.soap.soap.application.port.in.GetReadingPort;
+import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.domain.model.Reading;
 import java.util.UUID;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class GetReadingUseCase implements GetReadingPort {
   private final ReadingRepositoryPort readings;
+  private final CurrentUserPort currentUser;
 
   @Override
   @Transactional(readOnly = true)
@@ -21,6 +23,10 @@ public class GetReadingUseCase implements GetReadingPort {
     if (readingId == null) {
       throw new InvalidApplicationArgumentException("Reading id must not be null");
     }
-    return readings.findById(readingId).orElseThrow(() -> new ReadingNotFoundException(readingId));
+    var userId = currentUser.requireUserId();
+    return readings
+        .findById(readingId)
+        .filter(r -> userId.equals(r.user().id()))
+        .orElseThrow(() -> new ReadingNotFoundException(readingId));
   }
 }

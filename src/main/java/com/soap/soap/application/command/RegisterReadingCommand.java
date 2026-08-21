@@ -1,14 +1,10 @@
 package com.soap.soap.application.command;
 
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
-import java.util.UUID;
 
-public record RegisterReadingCommand(UUID userId, String title, String content, String language) {
+public record RegisterReadingCommand(String title, String content, String language) {
 
   public RegisterReadingCommand {
-    if (userId == null) {
-      throw new InvalidApplicationArgumentException("User id must not be null");
-    }
     title = requireText(title, "Title");
     content = requireText(content, "Content");
     language = requireText(language, "Language");

@@ -2,10 +2,8 @@ package com.soap.soap.infrastructure.soap.mapper;
 
 import com.soap.soap.application.command.RegisterReadingCommand;
 import com.soap.soap.domain.model.Reading;
-import com.soap.soap.infrastructure.soap.exception.InvalidSoapRequestException;
 import com.soap.soap.infrastructure.soap.generated.RegisterReadingRequest;
 import com.soap.soap.infrastructure.soap.generated.RegisterReadingResponse;
-import java.util.UUID;
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeFactory;
 import org.springframework.stereotype.Component;
@@ -25,10 +23,7 @@ public class RegisterReadingSoapMapper {
 
   public RegisterReadingCommand toCommand(RegisterReadingRequest request) {
     return new RegisterReadingCommand(
-        parseUserId(request.getUserId()),
-        request.getTitle(),
-        request.getContent(),
-        request.getLanguage());
+        request.getTitle(), request.getContent(), request.getLanguage());
   }
 
   public RegisterReadingResponse toResponse(Reading reading) {
@@ -44,13 +39,5 @@ public class RegisterReadingSoapMapper {
     }
 
     return response;
-  }
-
-  private UUID parseUserId(String userId) {
-    try {
-      return UUID.fromString(userId);
-    } catch (IllegalArgumentException exception) {
-      throw new InvalidSoapRequestException("Invalid userId format: " + userId, exception);
-    }
   }
 }

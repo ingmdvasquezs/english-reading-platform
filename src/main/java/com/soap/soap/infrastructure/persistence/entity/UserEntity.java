@@ -22,4 +22,7 @@ public class UserEntity extends CreatedAtEntity {
 
   @Column(nullable = false, length = 150)
   private String email;
+
+  @Column(name = "password_hash", nullable = false, length = 100)
+  private String passwordHash;
 }

@@ -1,6 +1,5 @@
 package com.soap.soap.infrastructure.persistence.repository;
 
-import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.infrastructure.persistence.entity.UserVocabularyEntity;
 import java.util.Collection;
 import java.util.List;
@@ -23,17 +22,15 @@ public interface JpaUserVocabularyRepository extends JpaRepository<UserVocabular
 
   @Query(
       """
-      select w.normalizedValue
+      select uv
       from UserVocabularyEntity uv
       join uv.word w
       where uv.user.id = :userId
-        and uv.status = :status
         and w.language = :language
         and w.normalizedValue in :normalizedValues
       """)
-  List<String> findNormalizedValues(
+  List<UserVocabularyEntity> findByNormalizedValues(
       @Param("userId") UUID userId,
-      @Param("status") VocabularyStatus status,
       @Param("language") String language,
       @Param("normalizedValues") Collection<String> normalizedValues);
 }

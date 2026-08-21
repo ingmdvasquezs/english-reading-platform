@@ -15,3 +15,8 @@ spring:
 
   webservices:
     path: /ws
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: ${JWT_EXPIRATION:3600s}

@@ -8,9 +8,10 @@ import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.infrastructure.persistence.mapper.UserVocabularyEntityMapper;
 import com.soap.soap.infrastructure.persistence.repository.JpaUserVocabularyRepository;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,11 +44,12 @@ public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositor
 
   @Override
   @Transactional(readOnly = true)
-  public Set<String> findKnownNormalizedValues(
+  public Map<String, VocabularyStatus> findStatusesByNormalizedValues(
       UUID userId, String language, Collection<String> normalizedValues) {
-    return Set.copyOf(
-        repository.findNormalizedValues(
-            userId, VocabularyStatus.KNOWN, language, normalizedValues));
+    return repository.findByNormalizedValues(userId, language, normalizedValues).stream()
+        .collect(
+            Collectors.toUnmodifiableMap(
+                entry -> entry.getWord().getNormalizedValue(), entry -> entry.getStatus()));
   }
 
   @Override

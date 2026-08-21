@@ -5,6 +5,7 @@ import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.port.in.AddWordToVocabularyPort;
+import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.service.LanguageNormalizer;
@@ -27,6 +28,7 @@ public class AddWordToVocabularyUseCase implements AddWordToVocabularyPort {
   private final LanguageNormalizer languages;
   private final WordResolver wordResolver;
   private final Clock clock;
+  private final CurrentUserPort currentUser;
 
   @Override
   @Transactional
@@ -34,7 +36,7 @@ public class AddWordToVocabularyUseCase implements AddWordToVocabularyPort {
     if (command == null) {
       throw new InvalidApplicationArgumentException("Command must not be null");
     }
-    var userId = command.userId();
+    var userId = currentUser.requireUserId();
     var status = command.initialStatus();
     var language = languages.normalize(command.language());
     var normalizedValue = wordProcessor.normalize(command.word());

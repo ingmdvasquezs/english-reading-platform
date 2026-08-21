@@ -14,6 +14,14 @@ import org.junit.jupiter.api.Test;
 class UserVocabularyTest {
 
   private final User user = new User(UUID.randomUUID(), "Ada", "ada@example.com");
+
+  @Test
+  void userStringRepresentationNeverExposesThePasswordHash() {
+    var securedUser =
+        new User(UUID.randomUUID(), "Ada", "ada@example.com", "super-secret-hash", null);
+    assertThat(securedUser.toString()).doesNotContain("super-secret-hash", "passwordHash");
+  }
+
   private final Word word = new Word(UUID.randomUUID(), "hello", "en");
   private final LocalDateTime firstSeenAt = LocalDateTime.parse("2026-08-18T12:00:00");
   private final Clock clock = Clock.fixed(Instant.parse("2026-08-19T12:00:00Z"), ZoneOffset.UTC);
@@ -62,5 +70,18 @@ class UserVocabularyTest {
 
     assertThat(vocabulary.changeStatus(VocabularyStatus.KNOWN, clock).learnedAt())
         .isEqualTo(learnedAt);
+  }
+
+  @Test
+  void ignoredIsExplicitlyDifferentFromKnownAndHasNoLearnedDate() {
+    var known =
+        new UserVocabulary(
+            UUID.randomUUID(), user, word, VocabularyStatus.KNOWN, firstSeenAt, firstSeenAt);
+
+    var ignored = known.changeStatus(VocabularyStatus.IGNORED, clock);
+
+    assertThat(ignored.status()).isEqualTo(VocabularyStatus.IGNORED);
+    assertThat(ignored.status()).isNotEqualTo(VocabularyStatus.KNOWN);
+    assertThat(ignored.learnedAt()).isNull();
   }
 }

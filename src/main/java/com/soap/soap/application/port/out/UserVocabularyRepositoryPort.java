@@ -4,8 +4,8 @@ import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.domain.model.UserVocabulary;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 public interface UserVocabularyRepositoryPort {
@@ -14,7 +14,7 @@ public interface UserVocabularyRepositoryPort {
 
   PageResult<UserVocabulary> findByUserId(UUID userId, PageRequest pageRequest);
 
-  Set<String> findKnownNormalizedValues(
+  Map<String, com.soap.soap.domain.model.VocabularyStatus> findStatusesByNormalizedValues(
       UUID userId, String language, Collection<String> normalizedValues);
 
   UserVocabulary save(UserVocabulary vocabulary);

@@ -1,5 +1,7 @@
 package com.soap.soap.infrastructure.soap.endpoint;
 
+import static com.soap.soap.infrastructure.soap.contract.ReadingsSoapContract.NAMESPACE_URI;
+
 import com.soap.soap.application.port.in.RegisterReadingPort;
 import com.soap.soap.infrastructure.soap.generated.RegisterReadingRequest;
 import com.soap.soap.infrastructure.soap.generated.RegisterReadingResponse;
@@ -13,8 +15,6 @@ import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
 @Endpoint
 @RequiredArgsConstructor
 public class RegisterReadingEndpoint {
-
-  private static final String NAMESPACE_URI = "http://soap.com/english-reading/readings";
 
   private final RegisterReadingPort registerReadingPort;
   private final RegisterReadingSoapMapper mapper;

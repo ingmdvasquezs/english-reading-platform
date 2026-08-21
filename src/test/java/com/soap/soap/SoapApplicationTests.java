@@ -1,6 +1,8 @@
 package com.soap.soap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.ws.test.server.RequestCreators.withPayload;
+import static org.springframework.ws.test.server.ResponseMatchers.clientOrSenderFault;
 
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
@@ -12,18 +14,27 @@ import com.soap.soap.domain.model.User;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.domain.model.Word;
+import com.soap.soap.infrastructure.soap.resolver.SoapExceptionResolver;
+import java.io.StringReader;
 import java.time.LocalDateTime;
+import javax.xml.transform.stream.StreamSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.ApplicationContext;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.ws.context.DefaultMessageContext;
+import org.springframework.ws.soap.SoapMessage;
+import org.springframework.ws.soap.SoapVersion;
+import org.springframework.ws.soap.saaj.SaajSoapMessageFactory;
+import org.springframework.ws.test.server.MockWebServiceClient;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest
+@SpringBootTest(properties = "security.jwt.secret=test-only-secret-with-at-least-32-bytes")
 @Testcontainers(disabledWithoutDocker = true)
 class SoapApplicationTests {
 
@@ -34,12 +45,108 @@ class SoapApplicationTests {
   @Autowired private WordRepositoryPort words;
   @Autowired private ReadingRepositoryPort readings;
   @Autowired private UserVocabularyRepositoryPort vocabulary;
+  @Autowired private ApplicationContext applicationContext;
+  @Autowired private SoapExceptionResolver soapExceptionResolver;
 
   private User user;
 
+  @Test
+  void protectedSoapOperationWithoutAuthenticationReturnsAClientFault() {
+    var payload =
+        """
+        <getReadingRequest xmlns="http://soap.com/english-reading/readings">
+          <readingId>00000000-0000-0000-0000-000000000001</readingId>
+        </getReadingRequest>
+        """;
+    MockWebServiceClient.createClient(applicationContext)
+        .sendRequest(withPayload(new StreamSource(new StringReader(payload))))
+        .andExpect(clientOrSenderFault());
+  }
+
+  @Test
+  void vocabularyPageSizeZeroReturnsAClientFault() {
+    assertVocabularyPaginationClientFault(0, 0);
+  }
+
+  @Test
+  void vocabularyPageSizeAboveMaximumReturnsAClientFault() {
+    assertVocabularyPaginationClientFault(0, 101);
+  }
+
+  @Test
+  void negativeVocabularyPageReturnsAClientFault() {
+    assertVocabularyPaginationClientFault(-1, 10);
+  }
+
+  private void assertVocabularyPaginationClientFault(int page, int size) {
+    var payload =
+        """
+        <listUserVocabularyRequest xmlns="http://soap.com/english-reading/readings">
+          <page>%d</page>
+          <size>%d</size>
+        </listUserVocabularyRequest>
+        """
+            .formatted(page, size);
+    MockWebServiceClient.createClient(applicationContext)
+        .sendRequest(withPayload(new StreamSource(new StringReader(payload))))
+        .andExpect(clientOrSenderFault());
+  }
+
+  @Test
+  void unexpectedExceptionsRemainServerFaults() {
+    var messageFactory = new SaajSoapMessageFactory();
+    messageFactory.afterPropertiesSet();
+    var messageContext = new DefaultMessageContext(messageFactory);
+
+    assertThat(
+            soapExceptionResolver.resolveException(
+                messageContext, null, new RuntimeException("unexpected")))
+        .isTrue();
+    var response = (SoapMessage) messageContext.getResponse();
+
+    assertThat(response.getSoapBody().getFault().getFaultCode())
+        .isEqualTo(SoapVersion.SOAP_11.getServerOrReceiverFaultName());
+  }
+
+  @Test
+  void invalidVocabularyStatusReturnsAClearClientFault() {
+    var payload =
+        """
+        <changeVocabularyStatusRequest xmlns="http://soap.com/english-reading/readings">
+          <wordId>00000000-0000-0000-0000-000000000001</wordId>
+          <status>MASTERED</status>
+        </changeVocabularyStatusRequest>
+        """;
+
+    MockWebServiceClient.createClient(applicationContext)
+        .sendRequest(withPayload(new StreamSource(new StringReader(payload))))
+        .andExpect(clientOrSenderFault("Invalid vocabulary status: MASTERED"));
+  }
+
+  @Test
+  void missingVocabularyStatusReturnsAClientFault() {
+    var payload =
+        """
+        <changeVocabularyStatusRequest xmlns="http://soap.com/english-reading/readings">
+          <wordId>00000000-0000-0000-0000-000000000001</wordId>
+        </changeVocabularyStatusRequest>
+        """;
+
+    MockWebServiceClient.createClient(applicationContext)
+        .sendRequest(withPayload(new StreamSource(new StringReader(payload))))
+        .andExpect(clientOrSenderFault("Vocabulary status must not be null"));
+  }
+
   @BeforeEach
   void createUser() {
-    user = users.save(new User(null, "Ada Lovelace", "ada@example.com"));
+    user =
+        users.save(
+            new User(
+                null,
+                "Ada Lovelace",
+                "ada-" + java.util.UUID.randomUUID() + "@example.com",
+                "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+                null));
   }
 
   @Test
@@ -91,8 +198,9 @@ class SoapApplicationTests {
     vocabulary.save(new UserVocabulary(null, user, french, VocabularyStatus.KNOWN, now, now));
 
     assertThat(
-            vocabulary.findKnownNormalizedValues(
+            vocabulary.findStatusesByNormalizedValues(
                 user.id(), "en", java.util.Set.of("hello", "world", "bonjour", "missing")))
-        .containsExactly("hello");
+        .containsExactlyInAnyOrderEntriesOf(
+            java.util.Map.of("hello", VocabularyStatus.KNOWN, "world", VocabularyStatus.LEARNING));
   }
 }

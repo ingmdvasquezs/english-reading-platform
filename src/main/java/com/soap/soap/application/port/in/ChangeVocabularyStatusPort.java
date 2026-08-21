@@ -5,5 +5,5 @@ import com.soap.soap.domain.model.VocabularyStatus;
 import java.util.UUID;
 
 public interface ChangeVocabularyStatusPort {
-  UserVocabulary changeVocabularyStatus(UUID userId, UUID wordId, VocabularyStatus status);
+  UserVocabulary changeVocabularyStatus(UUID wordId, VocabularyStatus status);
 }
