@@ -357,6 +357,24 @@ class SoapApplicationTests {
   }
 
   @Test
+  void runtimeSchemaRejectsOversizedLoginCredentialsAsClientFaults() {
+    assertSchemaClientFault(
+        """
+        <loginRequest xmlns="http://soap.com/english-reading/readings">
+          <email>%s</email><password>secret123</password>
+        </loginRequest>
+        """
+            .formatted("a".repeat(255)));
+    assertSchemaClientFault(
+        """
+        <loginRequest xmlns="http://soap.com/english-reading/readings">
+          <email>ada@example.com</email><password>%s</password>
+        </loginRequest>
+        """
+            .formatted("x".repeat(129)));
+  }
+
+  @Test
   void publicRegisterAndLoginRemainValidSoapOperations() {
     var email = "public-" + java.util.UUID.randomUUID() + "@example.com";
     var register =

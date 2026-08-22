@@ -3,6 +3,7 @@ package com.soap.soap.application.usecase;
 import com.soap.soap.application.command.LoginCommand;
 import com.soap.soap.application.exception.InvalidCredentialsException;
 import com.soap.soap.application.model.AccessToken;
+import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.port.in.LoginPort;
 import com.soap.soap.application.port.out.PasswordEncoderPort;
 import com.soap.soap.application.port.out.TokenProviderPort;
@@ -17,10 +18,15 @@ public class LoginUseCase implements LoginPort {
   private final UserRepositoryPort users;
   private final PasswordEncoderPort passwords;
   private final TokenProviderPort tokens;
+  private final InputLimits limits;
 
   @Override
   public AccessToken login(LoginCommand command) {
-    if (command == null || command.email() == null || command.password() == null)
+    if (command == null
+        || command.email() == null
+        || command.password() == null
+        || command.email().length() > limits.maxEmailCharacters()
+        || command.password().length() > limits.maxPasswordCharacters())
       throw new InvalidCredentialsException();
     var user =
         users

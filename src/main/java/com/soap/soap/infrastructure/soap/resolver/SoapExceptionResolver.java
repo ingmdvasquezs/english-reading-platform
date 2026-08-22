@@ -25,7 +25,7 @@ public class SoapExceptionResolver extends SoapFaultMappingExceptionResolver {
       sanitized.setFaultStringOrReason("Internal server error");
       return sanitized;
     }
-    LOGGER.warn("soap.fault category={} message={}", category, exception.getMessage());
+    LOGGER.warn("soap.fault category={} type={}", category, exception.getClass().getSimpleName());
     return super.getFaultDefinition(endpoint, exception);
   }
 }

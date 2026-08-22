@@ -63,7 +63,7 @@ class AuthenticationUseCasesTest {
     when(passwords.matches("secret123", "hash")).thenReturn(true);
     when(tokens.create(user)).thenReturn(token);
     assertThat(
-            new LoginUseCase(users, passwords, tokens)
+            new LoginUseCase(users, passwords, tokens, InputLimits.defaults())
                 .login(new LoginCommand("ADA@example.com", "secret123")))
         .isEqualTo(token);
   }
@@ -73,9 +73,47 @@ class AuthenticationUseCasesTest {
     when(users.findByEmail("ada@example.com")).thenReturn(Optional.empty());
     assertThatThrownBy(
             () ->
-                new LoginUseCase(users, passwords, tokens)
+                new LoginUseCase(users, passwords, tokens, InputLimits.defaults())
                     .login(new LoginCommand("ada@example.com", "wrong")))
         .isInstanceOf(InvalidCredentialsException.class);
     verifyNoInteractions(tokens);
+  }
+
+  @Test
+  void rejectsOversizedEmailBeforeRepositoryOrBcryptWork() {
+    assertThatThrownBy(
+            () ->
+                new LoginUseCase(users, passwords, tokens, InputLimits.defaults())
+                    .login(new LoginCommand("a".repeat(255), "secret123")))
+        .isInstanceOf(InvalidCredentialsException.class);
+
+    verifyNoInteractions(users, passwords, tokens);
+  }
+
+  @Test
+  void rejectsOversizedPasswordBeforeRepositoryOrBcryptWork() {
+    assertThatThrownBy(
+            () ->
+                new LoginUseCase(users, passwords, tokens, InputLimits.defaults())
+                    .login(new LoginCommand("ada@example.com", "x".repeat(129))))
+        .isInstanceOf(InvalidCredentialsException.class);
+
+    verifyNoInteractions(users, passwords, tokens);
+  }
+
+  @Test
+  void acceptsCredentialLengthsAtTheirBoundaries() {
+    var email = "a".repeat(242) + "@example.com";
+    var password = "x".repeat(128);
+    var user = new User(UUID.randomUUID(), "Ada", email, "hash", LocalDateTime.now());
+    var token = new AccessToken("jwt", "Bearer", 3600);
+    when(users.findByEmail(email)).thenReturn(Optional.of(user));
+    when(passwords.matches(password, "hash")).thenReturn(true);
+    when(tokens.create(user)).thenReturn(token);
+
+    assertThat(
+            new LoginUseCase(users, passwords, tokens, InputLimits.defaults())
+                .login(new LoginCommand(email, password)))
+        .isEqualTo(token);
   }
 }

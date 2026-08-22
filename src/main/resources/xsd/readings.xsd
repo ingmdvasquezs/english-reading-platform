@@ -46,8 +46,8 @@
     </xs:element>
     <xs:element name="loginRequest">
         <xs:complexType><xs:sequence>
-            <xs:element name="email" type="xs:string"/>
-            <xs:element name="password" type="xs:string"/>
+            <xs:element name="email" type="tns:emailType"/>
+            <xs:element name="password" type="tns:passwordType"/>
         </xs:sequence></xs:complexType>
     </xs:element>
     <xs:element name="loginResponse">
