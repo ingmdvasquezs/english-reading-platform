@@ -11,6 +11,7 @@ import com.soap.soap.application.exception.ReadingNotFoundException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.exception.VocabularyEntryNotFoundException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
+import com.soap.soap.application.exception.WordNotFoundException;
 import com.soap.soap.domain.exception.InvalidVocabularyStateException;
 import com.soap.soap.infrastructure.soap.exception.InvalidSoapRequestException;
 import com.soap.soap.infrastructure.soap.resolver.SoapExceptionResolver;
@@ -67,6 +68,8 @@ public class WebServiceConfiguration {
 
     mappings.setProperty(
         WordAlreadyInVocabularyException.class.getName(), SoapFaultDefinition.CLIENT.toString());
+    mappings.setProperty(
+        WordNotFoundException.class.getName(), SoapFaultDefinition.CLIENT.toString());
 
     mappings.setProperty(
         InvalidVocabularyStateException.class.getName(), SoapFaultDefinition.CLIENT.toString());

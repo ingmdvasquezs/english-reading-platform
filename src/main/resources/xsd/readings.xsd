@@ -64,6 +64,23 @@
         </xs:restriction>
     </xs:simpleType>
 
+    <xs:simpleType name="readerTokenTypeType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="WORD"/>
+            <xs:enumeration value="PUNCTUATION"/>
+            <xs:enumeration value="WHITESPACE"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="readerTokenType">
+        <xs:sequence>
+            <xs:element name="value" type="xs:string"/>
+            <xs:element name="normalizedValue" type="xs:string" minOccurs="0"/>
+            <xs:element name="type" type="tns:readerTokenTypeType"/>
+            <xs:element name="status" type="tns:vocabularyStatusType" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
     <xs:complexType name="pageType">
         <xs:sequence>
             <xs:element name="page" type="xs:int"/>
@@ -104,6 +121,20 @@
     <xs:element name="getReadingResponse">
         <xs:complexType><xs:sequence>
             <xs:element name="reading" type="tns:readingType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="getReadingReaderDataRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="getReadingReaderDataResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="language" type="xs:string"/>
+            <xs:element name="tokens" type="tns:readerTokenType" minOccurs="0" maxOccurs="unbounded"/>
         </xs:sequence></xs:complexType>
     </xs:element>
 
@@ -202,6 +233,32 @@
             <xs:element name="confirmedWordCount" type="xs:int"/>
             <xs:element name="knownWords" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
             <xs:element name="markedPercentage" type="xs:double"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="lookupWordRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="word" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="lookupWordResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="word" type="xs:string"/>
+            <xs:element name="normalizedWord" type="xs:string"/>
+            <xs:element name="translation" type="xs:string"/>
+            <xs:element name="phonetic" type="xs:string" minOccurs="0"/>
+            <xs:element name="audioUrl" type="xs:string" minOccurs="0"/>
+            <xs:element name="meanings" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType><xs:sequence>
+                    <xs:element name="partOfSpeech" type="xs:string"/>
+                    <xs:element name="definitions" minOccurs="0" maxOccurs="unbounded">
+                        <xs:complexType><xs:sequence>
+                            <xs:element name="definition" type="xs:string"/>
+                            <xs:element name="example" type="xs:string" minOccurs="0"/>
+                        </xs:sequence></xs:complexType>
+                    </xs:element>
+                </xs:sequence></xs:complexType>
+            </xs:element>
         </xs:sequence></xs:complexType>
     </xs:element>
 

@@ -31,5 +31,9 @@ public class TextWordProcessor {
     return List.copyOf(tokens);
   }
 
+  Pattern wordPattern() {
+    return WORD_PATTERN;
+  }
+
   public record Token(String value, String normalizedValue) {}
 }

@@ -3,9 +3,15 @@ package com.soap.soap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.ws.test.server.RequestCreators.withPayload;
 import static org.springframework.ws.test.server.ResponseMatchers.clientOrSenderFault;
+import static org.springframework.ws.test.server.ResponseMatchers.noFault;
+import static org.springframework.ws.test.server.ResponseMatchers.xpath;
 
+import com.soap.soap.application.model.DictionaryEntry;
 import com.soap.soap.application.model.PageRequest;
+import com.soap.soap.application.model.WordMeaning;
+import com.soap.soap.application.port.out.DictionaryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
+import com.soap.soap.application.port.out.TranslationPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.port.out.WordRepositoryPort;
@@ -16,7 +22,10 @@ import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.domain.model.Word;
 import com.soap.soap.infrastructure.soap.resolver.SoapExceptionResolver;
 import java.io.StringReader;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import javax.xml.transform.stream.StreamSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +33,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.ApplicationContext;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ws.context.DefaultMessageContext;
 import org.springframework.ws.soap.SoapMessage;
@@ -47,6 +60,8 @@ class SoapApplicationTests {
   @Autowired private UserVocabularyRepositoryPort vocabulary;
   @Autowired private ApplicationContext applicationContext;
   @Autowired private SoapExceptionResolver soapExceptionResolver;
+  @MockitoBean private DictionaryPort dictionaryPort;
+  @MockitoBean private TranslationPort translationPort;
 
   private User user;
 
@@ -135,6 +150,50 @@ class SoapApplicationTests {
     MockWebServiceClient.createClient(applicationContext)
         .sendRequest(withPayload(new StreamSource(new StringReader(payload))))
         .andExpect(clientOrSenderFault("Vocabulary status must not be null"));
+  }
+
+  @Test
+  void lookupWordWithoutJwtReturnsAClientFault() {
+    SecurityContextHolder.clearContext();
+    MockWebServiceClient.createClient(applicationContext)
+        .sendRequest(withPayload(new StreamSource(new StringReader(lookupWordPayload()))))
+        .andExpect(clientOrSenderFault("Authentication is required"));
+  }
+
+  @Test
+  void lookupWordWithAValidJwtPrincipalReturnsTheSoapResponse() {
+    var now = Instant.now();
+    var jwt =
+        new Jwt(
+            "token",
+            now,
+            now.plusSeconds(60),
+            Map.of("alg", "none"),
+            Map.of("sub", user.id().toString()));
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken(jwt, jwt, List.of()));
+    org.mockito.Mockito.when(dictionaryPort.lookup("bridge", "en"))
+        .thenReturn(new DictionaryEntry("bridge", null, null, List.<WordMeaning>of()));
+    org.mockito.Mockito.when(translationPort.translate("bridge", "en", "es")).thenReturn("puente");
+
+    try {
+      MockWebServiceClient.createClient(applicationContext)
+          .sendRequest(withPayload(new StreamSource(new StringReader(lookupWordPayload()))))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("/*[local-name()='lookupWordResponse']/*[local-name()='translation']")
+                  .evaluatesTo("puente"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  private String lookupWordPayload() {
+    return """
+        <lookupWordRequest xmlns="http://soap.com/english-reading/readings">
+          <word>bridge</word>
+        </lookupWordRequest>
+        """;
   }
 
   @BeforeEach

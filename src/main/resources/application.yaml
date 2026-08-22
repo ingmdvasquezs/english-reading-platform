@@ -20,3 +20,16 @@ security:
   jwt:
     secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:3600s}
+
+dictionary:
+  free:
+    base-url: ${DICTIONARY_FREE_BASE_URL:https://api.dictionaryapi.dev}
+    connect-timeout: ${DICTIONARY_FREE_CONNECT_TIMEOUT:2s}
+    read-timeout: ${DICTIONARY_FREE_READ_TIMEOUT:3s}
+
+translation:
+  libre:
+    base-url: ${LIBRETRANSLATE_BASE_URL:http://localhost:5000}
+    api-key: ${LIBRETRANSLATE_API_KEY:}
+    connect-timeout: ${LIBRETRANSLATE_CONNECT_TIMEOUT:2s}
+    read-timeout: ${LIBRETRANSLATE_READ_TIMEOUT:3s}
