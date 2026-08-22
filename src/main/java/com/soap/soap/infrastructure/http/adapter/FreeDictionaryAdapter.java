@@ -6,10 +6,12 @@ import com.soap.soap.application.model.DictionaryEntry;
 import com.soap.soap.application.model.WordDefinition;
 import com.soap.soap.application.model.WordMeaning;
 import com.soap.soap.application.port.out.DictionaryPort;
+import com.soap.soap.infrastructure.http.configuration.ExternalProviderLimits;
 import com.soap.soap.infrastructure.http.dto.FreeDictionaryResponse;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -21,9 +23,17 @@ import org.springframework.web.client.RestClientResponseException;
 public class FreeDictionaryAdapter implements DictionaryPort {
   private static final int MAX_DEFINITIONS_PER_MEANING = 3;
   private final RestClient client;
+  private final ExternalProviderLimits limits;
 
   public FreeDictionaryAdapter(@Qualifier("freeDictionaryRestClient") RestClient client) {
+    this(client, ExternalProviderLimits.defaults());
+  }
+
+  @Autowired
+  public FreeDictionaryAdapter(
+      @Qualifier("freeDictionaryRestClient") RestClient client, ExternalProviderLimits limits) {
     this.client = client;
+    this.limits = limits;
   }
 
   @Override
@@ -35,7 +45,9 @@ public class FreeDictionaryAdapter implements DictionaryPort {
               .uri("/api/v2/entries/{language}/{word}", language, word)
               .retrieve()
               .body(FreeDictionaryResponse[].class);
-      if (responses == null || responses.length == 0) {
+      if (responses == null
+          || responses.length == 0
+          || responses.length > limits.maximumEntries()) {
         throw providerFailure(null);
       }
       return map(responses);
@@ -60,10 +72,16 @@ public class FreeDictionaryAdapter implements DictionaryPort {
     if (isBlank(first.word())) {
       throw providerFailure(null);
     }
-    var meanings =
+    var allMeanings =
         Arrays.stream(responses)
             .filter(Objects::nonNull)
             .flatMap(response -> safe(response.meanings()).stream())
+            .toList();
+    if (allMeanings.size() > limits.maximumMeanings()) {
+      throw providerFailure(null);
+    }
+    var meanings =
+        allMeanings.stream()
             .filter(meaning -> !isBlank(meaning.partOfSpeech()))
             .map(
                 meaning ->
@@ -75,7 +93,12 @@ public class FreeDictionaryAdapter implements DictionaryPort {
                             .map(
                                 definition ->
                                     new WordDefinition(
-                                        definition.definition(), blankToNull(definition.example())))
+                                        checked(
+                                            definition.definition(),
+                                            limits.maximumDefinitionCharacters()),
+                                        checkedNullable(
+                                            definition.example(),
+                                            limits.maximumExampleCharacters())))
                             .toList()))
             .filter(meaning -> !meaning.definitions().isEmpty())
             .toList();
@@ -84,7 +107,21 @@ public class FreeDictionaryAdapter implements DictionaryPort {
     if (audio != null && audio.startsWith("//")) {
       audio = "https:" + audio;
     }
+    phonetic = checkedNullable(phonetic, limits.maximumPhoneticCharacters());
+    audio = checkedNullable(audio, limits.maximumAudioUrlCharacters());
     return new DictionaryEntry(first.word(), phonetic, audio, meanings);
+  }
+
+  private String checked(String value, int maximumCharacters) {
+    if (value.length() > maximumCharacters) {
+      throw providerFailure(null);
+    }
+    return value;
+  }
+
+  private String checkedNullable(String value, int maximumCharacters) {
+    var normalized = blankToNull(value);
+    return normalized == null ? null : checked(normalized, maximumCharacters);
   }
 
   private List<String> phoneticTexts(FreeDictionaryResponse[] responses) {

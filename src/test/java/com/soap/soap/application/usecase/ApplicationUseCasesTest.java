@@ -107,7 +107,7 @@ class ApplicationUseCasesTest {
   void addsANormalizedKnownWordAndSetsLearnedAt() {
     var word = new Word(UUID.randomUUID(), "don't", "en");
     when(users.findById(user.id())).thenReturn(Optional.of(user));
-    when(words.findByNormalizedValueAndLanguage("don't", "en")).thenReturn(Optional.of(word));
+    when(words.resolve("don't", "en")).thenReturn(word);
     when(vocabulary.findByUserIdAndWordId(user.id(), word.id())).thenReturn(Optional.empty());
     when(vocabulary.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     var useCase =
@@ -136,7 +136,7 @@ class ApplicationUseCasesTest {
         new UserVocabulary(
             UUID.randomUUID(), user, word, VocabularyStatus.NEW, LocalDateTime.now(CLOCK), null);
     when(users.findById(user.id())).thenReturn(Optional.of(user));
-    when(words.findByNormalizedValueAndLanguage("hello", "en")).thenReturn(Optional.of(word));
+    when(words.resolve("hello", "en")).thenReturn(word);
     when(vocabulary.findByUserIdAndWordId(user.id(), word.id())).thenReturn(Optional.of(existing));
 
     assertThatThrownBy(

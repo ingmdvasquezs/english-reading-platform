@@ -7,6 +7,8 @@ import static org.springframework.ws.test.server.ResponseMatchers.clientOrSender
 import static org.springframework.ws.test.server.ResponseMatchers.noFault;
 import static org.springframework.ws.test.server.ResponseMatchers.xpath;
 
+import com.soap.soap.application.exception.ConcurrentVocabularyModificationException;
+import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.DictionaryEntry;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.WordMeaning;
@@ -21,6 +23,7 @@ import com.soap.soap.domain.model.User;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.domain.model.Word;
+import com.soap.soap.infrastructure.persistence.repository.JpaWordRepository;
 import com.soap.soap.infrastructure.soap.resolver.SoapExceptionResolver;
 import java.io.ByteArrayInputStream;
 import java.io.StringReader;
@@ -33,6 +36,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import javax.xml.transform.stream.StreamSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +72,7 @@ class SoapApplicationTests {
 
   @Autowired private UserRepositoryPort users;
   @Autowired private WordRepositoryPort words;
+  @Autowired private JpaWordRepository jpaWords;
   @Autowired private ReadingRepositoryPort readings;
   @Autowired private UserVocabularyRepositoryPort vocabulary;
   @Autowired private ApplicationContext applicationContext;
@@ -76,6 +82,58 @@ class SoapApplicationTests {
   @MockitoBean private TranslationPort translationPort;
 
   private User user;
+
+  @Test
+  void concurrentWordResolutionReturnsTheSingleDatabaseWinner() throws Exception {
+    var value = "concurrent-" + java.util.UUID.randomUUID();
+    var results =
+        runConcurrently(() -> words.resolve(value, "en"), () -> words.resolve(value, "en"));
+
+    assertThat(results.first()).isEqualTo(results.second());
+    assertThat(jpaWords.countByNormalizedValueAndLanguage(value, "en")).isEqualTo(1);
+  }
+
+  @Test
+  void concurrentVocabularyInsertTranslatesTheLosingUniqueConstraint() throws Exception {
+    var word = words.resolve("vocabulary-race-" + java.util.UUID.randomUUID(), "en");
+    var now = LocalDateTime.now();
+    var first = new UserVocabulary(null, user, word, VocabularyStatus.NEW, now, null);
+    var second = new UserVocabulary(null, user, word, VocabularyStatus.NEW, now, null);
+
+    var outcomes =
+        runConcurrentlyCapturing(() -> vocabulary.save(first), () -> vocabulary.save(second));
+
+    assertThat(outcomes).filteredOn(UserVocabulary.class::isInstance).hasSize(1);
+    assertThat(outcomes).filteredOn(WordAlreadyInVocabularyException.class::isInstance).hasSize(1);
+    assertThat(vocabulary.findByUserIdAndWordId(user.id(), word.id())).isPresent();
+  }
+
+  @Test
+  void concurrentVocabularyUpdatesDetectTheLostUpdate() throws Exception {
+    var word = words.resolve("status-race-" + java.util.UUID.randomUUID(), "en");
+    var saved =
+        vocabulary.save(
+            new UserVocabulary(null, user, word, VocabularyStatus.NEW, LocalDateTime.now(), null));
+    var first = vocabulary.findByUserIdAndWordId(user.id(), word.id()).orElseThrow();
+    var second = vocabulary.findByUserIdAndWordId(user.id(), word.id()).orElseThrow();
+    assertThat(first.version()).isEqualTo(saved.version());
+
+    var outcomes =
+        runConcurrentlyCapturing(
+            () ->
+                vocabulary.save(
+                    first.changeStatus(VocabularyStatus.LEARNING, java.time.Clock.systemUTC())),
+            () ->
+                vocabulary.save(
+                    second.changeStatus(VocabularyStatus.IGNORED, java.time.Clock.systemUTC())));
+
+    assertThat(outcomes).filteredOn(UserVocabulary.class::isInstance).hasSize(1);
+    assertThat(outcomes)
+        .filteredOn(ConcurrentVocabularyModificationException.class::isInstance)
+        .hasSize(1);
+    assertThat(vocabulary.findByUserIdAndWordId(user.id(), word.id()).orElseThrow().version())
+        .isEqualTo(saved.version() + 1);
+  }
 
   @Test
   void oversizedAuthenticatedRegisterReadingReturnsHttp413BeforeSecurityOrSoapDispatch()
@@ -179,6 +237,24 @@ class SoapApplicationTests {
     assertThat(response.getSoapBody().getFault().getFaultStringOrReason())
         .isEqualTo("Internal server error")
         .doesNotContain("jdbc", "password", "secret");
+  }
+
+  @Test
+  void optimisticLockConflictIsAControlledClientFault() {
+    var messageFactory = new SaajSoapMessageFactory();
+    messageFactory.afterPropertiesSet();
+    var messageContext = new DefaultMessageContext(messageFactory);
+
+    assertThat(
+            soapExceptionResolver.resolveException(
+                messageContext, null, new ConcurrentVocabularyModificationException()))
+        .isTrue();
+    var response = (SoapMessage) messageContext.getResponse();
+
+    assertThat(response.getSoapBody().getFault().getFaultCode())
+        .isEqualTo(SoapVersion.SOAP_11.getClientOrSenderFaultName());
+    assertThat(response.getSoapBody().getFault().getFaultStringOrReason())
+        .isEqualTo("Vocabulary entry was modified concurrently");
   }
 
   @Test
@@ -309,6 +385,60 @@ class SoapApplicationTests {
     }
     return HttpClient.newHttpClient()
         .send(request.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+  }
+
+  private <T> ConcurrentResults<T> runConcurrently(
+      ThrowingSupplier<T> first, ThrowingSupplier<T> second) throws Exception {
+    var outcomes = runConcurrentlyCapturing(first, second);
+    if (outcomes.get(0) instanceof Throwable throwable) {
+      throw new AssertionError("First concurrent operation failed", throwable);
+    }
+    if (outcomes.get(1) instanceof Throwable throwable) {
+      throw new AssertionError("Second concurrent operation failed", throwable);
+    }
+    @SuppressWarnings("unchecked")
+    var firstResult = (T) outcomes.get(0);
+    @SuppressWarnings("unchecked")
+    var secondResult = (T) outcomes.get(1);
+    return new ConcurrentResults<>(firstResult, secondResult);
+  }
+
+  private java.util.List<Object> runConcurrentlyCapturing(
+      ThrowingSupplier<?> first, ThrowingSupplier<?> second) throws Exception {
+    var ready = new CountDownLatch(2);
+    var start = new CountDownLatch(1);
+    var executor = Executors.newFixedThreadPool(2);
+    try {
+      java.util.concurrent.Callable<Object> firstTask = concurrentTask(first, ready, start);
+      java.util.concurrent.Callable<Object> secondTask = concurrentTask(second, ready, start);
+      var firstFuture = executor.submit(firstTask);
+      var secondFuture = executor.submit(secondTask);
+      assertThat(ready.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+      return java.util.List.of(firstFuture.get(), secondFuture.get());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private java.util.concurrent.Callable<Object> concurrentTask(
+      ThrowingSupplier<?> operation, CountDownLatch ready, CountDownLatch start) {
+    return () -> {
+      ready.countDown();
+      start.await();
+      try {
+        return operation.get();
+      } catch (Throwable throwable) {
+        return throwable;
+      }
+    };
+  }
+
+  private record ConcurrentResults<T>(T first, T second) {}
+
+  @FunctionalInterface
+  private interface ThrowingSupplier<T> {
+    T get() throws Exception;
   }
 
   @Test

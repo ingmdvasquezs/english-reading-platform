@@ -1,6 +1,7 @@
 package com.soap.soap.infrastructure.soap.resolver;
 
 import com.soap.soap.application.exception.AuthenticationRequiredException;
+import com.soap.soap.application.exception.ConcurrentVocabularyModificationException;
 import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.InvalidCredentialsException;
@@ -30,6 +31,7 @@ public class SoapExceptionResolver extends SoapFaultMappingExceptionResolver {
   private boolean isControlledClientException(Exception exception) {
     return exception instanceof AuthenticationRequiredException
         || exception instanceof EmailAlreadyRegisteredException
+        || exception instanceof ConcurrentVocabularyModificationException
         || exception instanceof InvalidApplicationArgumentException
         || exception instanceof InvalidCredentialsException
         || exception instanceof ReadingAccessDeniedException

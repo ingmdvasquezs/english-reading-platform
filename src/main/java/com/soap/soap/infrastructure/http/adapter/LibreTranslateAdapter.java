@@ -2,8 +2,10 @@ package com.soap.soap.infrastructure.http.adapter;
 
 import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.port.out.TranslationPort;
+import com.soap.soap.infrastructure.http.configuration.ExternalProviderLimits;
 import com.soap.soap.infrastructure.http.dto.LibreTranslateResponse;
 import java.util.LinkedHashMap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -14,12 +16,22 @@ import org.springframework.web.client.RestClientException;
 public class LibreTranslateAdapter implements TranslationPort {
   private final RestClient client;
   private final String apiKey;
+  private final ExternalProviderLimits limits;
 
   public LibreTranslateAdapter(
       @Qualifier("libreTranslateRestClient") RestClient client,
       @Value("${translation.libre.api-key:}") String apiKey) {
+    this(client, apiKey, ExternalProviderLimits.defaults());
+  }
+
+  @Autowired
+  public LibreTranslateAdapter(
+      @Qualifier("libreTranslateRestClient") RestClient client,
+      @Value("${translation.libre.api-key:}") String apiKey,
+      ExternalProviderLimits limits) {
     this.client = client;
     this.apiKey = apiKey;
+    this.limits = limits;
   }
 
   @Override
@@ -37,7 +49,8 @@ public class LibreTranslateAdapter implements TranslationPort {
           client.post().uri("/translate").body(body).retrieve().body(LibreTranslateResponse.class);
       if (response == null
           || response.translatedText() == null
-          || response.translatedText().isBlank()) {
+          || response.translatedText().isBlank()
+          || response.translatedText().length() > limits.maximumTranslationCharacters()) {
         throw providerFailure(null);
       }
       return response.translatedText();

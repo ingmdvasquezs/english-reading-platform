@@ -3,6 +3,7 @@ package com.soap.soap.application.usecase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,6 +27,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,16 +70,16 @@ class InitialVocabularyTestUseCasesTest {
   void persistsOnlySelectedWordsAsKnownAndDeduplicatesSelections() {
     var hello = new Word(UUID.randomUUID(), "hello", "en");
     prepareCompletion();
-    when(words.findByNormalizedValueAndLanguage("hello", "en")).thenReturn(Optional.of(hello));
-    when(vocabulary.findByUserIdAndWordId(userId, hello.id())).thenReturn(Optional.empty());
-    when(vocabulary.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    when(words.resolveAll(any(), eq("en"))).thenReturn(Map.of("hello", hello));
+    when(vocabulary.findByUserIdAndWordIds(eq(userId), any())).thenReturn(Map.of());
 
     var result = useCase().completeInitialVocabularyTest("v1", List.of("Hello", "hello"));
 
     assertThat(result.confirmedWordCount()).isEqualTo(1);
     assertThat(result.knownWords()).containsExactly("hello");
-    verify(vocabulary).save(any(UserVocabulary.class));
-    verify(words, never()).findByNormalizedValueAndLanguage("world", "en");
+    verify(vocabulary).saveAll(any());
+    verify(vocabulary, never()).findByUserIdAndWordId(any(), any());
+    verify(words).resolveAll(any(), eq("en"));
   }
 
   @Test
@@ -86,8 +88,8 @@ class InitialVocabularyTestUseCasesTest {
 
     assertThatThrownBy(() -> useCase().completeInitialVocabularyTest("v1", List.of("injected")))
         .isInstanceOf(InvalidApplicationArgumentException.class);
-    verify(vocabulary, never()).save(any());
-    verify(words, never()).findByNormalizedValueAndLanguage(any(), any());
+    verify(vocabulary, never()).saveAll(any());
+    verify(words, never()).resolveAll(any(), any());
   }
 
   @Test
@@ -102,13 +104,59 @@ class InitialVocabularyTestUseCasesTest {
             LocalDateTime.now(clock),
             null);
     prepareCompletion();
-    when(words.findByNormalizedValueAndLanguage("hello", "en")).thenReturn(Optional.of(hello));
-    when(vocabulary.findByUserIdAndWordId(userId, hello.id())).thenReturn(Optional.of(ignored));
+    when(words.resolveAll(any(), eq("en"))).thenReturn(Map.of("hello", hello));
+    when(vocabulary.findByUserIdAndWordIds(eq(userId), any()))
+        .thenReturn(Map.of(hello.id(), ignored));
 
     var result = useCase().completeInitialVocabularyTest("v1", List.of("hello"));
 
     assertThat(result.confirmedWordCount()).isZero();
-    verify(vocabulary, never()).save(any());
+    verify(vocabulary, never()).saveAll(any());
+  }
+
+  @Test
+  void knownWordIsIdempotentAndUsesOnlyBatchRepositoryOperations() {
+    var hello = new Word(UUID.randomUUID(), "hello", "en");
+    var known =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            hello,
+            VocabularyStatus.KNOWN,
+            LocalDateTime.now(clock),
+            LocalDateTime.now(clock));
+    prepareCompletion();
+    when(words.resolveAll(any(), eq("en"))).thenReturn(Map.of("hello", hello));
+    when(vocabulary.findByUserIdAndWordIds(eq(userId), any()))
+        .thenReturn(Map.of(hello.id(), known));
+
+    var result = useCase().completeInitialVocabularyTest("v1", List.of("hello"));
+
+    assertThat(result.knownWords()).containsExactly("hello");
+    verify(vocabulary, never()).saveAll(any());
+    verify(vocabulary, never()).findByUserIdAndWordId(any(), any());
+  }
+
+  @Test
+  void processesTheMaximumSelectionWithConstantBatchCalls() {
+    var values = java.util.stream.IntStream.range(0, 100).mapToObj(i -> "word" + i).toList();
+    var resolved =
+        values.stream()
+            .collect(
+                java.util.stream.Collectors.toMap(
+                    value -> value, value -> new Word(UUID.randomUUID(), value, "en")));
+    when(users.findById(userId)).thenReturn(Optional.of(user));
+    when(source.load()).thenReturn(new InitialVocabularyTest("large", "text", values));
+    when(words.resolveAll(any(), eq("en"))).thenReturn(resolved);
+    when(vocabulary.findByUserIdAndWordIds(eq(userId), any())).thenReturn(Map.of());
+
+    var result = useCase().completeInitialVocabularyTest("large", values);
+
+    assertThat(result.confirmedWordCount()).isEqualTo(100);
+    verify(words).resolveAll(any(), eq("en"));
+    verify(vocabulary).findByUserIdAndWordIds(eq(userId), any());
+    verify(vocabulary).saveAll(any());
+    verify(vocabulary, never()).findByUserIdAndWordId(any(), any());
   }
 
   private void prepareCompletion() {

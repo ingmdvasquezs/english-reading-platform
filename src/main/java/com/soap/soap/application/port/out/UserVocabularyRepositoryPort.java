@@ -17,5 +17,9 @@ public interface UserVocabularyRepositoryPort {
   Map<String, com.soap.soap.domain.model.VocabularyStatus> findStatusesByNormalizedValues(
       UUID userId, String language, Collection<String> normalizedValues);
 
+  Map<UUID, UserVocabulary> findByUserIdAndWordIds(UUID userId, Collection<UUID> wordIds);
+
   UserVocabulary save(UserVocabulary vocabulary);
+
+  Collection<UserVocabulary> saveAll(Collection<UserVocabulary> vocabulary);
 }

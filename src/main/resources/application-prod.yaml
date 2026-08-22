@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+
+dictionary:
+  free:
+    base-url: ${DICTIONARY_FREE_BASE_URL}
+
+translation:
+  libre:
+    base-url: ${LIBRETRANSLATE_BASE_URL}
+    api-key: ${LIBRETRANSLATE_API_KEY:}
+
+server:
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false

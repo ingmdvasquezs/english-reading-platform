@@ -12,7 +12,18 @@ public record UserVocabulary(
     Word word,
     VocabularyStatus status,
     LocalDateTime firstSeenAt,
-    LocalDateTime learnedAt) {
+    LocalDateTime learnedAt,
+    Long version) {
+
+  public UserVocabulary(
+      UUID id,
+      User user,
+      Word word,
+      VocabularyStatus status,
+      LocalDateTime firstSeenAt,
+      LocalDateTime learnedAt) {
+    this(id, user, word, status, firstSeenAt, learnedAt, null);
+  }
 
   public UserVocabulary {
     Objects.requireNonNull(user, "User must not be null");
@@ -36,6 +47,6 @@ public record UserVocabulary(
                 ? learnedAt
                 : LocalDateTime.now(clock)
             : null;
-    return new UserVocabulary(id, user, word, newStatus, firstSeenAt, newLearnedAt);
+    return new UserVocabulary(id, user, word, newStatus, firstSeenAt, newLearnedAt, version);
   }
 }

@@ -58,25 +58,35 @@ public class CompleteInitialVocabularyTestUseCase implements CompleteInitialVoca
     if (!new java.util.HashSet<>(test.selectableWords()).containsAll(selected)) {
       throw new InvalidApplicationArgumentException("Every selected word must belong to the test");
     }
+    var resolvedWords = wordResolver.resolveAll(selected, "en");
+    if (resolvedWords.size() != selected.size()) {
+      throw new IllegalStateException("Unable to resolve every onboarding word");
+    }
+    var existingByWordId =
+        vocabulary.findByUserIdAndWordIds(
+            userId, resolvedWords.values().stream().map(word -> word.id()).toList());
     var confirmed = new java.util.ArrayList<String>();
+    var changes = new java.util.ArrayList<UserVocabulary>();
+    var now = LocalDateTime.now(clock);
     for (var value : selected) {
-      var word = wordResolver.resolve(value, "en");
-      var existing = vocabulary.findByUserIdAndWordId(userId, word.id());
-      if (existing.isPresent() && existing.get().status() == VocabularyStatus.IGNORED) {
+      var word = resolvedWords.get(value);
+      var existing = existingByWordId.get(word.id());
+      if (existing != null && existing.status() == VocabularyStatus.IGNORED) {
         continue;
       }
-      if (existing.isPresent() && existing.get().status() == VocabularyStatus.KNOWN) {
+      if (existing != null && existing.status() == VocabularyStatus.KNOWN) {
         confirmed.add(value);
         continue;
       }
-      var now = LocalDateTime.now(clock);
       var entry =
-          existing
-              .map(current -> current.changeStatus(VocabularyStatus.KNOWN, clock))
-              .orElseGet(
-                  () -> new UserVocabulary(null, user, word, VocabularyStatus.KNOWN, now, now));
-      vocabulary.save(entry);
+          existing != null
+              ? existing.changeStatus(VocabularyStatus.KNOWN, clock)
+              : new UserVocabulary(null, user, word, VocabularyStatus.KNOWN, now, now);
+      changes.add(entry);
       confirmed.add(value);
+    }
+    if (!changes.isEmpty()) {
+      vocabulary.saveAll(changes);
     }
     double percentage =
         test.selectableWords().isEmpty()

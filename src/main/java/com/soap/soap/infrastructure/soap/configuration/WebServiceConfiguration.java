@@ -3,6 +3,7 @@ package com.soap.soap.infrastructure.soap.configuration;
 import static com.soap.soap.infrastructure.soap.contract.ReadingsSoapContract.NAMESPACE_URI;
 
 import com.soap.soap.application.exception.AuthenticationRequiredException;
+import com.soap.soap.application.exception.ConcurrentVocabularyModificationException;
 import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.InvalidCredentialsException;
@@ -68,6 +69,9 @@ public class WebServiceConfiguration {
 
     mappings.setProperty(
         WordAlreadyInVocabularyException.class.getName(), SoapFaultDefinition.CLIENT.toString());
+    mappings.setProperty(
+        ConcurrentVocabularyModificationException.class.getName(),
+        SoapFaultDefinition.CLIENT.toString());
     mappings.setProperty(
         WordNotFoundException.class.getName(), SoapFaultDefinition.CLIENT.toString());
 

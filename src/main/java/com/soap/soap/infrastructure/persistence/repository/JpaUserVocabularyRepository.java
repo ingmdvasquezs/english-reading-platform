@@ -18,6 +18,9 @@ public interface JpaUserVocabularyRepository extends JpaRepository<UserVocabular
   Optional<UserVocabularyEntity> findByUserIdAndWordId(UUID userId, UUID wordId);
 
   @EntityGraph(attributePaths = {"user", "word"})
+  List<UserVocabularyEntity> findByUserIdAndWordIdIn(UUID userId, Collection<UUID> wordIds);
+
+  @EntityGraph(attributePaths = {"user", "word"})
   Page<UserVocabularyEntity> findByUserIdOrderByFirstSeenAtDesc(UUID userId, Pageable pageable);
 
   @Query(

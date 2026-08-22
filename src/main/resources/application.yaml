@@ -1,14 +1,16 @@
 spring:
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/english_reading}
-    username: ${DB_USERNAME:english_user}
-    password: ${DB_PASSWORD:english_password}
-    driver-class-name: org.postgresql.Driver
+  profiles:
+    default: local
 
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+    properties:
+      hibernate:
+        jdbc.batch_size: 100
+        order_inserts: true
+        order_updates: true
 
   flyway:
     enabled: true
@@ -18,19 +20,15 @@ spring:
 
 security:
   jwt:
-    secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:3600s}
 
 dictionary:
   free:
-    base-url: ${DICTIONARY_FREE_BASE_URL:https://api.dictionaryapi.dev}
     connect-timeout: ${DICTIONARY_FREE_CONNECT_TIMEOUT:2s}
     read-timeout: ${DICTIONARY_FREE_READ_TIMEOUT:3s}
 
 translation:
   libre:
-    base-url: ${LIBRETRANSLATE_BASE_URL:http://localhost:5000}
-    api-key: ${LIBRETRANSLATE_API_KEY:}
     connect-timeout: ${LIBRETRANSLATE_CONNECT_TIMEOUT:2s}
     read-timeout: ${LIBRETRANSLATE_READ_TIMEOUT:3s}
 
@@ -63,3 +61,14 @@ app:
     reader:
       requests: ${READER_RATE_REQUESTS:20}
       window: ${READER_RATE_WINDOW:1m}
+
+external-limits:
+  dictionary-body-bytes: ${DICTIONARY_MAX_BODY_BYTES:1048576}
+  translation-body-bytes: ${TRANSLATION_MAX_BODY_BYTES:262144}
+  maximum-entries: ${DICTIONARY_MAX_ENTRIES:5}
+  maximum-meanings: ${DICTIONARY_MAX_MEANINGS:20}
+  maximum-definition-characters: ${DICTIONARY_MAX_DEFINITION_CHARACTERS:2000}
+  maximum-example-characters: ${DICTIONARY_MAX_EXAMPLE_CHARACTERS:2000}
+  maximum-translation-characters: ${TRANSLATION_MAX_CHARACTERS:10000}
+  maximum-phonetic-characters: ${DICTIONARY_MAX_PHONETIC_CHARACTERS:200}
+  maximum-audio-url-characters: ${DICTIONARY_MAX_AUDIO_URL_CHARACTERS:2048}

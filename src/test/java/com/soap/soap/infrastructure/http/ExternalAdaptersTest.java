@@ -17,6 +17,8 @@ import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.exception.WordNotFoundException;
 import com.soap.soap.infrastructure.http.adapter.FreeDictionaryAdapter;
 import com.soap.soap.infrastructure.http.adapter.LibreTranslateAdapter;
+import com.soap.soap.infrastructure.http.configuration.ExternalProviderLimits;
+import com.soap.soap.infrastructure.http.configuration.LimitedResponseBodyInterceptor;
 import java.net.SocketTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -92,6 +94,55 @@ class ExternalAdaptersTest {
   }
 
   @Test
+  void rejectsAnOversizedDictionaryBodyBeforeJsonMapping() {
+    var builder =
+        RestClient.builder()
+            .baseUrl("https://dictionary.test")
+            .requestInterceptor(new LimitedResponseBodyInterceptor(100));
+    var server = MockRestServiceServer.bindTo(builder).build();
+    server
+        .expect(requestTo("https://dictionary.test/api/v2/entries/en/large"))
+        .andRespond(
+            withSuccess(
+                "[{\"word\":\"large\",\"padding\":\"" + "x".repeat(500) + "\"}]",
+                MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> new FreeDictionaryAdapter(builder.build()).lookup("large", "en"))
+        .isInstanceOf(ExternalProviderException.class);
+  }
+
+  @Test
+  void rejectsTooManyMeaningsAndOverlongDefinitions() {
+    assertDictionaryPayloadRejected(
+        "[{\"word\":\"large\",\"meanings\":["
+            + java.util.stream.IntStream.range(0, 21)
+                .mapToObj(
+                    index -> "{\"partOfSpeech\":\"noun\",\"definitions\":[{\"definition\":\"d\"}]}")
+                .collect(java.util.stream.Collectors.joining(","))
+            + "]}]");
+    assertDictionaryPayloadRejected(
+        "[{\"word\":\"large\",\"meanings\":[{\"partOfSpeech\":\"noun\","
+            + "\"definitions\":[{\"definition\":\""
+            + "d".repeat(2_001)
+            + "\"}]}]}]");
+  }
+
+  @Test
+  void rejectsAnOverlongTranslation() {
+    var builder = RestClient.builder().baseUrl("https://translate.test");
+    var server = MockRestServiceServer.bindTo(builder).build();
+    server
+        .expect(requestTo("https://translate.test/translate"))
+        .andRespond(
+            withSuccess(
+                "{\"translatedText\":\"" + "x".repeat(10_001) + "\"}", MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(
+            () -> new LibreTranslateAdapter(builder.build(), "").translate("bridge", "en", "es"))
+        .isInstanceOf(ExternalProviderException.class);
+  }
+
+  @Test
   void translatesWithoutAnApiKey() {
     assertTranslationRequest("", false);
   }
@@ -138,6 +189,19 @@ class ExternalAdaptersTest {
         .andRespond(response);
     assertThatThrownBy(() -> new FreeDictionaryAdapter(builder.build()).lookup("missing", "en"))
         .isInstanceOf(expected);
+  }
+
+  private void assertDictionaryPayloadRejected(String payload) {
+    var builder = RestClient.builder().baseUrl("https://dictionary.test");
+    var server = MockRestServiceServer.bindTo(builder).build();
+    server
+        .expect(requestTo("https://dictionary.test/api/v2/entries/en/large"))
+        .andRespond(withSuccess(payload, MediaType.APPLICATION_JSON));
+    assertThatThrownBy(
+            () ->
+                new FreeDictionaryAdapter(builder.build(), ExternalProviderLimits.defaults())
+                    .lookup("large", "en"))
+        .isInstanceOf(ExternalProviderException.class);
   }
 
   private void assertTranslationFailure(

@@ -41,4 +41,6 @@ public class UserVocabularyEntity {
   private LocalDateTime firstSeenAt;
 
   private LocalDateTime learnedAt;
+
+  @Version private Long version;
 }
