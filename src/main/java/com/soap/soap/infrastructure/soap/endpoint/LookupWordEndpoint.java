@@ -3,6 +3,8 @@ package com.soap.soap.infrastructure.soap.endpoint;
 import static com.soap.soap.infrastructure.soap.contract.ReadingsSoapContract.NAMESPACE_URI;
 
 import com.soap.soap.application.port.in.LookupWordPort;
+import com.soap.soap.infrastructure.security.RateLimitPolicy;
+import com.soap.soap.infrastructure.security.RateLimited;
 import com.soap.soap.infrastructure.soap.generated.LookupWordRequest;
 import com.soap.soap.infrastructure.soap.generated.LookupWordResponse;
 import com.soap.soap.infrastructure.soap.mapper.LookupWordSoapMapper;
@@ -20,6 +22,7 @@ public class LookupWordEndpoint {
 
   @PayloadRoot(namespace = NAMESPACE_URI, localPart = "lookupWordRequest")
   @ResponsePayload
+  @RateLimited(RateLimitPolicy.LOOKUP)
   public LookupWordResponse lookup(@RequestPayload LookupWordRequest request) {
     return mapper.toResponse(port.lookupWord(mapper.toWord(request)));
   }

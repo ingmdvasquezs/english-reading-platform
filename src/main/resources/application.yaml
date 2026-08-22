@@ -33,3 +33,33 @@ translation:
     api-key: ${LIBRETRANSLATE_API_KEY:}
     connect-timeout: ${LIBRETRANSLATE_CONNECT_TIMEOUT:2s}
     read-timeout: ${LIBRETRANSLATE_READ_TIMEOUT:3s}
+
+# Security hardening defaults. Override with environment-specific configuration when necessary.
+app:
+  security:
+    max-request-bytes: ${MAX_SOAP_REQUEST_BYTES:1200000}
+  input:
+    max-name-characters: ${MAX_NAME_CHARACTERS:100}
+    max-email-characters: ${MAX_EMAIL_CHARACTERS:254}
+    max-password-characters: ${MAX_PASSWORD_CHARACTERS:128}
+    max-title-characters: ${MAX_TITLE_CHARACTERS:200}
+    max-reading-content-bytes: ${MAX_READING_CONTENT_BYTES:1048576}
+    max-word-characters: ${MAX_WORD_CHARACTERS:100}
+    max-onboarding-words: ${MAX_ONBOARDING_WORDS:100}
+  rate-limit:
+    maximum-buckets: ${RATE_LIMIT_MAXIMUM_BUCKETS:10000}
+    login:
+      requests: ${LOGIN_RATE_REQUESTS:10}
+      window: ${LOGIN_RATE_WINDOW:1m}
+    register:
+      requests: ${REGISTER_RATE_REQUESTS:5}
+      window: ${REGISTER_RATE_WINDOW:1h}
+    lookup:
+      requests: ${LOOKUP_RATE_REQUESTS:30}
+      window: ${LOOKUP_RATE_WINDOW:1m}
+    analyze:
+      requests: ${ANALYZE_RATE_REQUESTS:10}
+      window: ${ANALYZE_RATE_WINDOW:1m}
+    reader:
+      requests: ${READER_RATE_REQUESTS:20}
+      window: ${READER_RATE_WINDOW:1m}

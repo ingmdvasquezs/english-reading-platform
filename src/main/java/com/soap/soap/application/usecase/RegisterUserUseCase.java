@@ -3,6 +3,7 @@ package com.soap.soap.application.usecase;
 import com.soap.soap.application.command.RegisterUserCommand;
 import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
+import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.port.in.RegisterUserPort;
 import com.soap.soap.application.port.out.PasswordEncoderPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RegisterUserUseCase implements RegisterUserPort {
   private final UserRepositoryPort users;
   private final PasswordEncoderPort passwords;
+  private final InputLimits limits;
 
   @Override
   @Transactional
@@ -24,10 +26,13 @@ public class RegisterUserUseCase implements RegisterUserPort {
     if (command == null) throw new InvalidApplicationArgumentException("Command must not be null");
     var name = requireText(command.name(), "Name");
     var email = requireText(command.email(), "Email").toLowerCase(Locale.ROOT);
+    requireMaximum(name, limits.maxNameCharacters(), "Name");
+    requireMaximum(email, limits.maxEmailCharacters(), "Email");
     if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
       throw new InvalidApplicationArgumentException("Email is invalid");
     if (command.password() == null || command.password().length() < 8)
       throw new InvalidApplicationArgumentException("Password must contain at least 8 characters");
+    requireMaximum(command.password(), limits.maxPasswordCharacters(), "Password");
     if (users.findByEmail(email).isPresent()) throw new EmailAlreadyRegisteredException();
     return users.save(new User(null, name, email, passwords.encode(command.password()), null));
   }
@@ -36,5 +41,11 @@ public class RegisterUserUseCase implements RegisterUserPort {
     if (value == null || value.isBlank())
       throw new InvalidApplicationArgumentException(field + " must not be blank");
     return value.trim();
+  }
+
+  private static void requireMaximum(String value, int maximum, String field) {
+    if (value.length() > maximum)
+      throw new InvalidApplicationArgumentException(
+          field + " must contain at most " + maximum + " characters");
   }
 }

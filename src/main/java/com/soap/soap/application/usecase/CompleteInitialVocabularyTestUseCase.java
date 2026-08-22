@@ -3,6 +3,7 @@ package com.soap.soap.application.usecase;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.model.InitialVocabularyTestResult;
+import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.port.in.CompleteInitialVocabularyTestPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.InitialVocabularyTestSourcePort;
@@ -30,6 +31,7 @@ public class CompleteInitialVocabularyTestUseCase implements CompleteInitialVoca
   private final WordResolver wordResolver;
   private final Clock clock;
   private final CurrentUserPort currentUser;
+  private final InputLimits limits;
 
   @Override
   @Transactional
@@ -37,6 +39,9 @@ public class CompleteInitialVocabularyTestUseCase implements CompleteInitialVoca
       String testId, Collection<String> knownWords) {
     if (testId == null || knownWords == null) {
       throw new InvalidApplicationArgumentException("Test id and known words must not be null");
+    }
+    if (knownWords.size() > limits.maxOnboardingWords()) {
+      throw new InvalidApplicationArgumentException("Too many selected onboarding words");
     }
     var userId = currentUser.requireUserId();
     var user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));

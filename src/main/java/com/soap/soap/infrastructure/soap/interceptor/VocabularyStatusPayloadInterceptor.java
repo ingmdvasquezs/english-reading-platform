@@ -2,6 +2,7 @@ package com.soap.soap.infrastructure.soap.interceptor;
 
 import com.soap.soap.infrastructure.soap.exception.InvalidSoapRequestException;
 import java.util.Set;
+import javax.xml.XMLConstants;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMResult;
@@ -18,9 +19,11 @@ public class VocabularyStatusPayloadInterceptor extends EndpointInterceptorAdapt
     var request = (SoapMessage) messageContext.getRequest();
     var result = new DOMResult();
     try {
-      TransformerFactory.newInstance()
-          .newTransformer()
-          .transform(request.getPayloadSource(), result);
+      var factory = TransformerFactory.newInstance();
+      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+      factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+      factory.newTransformer().transform(request.getPayloadSource(), result);
     } catch (TransformerException exception) {
       throw new InvalidSoapRequestException("Cannot read SOAP request payload", exception);
     }

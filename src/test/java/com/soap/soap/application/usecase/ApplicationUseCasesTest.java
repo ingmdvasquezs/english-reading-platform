@@ -15,6 +15,7 @@ import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.ReadingNotFoundException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
+import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.port.out.CurrentUserPort;
@@ -72,7 +73,8 @@ class ApplicationUseCasesTest {
     when(users.findById(user.id())).thenReturn(Optional.of(user));
     when(readings.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     var useCase =
-        new RegisterReadingUseCase(users, readings, new LanguageNormalizer(), currentUser);
+        new RegisterReadingUseCase(
+            users, readings, new LanguageNormalizer(), currentUser, InputLimits.defaults());
 
     var result =
         useCase.registerReading(new RegisterReadingCommand("  Title  ", "  Content  ", " EN "));
@@ -90,7 +92,12 @@ class ApplicationUseCasesTest {
 
     assertThatThrownBy(
             () ->
-                new RegisterReadingUseCase(users, readings, new LanguageNormalizer(), currentUser)
+                new RegisterReadingUseCase(
+                        users,
+                        readings,
+                        new LanguageNormalizer(),
+                        currentUser,
+                        InputLimits.defaults())
                     .registerReading(new RegisterReadingCommand("Title", "Content", "en")))
         .isInstanceOf(UserNotFoundException.class);
     verify(readings, never()).save(any());
@@ -111,7 +118,8 @@ class ApplicationUseCasesTest {
             new LanguageNormalizer(),
             new WordResolver(words),
             CLOCK,
-            currentUser);
+            currentUser,
+            InputLimits.defaults());
 
     var result =
         useCase.addWordToVocabulary(
@@ -140,7 +148,8 @@ class ApplicationUseCasesTest {
                         new LanguageNormalizer(),
                         new WordResolver(words),
                         CLOCK,
-                        currentUser)
+                        currentUser,
+                        InputLimits.defaults())
                     .addWordToVocabulary(
                         new AddWordToVocabularyCommand("hello", "en", VocabularyStatus.NEW)))
         .isInstanceOf(WordAlreadyInVocabularyException.class);

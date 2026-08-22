@@ -1,6 +1,7 @@
 package com.soap.soap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.ws.test.server.RequestCreators.withPayload;
 import static org.springframework.ws.test.server.ResponseMatchers.clientOrSenderFault;
 import static org.springframework.ws.test.server.ResponseMatchers.noFault;
@@ -21,16 +22,24 @@ import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.domain.model.Word;
 import com.soap.soap.infrastructure.soap.resolver.SoapExceptionResolver;
+import java.io.ByteArrayInputStream;
 import java.io.StringReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import javax.xml.transform.stream.StreamSource;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.ApplicationContext;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -47,7 +56,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(properties = "security.jwt.secret=test-only-secret-with-at-least-32-bytes")
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = "security.jwt.secret=test-only-secret-with-at-least-32-bytes")
 @Testcontainers(disabledWithoutDocker = true)
 class SoapApplicationTests {
 
@@ -60,10 +71,52 @@ class SoapApplicationTests {
   @Autowired private UserVocabularyRepositoryPort vocabulary;
   @Autowired private ApplicationContext applicationContext;
   @Autowired private SoapExceptionResolver soapExceptionResolver;
+  @LocalServerPort private int serverPort;
   @MockitoBean private DictionaryPort dictionaryPort;
   @MockitoBean private TranslationPort translationPort;
 
   private User user;
+
+  @Test
+  void oversizedAuthenticatedRegisterReadingReturnsHttp413BeforeSecurityOrSoapDispatch()
+      throws Exception {
+    var email = "http-e2e-" + java.util.UUID.randomUUID() + "@example.com";
+    var register =
+        soapEnvelope(
+            "<registerUserRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                + "<name>Ada</name><email>"
+                + email
+                + "</email><password>secret123</password></registerUserRequest>");
+    var login =
+        soapEnvelope(
+            "<loginRequest xmlns=\"http://soap.com/english-reading/readings\"><email>"
+                + email
+                + "</email><password>secret123</password></loginRequest>");
+
+    assertThat(postSoap(register, null).statusCode()).isEqualTo(200);
+    var loginResponse = postSoap(login, null);
+    assertThat(loginResponse.statusCode()).isEqualTo(200);
+    var tokenMatcher =
+        java.util.regex.Pattern.compile("<(?:\\w+:)?accessToken>([^<]+)</(?:\\w+:)?accessToken>")
+            .matcher(loginResponse.body());
+    assertThat(tokenMatcher.find()).isTrue();
+    var token = tokenMatcher.group(1);
+
+    var normalReading = registerReadingEnvelope("A short reading");
+    var unauthenticated = postSoap(normalReading, null);
+    assertThat(unauthenticated.statusCode()).isNotEqualTo(200).isNotEqualTo(403);
+    assertThat(unauthenticated.body()).contains("Fault");
+    assertThat(postSoap(normalReading, token).statusCode()).isEqualTo(200);
+
+    var oversized = postSoap(registerReadingEnvelope("a".repeat(1_200_001)), token);
+    assertThat(oversized.statusCode()).isEqualTo(413);
+    assertThat(oversized.body()).isEqualTo("Request too large").doesNotContain("Fault");
+  }
+
+  @AfterEach
+  void clearSecurityContext() {
+    SecurityContextHolder.clearContext();
+  }
 
   @Test
   void protectedSoapOperationWithoutAuthenticationReturnsAClientFault() {
@@ -115,16 +168,152 @@ class SoapApplicationTests {
 
     assertThat(
             soapExceptionResolver.resolveException(
-                messageContext, null, new RuntimeException("unexpected")))
+                messageContext,
+                null,
+                new RuntimeException("jdbc:postgresql://db/private password=secret")))
         .isTrue();
     var response = (SoapMessage) messageContext.getResponse();
 
     assertThat(response.getSoapBody().getFault().getFaultCode())
         .isEqualTo(SoapVersion.SOAP_11.getServerOrReceiverFaultName());
+    assertThat(response.getSoapBody().getFault().getFaultStringOrReason())
+        .isEqualTo("Internal server error")
+        .doesNotContain("jdbc", "password", "secret");
+  }
+
+  @Test
+  void runtimeSchemaRejectsMissingRequiredElementAndInvalidStructure() {
+    assertSchemaClientFault(
+        """
+        <registerUserRequest xmlns="http://soap.com/english-reading/readings">
+          <name>Ada</name><password>secret123</password>
+        </registerUserRequest>
+        """);
+    assertSchemaClientFault(
+        """
+        <registerUserRequest xmlns="http://soap.com/english-reading/readings">
+          <email>ada@example.com</email><name>Ada</name><password>secret123</password>
+        </registerUserRequest>
+        """);
+  }
+
+  @Test
+  void runtimeSchemaRejectsExcessiveLength() {
+    assertSchemaClientFault(
+        """
+        <registerUserRequest xmlns="http://soap.com/english-reading/readings">
+          <name>%s</name><email>long@example.com</email><password>secret123</password>
+        </registerUserRequest>
+        """
+            .formatted("a".repeat(101)));
+  }
+
+  @Test
+  void publicRegisterAndLoginRemainValidSoapOperations() {
+    var email = "public-" + java.util.UUID.randomUUID() + "@example.com";
+    var register =
+        """
+        <registerUserRequest xmlns="http://soap.com/english-reading/readings">
+          <name>Ada</name><email>%s</email><password>secret123</password>
+        </registerUserRequest>
+        """
+            .formatted(email);
+    var login =
+        """
+        <loginRequest xmlns="http://soap.com/english-reading/readings">
+          <email>%s</email><password>secret123</password>
+        </loginRequest>
+        """
+            .formatted(email);
+    var client = MockWebServiceClient.createClient(applicationContext);
+    client.sendRequest(withPayload(source(register))).andExpect(noFault());
+    client.sendRequest(withPayload(source(login))).andExpect(noFault());
+  }
+
+  @Test
+  void saajRejectsDoctypeExternalEntitiesAndEntityExpansion() throws Exception {
+    assertXmlParserRejects(
+        "<!DOCTYPE x [<!ENTITY local SYSTEM \"file:///C:/Windows/win.ini\">]>"
+            + soapEnvelope(
+                "<loginRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                    + "<email>&local;</email><password>secret123</password></loginRequest>"));
+    assertXmlParserRejects(
+        "<!DOCTYPE x [<!ENTITY % remote SYSTEM \"https://127.0.0.1/entity.dtd\">%remote;]>"
+            + soapEnvelope(
+                "<loginRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                    + "<email>a@b.co</email><password>secret123</password></loginRequest>"));
+    assertXmlParserRejects(
+        "<!DOCTYPE x [<!ENTITY a \"1234567890\"><!ENTITY b \"&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;\">"
+            + "<!ENTITY c \"&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;\">]>"
+            + soapEnvelope(
+                "<loginRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                    + "<email>&c;@x.co</email><password>secret123</password></loginRequest>"));
+  }
+
+  @Test
+  void runtimeSchemaRejectsExcessiveXmlNesting() {
+    assertThatThrownBy(
+            () ->
+                assertSchemaClientFault(
+                    "<loginRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                        + "<email>a@b.co"
+                        + "<nested>".repeat(200)
+                        + "x"
+                        + "</nested>".repeat(200)
+                        + "</email><password>secret123</password></loginRequest>"))
+        .hasMessageContaining("maxElementDepth");
+  }
+
+  private void assertSchemaClientFault(String payload) {
+    MockWebServiceClient.createClient(applicationContext)
+        .sendRequest(withPayload(source(payload)))
+        .andExpect(clientOrSenderFault());
+  }
+
+  private StreamSource source(String payload) {
+    return new StreamSource(new StringReader(payload));
+  }
+
+  private void assertXmlParserRejects(String payload) throws Exception {
+    var factory = new SaajSoapMessageFactory();
+    factory.afterPropertiesSet();
+    assertThatThrownBy(
+            () ->
+                factory.createWebServiceMessage(
+                    new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8))))
+        .isNotNull();
+  }
+
+  private String soapEnvelope(String payload) {
+    return "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\">"
+        + "<soapenv:Header/><soapenv:Body>"
+        + payload
+        + "</soapenv:Body></soapenv:Envelope>";
+  }
+
+  private String registerReadingEnvelope(String content) {
+    return soapEnvelope(
+        "<registerReadingRequest xmlns=\"http://soap.com/english-reading/readings\">"
+            + "<title>HTTP E2E</title><content>"
+            + content
+            + "</content><language>en</language></registerReadingRequest>");
+  }
+
+  private HttpResponse<String> postSoap(String body, String token) throws Exception {
+    var request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + serverPort + "/ws"))
+            .header("Content-Type", "text/xml; charset=UTF-8")
+            .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+    if (token != null) {
+      request.header("Authorization", "Bearer " + token);
+    }
+    return HttpClient.newHttpClient()
+        .send(request.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
   }
 
   @Test
   void invalidVocabularyStatusReturnsAClearClientFault() {
+    authenticateUser();
     var payload =
         """
         <changeVocabularyStatusRequest xmlns="http://soap.com/english-reading/readings">
@@ -140,6 +329,7 @@ class SoapApplicationTests {
 
   @Test
   void missingVocabularyStatusReturnsAClientFault() {
+    authenticateUser();
     var payload =
         """
         <changeVocabularyStatusRequest xmlns="http://soap.com/english-reading/readings">
@@ -194,6 +384,19 @@ class SoapApplicationTests {
           <word>bridge</word>
         </lookupWordRequest>
         """;
+  }
+
+  private void authenticateUser() {
+    var now = Instant.now();
+    var jwt =
+        new Jwt(
+            "test-token",
+            now,
+            now.plusSeconds(60),
+            Map.of("alg", "HS256"),
+            Map.of("sub", user.id().toString()));
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken(jwt, jwt, List.of()));
   }
 
   @BeforeEach

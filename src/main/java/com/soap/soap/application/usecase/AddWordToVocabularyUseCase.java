@@ -4,6 +4,7 @@ import com.soap.soap.application.command.AddWordToVocabularyCommand;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
+import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.port.in.AddWordToVocabularyPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -29,12 +30,16 @@ public class AddWordToVocabularyUseCase implements AddWordToVocabularyPort {
   private final WordResolver wordResolver;
   private final Clock clock;
   private final CurrentUserPort currentUser;
+  private final InputLimits inputLimits;
 
   @Override
   @Transactional
   public UserVocabulary addWordToVocabulary(AddWordToVocabularyCommand command) {
     if (command == null) {
       throw new InvalidApplicationArgumentException("Command must not be null");
+    }
+    if (command.word() != null && command.word().length() > inputLimits.maxWordCharacters()) {
+      throw new InvalidApplicationArgumentException("Word is too long");
     }
     var userId = currentUser.requireUserId();
     var status = command.initialStatus();

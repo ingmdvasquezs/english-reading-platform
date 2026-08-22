@@ -9,6 +9,7 @@ import com.soap.soap.application.command.RegisterUserCommand;
 import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.exception.InvalidCredentialsException;
 import com.soap.soap.application.model.AccessToken;
+import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.port.out.PasswordEncoderPort;
 import com.soap.soap.application.port.out.TokenProviderPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -33,7 +34,7 @@ class AuthenticationUseCasesTest {
     when(passwords.encode("secret123")).thenReturn("bcrypt-hash");
     when(users.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     var result =
-        new RegisterUserUseCase(users, passwords)
+        new RegisterUserUseCase(users, passwords, InputLimits.defaults())
             .registerUser(new RegisterUserCommand(" Ada ", " ADA@Example.COM ", "secret123"));
     var saved = ArgumentCaptor.forClass(User.class);
     verify(users).save(saved.capture());
@@ -48,7 +49,7 @@ class AuthenticationUseCasesTest {
         .thenReturn(Optional.of(new User(UUID.randomUUID(), "Ada", "ada@example.com")));
     assertThatThrownBy(
             () ->
-                new RegisterUserUseCase(users, passwords)
+                new RegisterUserUseCase(users, passwords, InputLimits.defaults())
                     .registerUser(new RegisterUserCommand("Ada", "ADA@example.com", "secret123")))
         .isInstanceOf(EmailAlreadyRegisteredException.class);
     verify(passwords, never()).encode(any());

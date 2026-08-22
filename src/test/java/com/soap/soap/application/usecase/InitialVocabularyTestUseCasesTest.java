@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.model.InitialVocabularyTest;
+import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.InitialVocabularyTestSourcePort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -123,6 +124,7 @@ class InitialVocabularyTestUseCasesTest {
         new TextWordProcessor(),
         new WordResolver(words),
         clock,
-        currentUser);
+        currentUser,
+        InputLimits.defaults());
   }
 }

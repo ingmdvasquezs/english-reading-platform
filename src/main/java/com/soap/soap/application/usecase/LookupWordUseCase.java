@@ -1,6 +1,7 @@
 package com.soap.soap.application.usecase;
 
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
+import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.model.WordLookup;
 import com.soap.soap.application.port.in.LookupWordPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
@@ -17,12 +18,17 @@ public class LookupWordUseCase implements LookupWordPort {
   private final TranslationPort translation;
   private final TextWordProcessor words;
   private final CurrentUserPort currentUser;
+  private final InputLimits limits;
 
   @Override
   public WordLookup lookupWord(String word) {
     currentUser.requireUserId();
     if (word == null || word.isBlank()) {
       throw new InvalidApplicationArgumentException("Word must not be blank");
+    }
+    if (word.length() > limits.maxWordCharacters()) {
+      throw new InvalidApplicationArgumentException(
+          "Word must contain at most " + limits.maxWordCharacters() + " characters");
     }
     var tokens = words.tokenize(word);
     String normalized;

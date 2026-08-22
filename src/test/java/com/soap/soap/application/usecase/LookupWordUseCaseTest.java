@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.soap.soap.application.exception.AuthenticationRequiredException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.model.DictionaryEntry;
+import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.model.WordDefinition;
 import com.soap.soap.application.model.WordMeaning;
 import com.soap.soap.application.port.out.CurrentUserPort;
@@ -61,6 +62,7 @@ class LookupWordUseCaseTest {
   }
 
   private LookupWordUseCase useCase() {
-    return new LookupWordUseCase(dictionary, translation, new TextWordProcessor(), currentUser);
+    return new LookupWordUseCase(
+        dictionary, translation, new TextWordProcessor(), currentUser, InputLimits.defaults());
   }
 }

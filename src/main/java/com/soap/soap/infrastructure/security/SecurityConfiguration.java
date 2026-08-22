@@ -5,8 +5,10 @@ import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -21,6 +23,25 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 public class SecurityConfiguration {
+  @Bean
+  FilterRegistrationBean<RequestSizeLimitFilter> requestSizeFilterRegistration(
+      RequestSizeLimitFilter filter) {
+    var registration = new FilterRegistrationBean<>(filter);
+    registration.setName("requestSizeLimitFilter");
+    registration.addUrlPatterns("/ws/*");
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+    return registration;
+  }
+
+  @Bean
+  FilterRegistrationBean<JwtAuthenticationFilter> disableStandaloneJwtFilterRegistration(
+      JwtAuthenticationFilter filter) {
+    // JWT belongs exclusively to the Spring Security chain, immediately before username/password.
+    var registration = new FilterRegistrationBean<>(filter);
+    registration.setEnabled(false);
+    return registration;
+  }
+
   @Bean
   PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
@@ -54,7 +75,10 @@ public class SecurityConfiguration {
     return http.csrf(csrf -> csrf.disable())
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())
+        // SOAP login and protected operations share /ws. Operation-level authentication is
+        // enforced by SoapSecurityInterceptor without parsing XML in this HTTP filter chain.
+        .authorizeHttpRequests(
+            requests -> requests.requestMatchers("/ws/**").permitAll().anyRequest().denyAll())
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }

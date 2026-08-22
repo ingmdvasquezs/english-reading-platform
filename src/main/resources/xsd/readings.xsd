@@ -6,11 +6,34 @@
         targetNamespace="http://soap.com/english-reading/readings"
         elementFormDefault="qualified">
 
+    <xs:simpleType name="nameType"><xs:restriction base="xs:string">
+        <xs:minLength value="1"/><xs:maxLength value="100"/>
+    </xs:restriction></xs:simpleType>
+    <xs:simpleType name="emailType"><xs:restriction base="xs:string">
+        <xs:minLength value="3"/><xs:maxLength value="254"/>
+    </xs:restriction></xs:simpleType>
+    <xs:simpleType name="passwordType"><xs:restriction base="xs:string">
+        <xs:minLength value="8"/><xs:maxLength value="128"/>
+    </xs:restriction></xs:simpleType>
+    <xs:simpleType name="titleType"><xs:restriction base="xs:string">
+        <xs:minLength value="1"/><xs:maxLength value="200"/>
+    </xs:restriction></xs:simpleType>
+    <xs:simpleType name="readingContentType"><xs:restriction base="xs:string">
+        <xs:minLength value="1"/><xs:maxLength value="1048576"/>
+    </xs:restriction></xs:simpleType>
+    <xs:simpleType name="wordType"><xs:restriction base="xs:string">
+        <xs:minLength value="1"/><xs:maxLength value="100"/>
+    </xs:restriction></xs:simpleType>
+    <xs:simpleType name="languageType"><xs:restriction base="xs:string">
+        <xs:pattern value="[A-Za-z]{2,3}(-[A-Za-z]{2,3})?"/>
+        <xs:maxLength value="10"/>
+    </xs:restriction></xs:simpleType>
+
     <xs:element name="registerUserRequest">
         <xs:complexType><xs:sequence>
-            <xs:element name="name" type="xs:string"/>
-            <xs:element name="email" type="xs:string"/>
-            <xs:element name="password" type="xs:string"/>
+            <xs:element name="name" type="tns:nameType"/>
+            <xs:element name="email" type="tns:emailType"/>
+            <xs:element name="password" type="tns:passwordType"/>
         </xs:sequence></xs:complexType>
     </xs:element>
     <xs:element name="registerUserResponse">
@@ -38,9 +61,9 @@
     <xs:element name="registerReadingRequest">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="title" type="xs:string"/>
-                <xs:element name="content" type="xs:string"/>
-                <xs:element name="language" type="xs:string"/>
+                <xs:element name="title" type="tns:titleType"/>
+                <xs:element name="content" type="tns:readingContentType"/>
+                <xs:element name="language" type="tns:languageType"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
@@ -105,8 +128,8 @@
             <xs:element name="entryId" type="xs:string" minOccurs="0"/>
             <xs:element name="userId" type="xs:string"/>
             <xs:element name="wordId" type="xs:string"/>
-            <xs:element name="word" type="xs:string"/>
-            <xs:element name="language" type="xs:string"/>
+            <xs:element name="word" type="tns:wordType"/>
+            <xs:element name="language" type="tns:languageType"/>
             <xs:element name="status" type="tns:vocabularyStatusType"/>
             <xs:element name="firstSeenAt" type="xs:dateTime"/>
             <xs:element name="learnedAt" type="xs:dateTime" minOccurs="0"/>
@@ -225,7 +248,7 @@
     <xs:element name="completeInitialVocabularyTestRequest">
         <xs:complexType><xs:sequence>
             <xs:element name="testId" type="xs:string"/>
-            <xs:element name="knownWords" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="knownWords" type="tns:wordType" minOccurs="0" maxOccurs="100"/>
         </xs:sequence></xs:complexType>
     </xs:element>
     <xs:element name="completeInitialVocabularyTestResponse">
@@ -238,7 +261,7 @@
 
     <xs:element name="lookupWordRequest">
         <xs:complexType><xs:sequence>
-            <xs:element name="word" type="xs:string"/>
+            <xs:element name="word" type="tns:wordType"/>
         </xs:sequence></xs:complexType>
     </xs:element>
     <xs:element name="lookupWordResponse">
