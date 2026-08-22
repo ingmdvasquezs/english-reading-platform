@@ -4,6 +4,8 @@ import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.port.out.TranslationPort;
 import com.soap.soap.infrastructure.http.configuration.ExternalProviderLimits;
 import com.soap.soap.infrastructure.http.dto.LibreTranslateResponse;
+import com.soap.soap.infrastructure.observability.ExternalProviderObservation;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.LinkedHashMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -17,25 +19,44 @@ public class LibreTranslateAdapter implements TranslationPort {
   private final RestClient client;
   private final String apiKey;
   private final ExternalProviderLimits limits;
+  private final ExternalProviderObservation observation;
 
   public LibreTranslateAdapter(
       @Qualifier("libreTranslateRestClient") RestClient client,
       @Value("${translation.libre.api-key:}") String apiKey) {
-    this(client, apiKey, ExternalProviderLimits.defaults());
+    this(
+        client,
+        apiKey,
+        ExternalProviderLimits.defaults(),
+        new ExternalProviderObservation(new SimpleMeterRegistry()));
+  }
+
+  public LibreTranslateAdapter(
+      @Qualifier("libreTranslateRestClient") RestClient client,
+      @Value("${translation.libre.api-key:}") String apiKey,
+      ExternalProviderLimits limits) {
+    this(client, apiKey, limits, new ExternalProviderObservation(new SimpleMeterRegistry()));
   }
 
   @Autowired
   public LibreTranslateAdapter(
       @Qualifier("libreTranslateRestClient") RestClient client,
       @Value("${translation.libre.api-key:}") String apiKey,
-      ExternalProviderLimits limits) {
+      ExternalProviderLimits limits,
+      ExternalProviderObservation observation) {
     this.client = client;
     this.apiKey = apiKey;
     this.limits = limits;
+    this.observation = observation;
   }
 
   @Override
   public String translate(String text, String sourceLanguage, String targetLanguage) {
+    return observation.observe(
+        "libre_translate", () -> doTranslate(text, sourceLanguage, targetLanguage));
+  }
+
+  private String doTranslate(String text, String sourceLanguage, String targetLanguage) {
     var body = new LinkedHashMap<String, Object>();
     body.put("q", text);
     body.put("source", sourceLanguage);

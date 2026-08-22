@@ -4,6 +4,11 @@ spring:
     username: ${DB_USERNAME:english_user}
     password: ${DB_PASSWORD:english_password}
     driver-class-name: org.postgresql.Driver
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
 
 security:
   jwt:

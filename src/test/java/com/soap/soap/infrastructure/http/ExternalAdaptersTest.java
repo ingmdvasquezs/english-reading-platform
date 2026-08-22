@@ -21,12 +21,25 @@ import com.soap.soap.infrastructure.http.configuration.ExternalProviderLimits;
 import com.soap.soap.infrastructure.http.configuration.LimitedResponseBodyInterceptor;
 import java.net.SocketTimeoutException;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 class ExternalAdaptersTest {
+  @Test
+  void eachProviderAdapterHasExactlyOneSpringInjectionConstructor() {
+    assertThat(
+            java.util.stream.Stream.of(FreeDictionaryAdapter.class, LibreTranslateAdapter.class)
+                .map(
+                    type ->
+                        java.util.Arrays.stream(type.getConstructors())
+                            .filter(constructor -> constructor.isAnnotationPresent(Autowired.class))
+                            .count()))
+        .containsExactly(1L, 1L);
+  }
+
   @Test
   void mapsDictionaryPhoneticAudioMeaningsAndLimitsDefinitions() {
     var builder = RestClient.builder().baseUrl("https://dictionary.test");

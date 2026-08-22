@@ -15,6 +15,11 @@ class ConfigurationProfilesTest {
   @Test
   void commonConfigurationDefaultsToTheLocalProfile() throws Exception {
     assertThat(property("application.yaml", "spring.profiles.default")).isEqualTo("local");
+    assertThat(property("application.yaml", "server.shutdown")).isEqualTo("graceful");
+    assertThat(property("application.yaml", "spring.datasource.hikari.maximum-pool-size"))
+        .isEqualTo("${DB_MAXIMUM_POOL_SIZE:10}");
+    assertThat(property("application.yaml", "management.endpoint.health.group.readiness.include"))
+        .isEqualTo("readinessState,db");
   }
 
   @Test
@@ -23,6 +28,8 @@ class ConfigurationProfilesTest {
         .isEqualTo("${DB_URL:jdbc:postgresql://localhost:5432/english_reading}");
     assertThat(property("application-local.yaml", "translation.libre.base-url"))
         .isEqualTo("${LIBRETRANSLATE_BASE_URL:http://localhost:5000}");
+    assertThat(property("application-local.yaml", "management.endpoints.web.exposure.include"))
+        .isEqualTo("health,info,prometheus");
   }
 
   @Test
@@ -34,6 +41,10 @@ class ConfigurationProfilesTest {
     assertThat(jwtSecret).isEqualTo("${JWT_SECRET}");
     assertThat(property("application-prod.yaml", "spring.datasource.url"))
         .doesNotContain("localhost");
+    assertThat(property("application-prod.yaml", "management.endpoints.web.exposure.include"))
+        .isEqualTo("${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info}");
+    assertThat(property("application-prod.yaml", "logging.structured.format.console"))
+        .isEqualTo("logstash");
     assertThatThrownBy(
             () ->
                 new PropertyPlaceholderHelper("${", "}", ":", null, false)

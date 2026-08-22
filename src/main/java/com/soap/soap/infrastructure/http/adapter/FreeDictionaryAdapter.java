@@ -8,6 +8,8 @@ import com.soap.soap.application.model.WordMeaning;
 import com.soap.soap.application.port.out.DictionaryPort;
 import com.soap.soap.infrastructure.http.configuration.ExternalProviderLimits;
 import com.soap.soap.infrastructure.http.dto.FreeDictionaryResponse;
+import com.soap.soap.infrastructure.observability.ExternalProviderObservation;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -24,20 +26,36 @@ public class FreeDictionaryAdapter implements DictionaryPort {
   private static final int MAX_DEFINITIONS_PER_MEANING = 3;
   private final RestClient client;
   private final ExternalProviderLimits limits;
+  private final ExternalProviderObservation observation;
 
   public FreeDictionaryAdapter(@Qualifier("freeDictionaryRestClient") RestClient client) {
-    this(client, ExternalProviderLimits.defaults());
+    this(
+        client,
+        ExternalProviderLimits.defaults(),
+        new ExternalProviderObservation(new SimpleMeterRegistry()));
+  }
+
+  public FreeDictionaryAdapter(
+      @Qualifier("freeDictionaryRestClient") RestClient client, ExternalProviderLimits limits) {
+    this(client, limits, new ExternalProviderObservation(new SimpleMeterRegistry()));
   }
 
   @Autowired
   public FreeDictionaryAdapter(
-      @Qualifier("freeDictionaryRestClient") RestClient client, ExternalProviderLimits limits) {
+      @Qualifier("freeDictionaryRestClient") RestClient client,
+      ExternalProviderLimits limits,
+      ExternalProviderObservation observation) {
     this.client = client;
     this.limits = limits;
+    this.observation = observation;
   }
 
   @Override
   public DictionaryEntry lookup(String word, String language) {
+    return observation.observe("free_dictionary", () -> doLookup(word, language));
+  }
+
+  private DictionaryEntry doLookup(String word, String language) {
     try {
       var responses =
           client

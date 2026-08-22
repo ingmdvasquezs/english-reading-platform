@@ -1,10 +1,12 @@
 package com.soap.soap.infrastructure.soap.configuration;
 
 import com.soap.soap.application.port.out.CurrentUserPort;
+import com.soap.soap.infrastructure.observability.SoapObservationInterceptor;
 import com.soap.soap.infrastructure.security.InMemoryRateLimiter;
 import com.soap.soap.infrastructure.security.RateLimitPolicy;
 import com.soap.soap.infrastructure.security.SoapSecurityInterceptor;
 import com.soap.soap.infrastructure.soap.interceptor.VocabularyStatusPayloadInterceptor;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.EnumMap;
@@ -20,13 +22,21 @@ import org.springframework.xml.xsd.XsdSchema;
 @Configuration
 public class SoapInterceptorConfiguration implements WsConfigurer {
   private final SoapSecurityInterceptor securityInterceptor;
+  private final SoapObservationInterceptor observationInterceptor;
   private final PayloadValidatingInterceptor validatingInterceptor;
 
   public SoapInterceptorConfiguration(
       SoapSecurityInterceptor securityInterceptor,
+      SoapObservationInterceptor observationInterceptor,
       PayloadValidatingInterceptor validatingInterceptor) {
     this.securityInterceptor = securityInterceptor;
+    this.observationInterceptor = observationInterceptor;
     this.validatingInterceptor = validatingInterceptor;
+  }
+
+  @Bean
+  static SoapObservationInterceptor soapObservationInterceptor(MeterRegistry meters) {
+    return new SoapObservationInterceptor(meters);
   }
 
   @Bean
@@ -48,7 +58,8 @@ public class SoapInterceptorConfiguration implements WsConfigurer {
       @Value("${app.rate-limit.analyze.requests:10}") int analyzeRequests,
       @Value("${app.rate-limit.analyze.window:1m}") Duration analyzeWindow,
       @Value("${app.rate-limit.reader.requests:20}") int readerRequests,
-      @Value("${app.rate-limit.reader.window:1m}") Duration readerWindow) {
+      @Value("${app.rate-limit.reader.window:1m}") Duration readerWindow,
+      MeterRegistry meters) {
     var limits = new EnumMap<RateLimitPolicy, SoapSecurityInterceptor.Limit>(RateLimitPolicy.class);
     limits.put(
         RateLimitPolicy.LOGIN, new SoapSecurityInterceptor.Limit(loginRequests, loginWindow));
@@ -61,7 +72,7 @@ public class SoapInterceptorConfiguration implements WsConfigurer {
         RateLimitPolicy.ANALYZE, new SoapSecurityInterceptor.Limit(analyzeRequests, analyzeWindow));
     limits.put(
         RateLimitPolicy.READER, new SoapSecurityInterceptor.Limit(readerRequests, readerWindow));
-    return new SoapSecurityInterceptor(currentUser, limiter, limits);
+    return new SoapSecurityInterceptor(currentUser, limiter, limits, meters);
   }
 
   @Bean
@@ -79,6 +90,7 @@ public class SoapInterceptorConfiguration implements WsConfigurer {
 
   @Override
   public void addInterceptors(List<EndpointInterceptor> interceptors) {
+    interceptors.add(observationInterceptor);
     interceptors.add(securityInterceptor);
     interceptors.add(new VocabularyStatusPayloadInterceptor());
     interceptors.add(validatingInterceptor);

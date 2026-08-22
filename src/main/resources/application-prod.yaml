@@ -29,3 +29,14 @@ server:
     include-binding-errors: never
     include-stacktrace: never
     include-exception: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info}
+
+logging:
+  structured:
+    format:
+      console: logstash

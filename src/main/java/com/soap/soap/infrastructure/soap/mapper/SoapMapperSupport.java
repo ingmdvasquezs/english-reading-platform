@@ -22,7 +22,7 @@ abstract class SoapMapperSupport {
     try {
       return UUID.fromString(value);
     } catch (IllegalArgumentException | NullPointerException exception) {
-      throw new InvalidSoapRequestException("Invalid " + field + " format: " + value, exception);
+      throw new InvalidSoapRequestException("Invalid " + field + " format", exception);
     }
   }
 

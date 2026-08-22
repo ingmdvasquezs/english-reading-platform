@@ -1,14 +1,22 @@
 package com.soap.soap.infrastructure.http.configuration;
 
+import com.soap.soap.infrastructure.observability.ExternalProviderObservation;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.net.http.HttpClient;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 @Configuration
 public class ExternalHttpConfiguration {
+  @Bean
+  ExternalProviderObservation externalProviderObservation(MeterRegistry meters) {
+    return new ExternalProviderObservation(meters);
+  }
+
   @Bean
   ExternalProviderLimits externalProviderLimits(
       @Value("${external-limits.dictionary-body-bytes:1048576}") int dictionaryBodyBytes,
@@ -52,8 +60,8 @@ public class ExternalHttpConfiguration {
 
   private RestClient client(
       String baseUrl, Duration connectTimeout, Duration readTimeout, int maximumBodyBytes) {
-    var requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(connectTimeout);
+    var httpClient = HttpClient.newBuilder().connectTimeout(connectTimeout).build();
+    var requestFactory = new JdkClientHttpRequestFactory(httpClient);
     requestFactory.setReadTimeout(readTimeout);
     return RestClient.builder()
         .baseUrl(baseUrl)

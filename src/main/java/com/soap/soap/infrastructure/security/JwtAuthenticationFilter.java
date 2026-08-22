@@ -1,11 +1,13 @@
 package com.soap.soap.infrastructure.security;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,9 +17,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final JwtDecoder decoder;
+  private final MeterRegistry meters;
+
+  public JwtAuthenticationFilter(JwtDecoder decoder) {
+    this(decoder, new SimpleMeterRegistry());
+  }
+
+  @Autowired
+  public JwtAuthenticationFilter(JwtDecoder decoder, MeterRegistry meters) {
+    this.decoder = decoder;
+    this.meters = meters;
+  }
 
   @Override
   protected void doFilterInternal(
@@ -34,6 +46,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       SecurityContextHolder.getContext().setAuthentication(authentication);
       chain.doFilter(request, response);
     } catch (JwtException exception) {
+      meters.counter("security.authentication.failures", "reason", "invalid_token").increment();
       SecurityContextHolder.clearContext();
       response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid bearer token");
     }

@@ -1,46 +1,31 @@
 package com.soap.soap.infrastructure.soap.resolver;
 
-import com.soap.soap.application.exception.AuthenticationRequiredException;
-import com.soap.soap.application.exception.ConcurrentVocabularyModificationException;
-import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
-import com.soap.soap.application.exception.InvalidApplicationArgumentException;
-import com.soap.soap.application.exception.InvalidCredentialsException;
-import com.soap.soap.application.exception.ReadingAccessDeniedException;
-import com.soap.soap.application.exception.ReadingNotFoundException;
-import com.soap.soap.application.exception.UserNotFoundException;
-import com.soap.soap.application.exception.VocabularyEntryNotFoundException;
-import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
-import com.soap.soap.application.exception.WordNotFoundException;
-import com.soap.soap.domain.exception.InvalidVocabularyStateException;
-import com.soap.soap.infrastructure.soap.exception.InvalidSoapRequestException;
+import com.soap.soap.application.exception.ExternalProviderException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ws.soap.server.endpoint.SoapFaultDefinition;
 import org.springframework.ws.soap.server.endpoint.SoapFaultMappingExceptionResolver;
 
 public class SoapExceptionResolver extends SoapFaultMappingExceptionResolver {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SoapExceptionResolver.class);
+
   @Override
   protected SoapFaultDefinition getFaultDefinition(Object endpoint, Exception exception) {
-    if (!isControlledClientException(exception)) {
+    var category = SoapFaultClassifier.category(exception);
+    if (!SoapFaultClassifier.isClientFault(exception)) {
+      if (exception instanceof ExternalProviderException) {
+        // Provider observation already recorded the safe failure details; its cause may contain a
+        // full URL, so do not duplicate that stack trace here.
+        LOGGER.error("soap.fault category={}", category);
+      } else {
+        LOGGER.error("soap.fault category={}", category, exception);
+      }
       var sanitized = new SoapFaultDefinition();
       sanitized.setFaultCode(SoapFaultDefinition.SERVER);
       sanitized.setFaultStringOrReason("Internal server error");
       return sanitized;
     }
+    LOGGER.warn("soap.fault category={} message={}", category, exception.getMessage());
     return super.getFaultDefinition(endpoint, exception);
-  }
-
-  private boolean isControlledClientException(Exception exception) {
-    return exception instanceof AuthenticationRequiredException
-        || exception instanceof EmailAlreadyRegisteredException
-        || exception instanceof ConcurrentVocabularyModificationException
-        || exception instanceof InvalidApplicationArgumentException
-        || exception instanceof InvalidCredentialsException
-        || exception instanceof ReadingAccessDeniedException
-        || exception instanceof ReadingNotFoundException
-        || exception instanceof UserNotFoundException
-        || exception instanceof VocabularyEntryNotFoundException
-        || exception instanceof WordAlreadyInVocabularyException
-        || exception instanceof WordNotFoundException
-        || exception instanceof InvalidVocabularyStateException
-        || exception instanceof InvalidSoapRequestException;
   }
 }

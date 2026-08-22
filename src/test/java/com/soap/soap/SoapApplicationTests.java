@@ -8,6 +8,7 @@ import static org.springframework.ws.test.server.ResponseMatchers.noFault;
 import static org.springframework.ws.test.server.ResponseMatchers.xpath;
 
 import com.soap.soap.application.exception.ConcurrentVocabularyModificationException;
+import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.DictionaryEntry;
 import com.soap.soap.application.model.PageRequest;
@@ -25,6 +26,7 @@ import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.domain.model.Word;
 import com.soap.soap.infrastructure.persistence.repository.JpaWordRepository;
 import com.soap.soap.infrastructure.soap.resolver.SoapExceptionResolver;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.io.ByteArrayInputStream;
 import java.io.StringReader;
 import java.net.URI;
@@ -77,6 +79,7 @@ class SoapApplicationTests {
   @Autowired private UserVocabularyRepositoryPort vocabulary;
   @Autowired private ApplicationContext applicationContext;
   @Autowired private SoapExceptionResolver soapExceptionResolver;
+  @Autowired private MeterRegistry meterRegistry;
   @LocalServerPort private int serverPort;
   @MockitoBean private DictionaryPort dictionaryPort;
   @MockitoBean private TranslationPort translationPort;
@@ -138,6 +141,43 @@ class SoapApplicationTests {
   @Test
   void oversizedAuthenticatedRegisterReadingReturnsHttp413BeforeSecurityOrSoapDispatch()
       throws Exception {
+    var token = createHttpUserToken();
+
+    var normalReading = registerReadingEnvelope("A short reading");
+    var unauthenticated = postSoap(normalReading, null);
+    assertThat(unauthenticated.statusCode()).isNotEqualTo(200).isNotEqualTo(403);
+    assertThat(unauthenticated.body()).contains("Fault");
+    assertThat(postSoap(normalReading, token).statusCode()).isEqualTo(200);
+
+    var oversized = postSoap(registerReadingEnvelope("a".repeat(1_200_001)), token);
+    assertThat(oversized.statusCode()).isEqualTo(413);
+    assertThat(oversized.body()).isEqualTo("Request too large").doesNotContain("Fault");
+    assertThat(oversized.headers().firstValue("X-Correlation-ID")).isPresent();
+  }
+
+  @Test
+  void serverFaultIsSanitizedAndReturnsTheCorrelationId() throws Exception {
+    var token = createHttpUserToken();
+    org.mockito.Mockito.when(dictionaryPort.lookup("bridge", "en"))
+        .thenThrow(
+            new ExternalProviderException(
+                "Dictionary provider is unavailable",
+                new IllegalStateException("api-key=secret provider=https://private.example")));
+    var lookup =
+        soapEnvelope(
+            "<lookupWordRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                + "<word>bridge</word></lookupWordRequest>");
+
+    var response = postSoap(lookup, token, "server-fault-42");
+
+    assertThat(response.statusCode()).isEqualTo(500);
+    assertThat(response.headers().firstValue("X-Correlation-ID")).contains("server-fault-42");
+    assertThat(response.body())
+        .contains("Internal server error")
+        .doesNotContain("secret", "private.example", "api-key");
+  }
+
+  private String createHttpUserToken() throws Exception {
     var email = "http-e2e-" + java.util.UUID.randomUUID() + "@example.com";
     var register =
         soapEnvelope(
@@ -158,17 +198,44 @@ class SoapApplicationTests {
         java.util.regex.Pattern.compile("<(?:\\w+:)?accessToken>([^<]+)</(?:\\w+:)?accessToken>")
             .matcher(loginResponse.body());
     assertThat(tokenMatcher.find()).isTrue();
-    var token = tokenMatcher.group(1);
+    return tokenMatcher.group(1);
+  }
 
-    var normalReading = registerReadingEnvelope("A short reading");
-    var unauthenticated = postSoap(normalReading, null);
-    assertThat(unauthenticated.statusCode()).isNotEqualTo(200).isNotEqualTo(403);
-    assertThat(unauthenticated.body()).contains("Fault");
-    assertThat(postSoap(normalReading, token).statusCode()).isEqualTo(200);
+  @Test
+  void correlationIdIsGeneratedReusedAndReturnedForSoapFaults() throws Exception {
+    var generated = postSoap(soapEnvelope("<invalid/>"), null);
+    assertThat(generated.headers().firstValue("X-Correlation-ID"))
+        .hasValueSatisfying(value -> assertThat(value).matches("[0-9a-f-]{36}"));
 
-    var oversized = postSoap(registerReadingEnvelope("a".repeat(1_200_001)), token);
-    assertThat(oversized.statusCode()).isEqualTo(413);
-    assertThat(oversized.body()).isEqualTo("Request too large").doesNotContain("Fault");
+    var received = postSoap(soapEnvelope("<invalid/>"), null, "client-request_42");
+    assertThat(received.headers().firstValue("X-Correlation-ID")).contains("client-request_42");
+
+    var invalid = postSoap(soapEnvelope("<invalid/>"), null, "unsafe value");
+    assertThat(invalid.headers().firstValue("X-Correlation-ID"))
+        .hasValueSatisfying(value -> assertThat(value).matches("[0-9a-f-]{36}"));
+  }
+
+  @Test
+  void actuatorExposesOnlyOperationalEndpointsAndReadinessIncludesDatabase() throws Exception {
+    assertThat(get("/actuator/health").body()).contains("\"status\":\"UP\"");
+    assertThat(get("/actuator/health/liveness").body()).contains("\"status\":\"UP\"");
+    assertThat(get("/actuator/health/readiness").body()).contains("\"status\":\"UP\"");
+    assertThat(get("/actuator/prometheus").statusCode()).isEqualTo(200);
+    assertThat(get("/actuator/env").statusCode()).isIn(403, 404);
+    assertThat(get("/actuator/beans").statusCode()).isIn(403, 404);
+  }
+
+  @Test
+  void soapMetricsAreCreatedWithoutHighCardinalityTags() throws Exception {
+    postSoap(soapEnvelope("<invalid/>"), null);
+
+    assertThat(meterRegistry.find("soap.requests").meters()).isNotEmpty();
+    assertThat(meterRegistry.find("soap.request.duration").meters()).isNotEmpty();
+    assertThat(
+            meterRegistry.find("soap.requests").meters().stream()
+                .flatMap(meter -> meter.getId().getTags().stream())
+                .map(tag -> tag.getKey()))
+        .doesNotContain("userId", "readingId", "word", "email", "correlationId");
   }
 
   @AfterEach
@@ -376,6 +443,11 @@ class SoapApplicationTests {
   }
 
   private HttpResponse<String> postSoap(String body, String token) throws Exception {
+    return postSoap(body, token, null);
+  }
+
+  private HttpResponse<String> postSoap(String body, String token, String correlationId)
+      throws Exception {
     var request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + serverPort + "/ws"))
             .header("Content-Type", "text/xml; charset=UTF-8")
@@ -383,8 +455,20 @@ class SoapApplicationTests {
     if (token != null) {
       request.header("Authorization", "Bearer " + token);
     }
+    if (correlationId != null) {
+      request.header("X-Correlation-ID", correlationId);
+    }
     return HttpClient.newHttpClient()
         .send(request.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+  }
+
+  private HttpResponse<String> get(String path) throws Exception {
+    return HttpClient.newHttpClient()
+        .send(
+            HttpRequest.newBuilder(URI.create("http://localhost:" + serverPort + path))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
   }
 
   private <T> ConcurrentResults<T> runConcurrently(

@@ -29,7 +29,7 @@ public class SecurityConfiguration {
     var registration = new FilterRegistrationBean<>(filter);
     registration.setName("requestSizeLimitFilter");
     registration.addUrlPatterns("/ws/*");
-    registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
     return registration;
   }
 
@@ -78,7 +78,13 @@ public class SecurityConfiguration {
         // SOAP login and protected operations share /ws. Operation-level authentication is
         // enforced by SoapSecurityInterceptor without parsing XML in this HTTP filter chain.
         .authorizeHttpRequests(
-            requests -> requests.requestMatchers("/ws/**").permitAll().anyRequest().denyAll())
+            requests ->
+                requests
+                    .requestMatchers(
+                        "/ws/**", "/actuator/health/**", "/actuator/info", "/actuator/prometheus")
+                    .permitAll()
+                    .anyRequest()
+                    .denyAll())
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
