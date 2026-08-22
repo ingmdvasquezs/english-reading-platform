@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -48,7 +49,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     } catch (JwtException exception) {
       meters.counter("security.authentication.failures", "reason", "invalid_token").increment();
       SecurityContextHolder.clearContext();
-      response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid bearer token");
+      rejectInvalidToken(response);
     }
+  }
+
+  private void rejectInvalidToken(HttpServletResponse response) throws IOException {
+    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    response.setContentType("text/plain");
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    response.getWriter().write("Invalid bearer token");
+    response.flushBuffer();
   }
 }

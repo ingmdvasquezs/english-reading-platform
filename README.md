@@ -10,12 +10,12 @@ Requisitos: JDK 26 y Docker.
 
 ```shell
 docker compose up -d
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-El perfil por defecto es `local`. Usa PostgreSQL en `localhost:5432`, LibreTranslate en
-`localhost:5000` y un secreto JWT exclusivamente de desarrollo. El servicio SOAP se publica en
-`/ws` y el WSDL en `/ws/readings.wsdl`.
+No existe un perfil implícito: `local` debe activarse expresamente. Ese perfil usa PostgreSQL en
+`localhost:5432`, LibreTranslate en `localhost:5000` y un secreto JWT exclusivamente de
+desarrollo. El servicio SOAP se publica en `/ws` y el WSDL en `/ws/readings.wsdl`.
 
 ## Producción
 
@@ -72,4 +72,29 @@ arbitrarios en esta fase.
 git diff --check
 ```
 
+La verificación normal es también la verificación de release: requiere Docker y ejecuta los E2E
+Tomcat/PostgreSQL sin permitir que Testcontainers los omita silenciosamente. Para un ciclo local
+rápido y explícito sin Docker puede usarse `./mvnw -Pfast verify`; ese perfil no debe usarse para
+aprobar un release.
+
+## Imagen de aplicación
+
+Después de `./mvnw clean package`, construir con:
+
+```shell
+docker build -t english-reading-platform:local .
+docker run --rm -p 8080:8080 --env-file .env -e SPRING_PROFILES_ACTIVE=prod \
+  english-reading-platform:local
+```
+
+La imagen usa Eclipse Temurin JRE 26 fijado por digest, ejecuta como usuario no-root y no contiene
+credenciales. PostgreSQL, JWT y proveedores se configuran exclusivamente mediante las variables
+del perfil `prod`. El `ENTRYPOINT` exec-form permite que SIGTERM llegue directamente a Java y sea
+atendido por el graceful shutdown configurado en Spring.
+
 Docker Compose es únicamente para desarrollo local.
+
+`listUserReadings` devuelve únicamente metadatos de listado (`readingId`, `title`, `language` y
+`createdAt`). El contenido completo se obtiene mediante `getReading`. Este es el contrato inicial
+pre-producción; cualquier cambio SOAP incompatible posterior deberá publicarse con versionado
+explícito y no como una modificación silenciosa del contrato existente.

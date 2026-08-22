@@ -123,6 +123,15 @@
         </xs:sequence>
     </xs:complexType>
 
+    <xs:complexType name="readingSummaryType">
+        <xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="language" type="xs:string"/>
+            <xs:element name="createdAt" type="xs:dateTime" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
     <xs:complexType name="vocabularyEntryType">
         <xs:sequence>
             <xs:element name="entryId" type="xs:string" minOccurs="0"/>
@@ -169,7 +178,7 @@
     </xs:element>
     <xs:element name="listUserReadingsResponse">
         <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
-            <xs:element name="readings" type="tns:readingType" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="readings" type="tns:readingSummaryType" minOccurs="0" maxOccurs="unbounded"/>
         </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
     </xs:element>
 

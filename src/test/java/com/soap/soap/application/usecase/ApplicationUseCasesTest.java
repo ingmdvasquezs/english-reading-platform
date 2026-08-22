@@ -18,6 +18,7 @@ import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.ReadingSummary;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -220,9 +221,9 @@ class ApplicationUseCasesTest {
   @Test
   void listsReadingsUsingApplicationPagination() {
     var request = new PageRequest(1, 10);
-    var expected = new PageResult<Reading>(List.of(), 1, 10, 12);
+    var expected = new PageResult<ReadingSummary>(List.of(), 1, 10, 12);
     when(users.existsById(user.id())).thenReturn(true);
-    when(readings.findByUserId(user.id(), request)).thenReturn(expected);
+    when(readings.findSummariesByUserId(user.id(), request)).thenReturn(expected);
 
     assertThat(new ListUserReadingsUseCase(users, readings, currentUser).listUserReadings(request))
         .isEqualTo(expected);

@@ -16,7 +16,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -29,7 +28,6 @@ public class AnalyzeReadingUseCase implements AnalyzeReadingPort {
   private final CurrentUserPort currentUser;
 
   @Override
-  @Transactional(readOnly = true)
   public ReadingAnalysis analyzeReading(UUID readingId) {
     var userId = currentUser.requireUserId();
     if (readingId == null) {

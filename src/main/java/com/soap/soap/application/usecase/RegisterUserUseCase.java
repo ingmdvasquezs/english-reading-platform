@@ -11,7 +11,6 @@ import com.soap.soap.domain.model.User;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -21,7 +20,6 @@ public class RegisterUserUseCase implements RegisterUserPort {
   private final InputLimits limits;
 
   @Override
-  @Transactional
   public User registerUser(RegisterUserCommand command) {
     if (command == null) throw new InvalidApplicationArgumentException("Command must not be null");
     var name = requireText(command.name(), "Name");

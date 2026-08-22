@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -31,7 +32,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
       "app.rate-limit.login.requests=2",
       "app.rate-limit.login.window=1m"
     })
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
+@ActiveProfiles("local")
 class RateLimitHttpE2ETest {
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
@@ -63,6 +65,42 @@ class RateLimitHttpE2ETest {
     var counter = meters.find("security.rate_limited").tag("policy", "login").counter();
     assertThat(counter).isNotNull();
     assertThat(counter.count()).isEqualTo(2.0);
+  }
+
+  @Test
+  void invalidJwtReturnsCommittedHttp401WithCorrelationIdWithoutSoapDispatch() throws Exception {
+    var correlationId = "jwt-e2e-correlation";
+    var body =
+        """
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+          <soapenv:Body>
+            <getReadingRequest xmlns="http://soap.com/english-reading/readings">
+              <readingId>00000000-0000-0000-0000-000000000001</readingId>
+            </getReadingRequest>
+          </soapenv:Body>
+        </soapenv:Envelope>
+        """;
+    var request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + serverPort + "/ws"))
+            .header("Content-Type", "text/xml; charset=UTF-8")
+            .header("Authorization", "Bearer invalid-token")
+            .header("X-Correlation-ID", correlationId)
+            .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+            .build();
+
+    var response =
+        HttpClient.newHttpClient()
+            .send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+    assertThat(response.statusCode()).isEqualTo(401).isNotEqualTo(403);
+    assertThat(response.body())
+        .isEqualTo("Invalid bearer token")
+        .doesNotContain("Fault", "getReadingResponse");
+    assertThat(response.headers().firstValue("Content-Type"))
+        .hasValueSatisfying(
+            value ->
+                assertThat(value).startsWith("text/plain").containsIgnoringCase("charset=UTF-8"));
+    assertThat(response.headers().firstValue("X-Correlation-ID")).contains(correlationId);
   }
 
   private void assertRejected(HttpResponse<String> response) {

@@ -10,6 +10,7 @@ import com.soap.soap.application.exception.ReadingNotFoundException;
 import com.soap.soap.application.model.AccessToken;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.ReadingSummary;
 import com.soap.soap.application.port.in.AddWordToVocabularyPort;
 import com.soap.soap.application.port.in.AnalyzeReadingPort;
 import com.soap.soap.application.port.in.ChangeVocabularyStatusPort;
@@ -169,9 +170,11 @@ class SoapEndpointsTest {
     var request = new ListUserReadingsRequest();
     request.setPage(2);
     request.setSize(5);
-    var page = new PageResult<>(List.of(reading), 2, 5, 11);
+    var summary =
+        new ReadingSummary(reading.id(), reading.title(), reading.language(), reading.createdAt());
+    var page = new PageResult<>(List.of(summary), 2, 5, 11);
     when(listReadingsPort.listUserReadings(new PageRequest(2, 5))).thenReturn(page);
-    var mapper = new ListUserReadingsSoapMapper(new GetReadingSoapMapper());
+    var mapper = new ListUserReadingsSoapMapper();
 
     var response = new ListUserReadingsEndpoint(listReadingsPort, mapper).listUserReadings(request);
 
@@ -179,6 +182,8 @@ class SoapEndpointsTest {
     assertThat(response.getSize()).isEqualTo(5);
     assertThat(response.getTotalElements()).isEqualTo(11);
     assertThat(response.getReadings()).hasSize(1);
+    assertThat(response.getReadings().getFirst().getClass().getMethods())
+        .noneMatch(method -> method.getName().equals("getContent"));
   }
 
   @Test

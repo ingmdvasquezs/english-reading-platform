@@ -1,7 +1,4 @@
 spring:
-  profiles:
-    default: local
-
   datasource:
     hikari:
       maximum-pool-size: ${DB_MAXIMUM_POOL_SIZE:10}

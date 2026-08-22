@@ -71,6 +71,9 @@ class JwtAuthenticationFilterTest {
     when(decoder.decode(token)).thenThrow(new BadJwtException(reason));
     filter.doFilter(request, response, chain);
     assertThat(response.getStatus()).isEqualTo(401);
+    assertThat(response.isCommitted()).isTrue();
+    assertThat(response.getContentType()).startsWith("text/plain").contains("charset=UTF-8");
+    assertThat(response.getContentAsString()).isEqualTo("Invalid bearer token");
     verifyNoInteractions(chain);
   }
 }

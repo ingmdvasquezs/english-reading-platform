@@ -15,7 +15,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -26,7 +25,6 @@ public class GetReadingReaderDataUseCase implements GetReadingReaderDataPort {
   private final CurrentUserPort currentUser;
 
   @Override
-  @Transactional(readOnly = true)
   public ReadingReaderData getReadingReaderData(UUID readingId) {
     if (readingId == null) {
       throw new InvalidApplicationArgumentException("Reading id must not be null");

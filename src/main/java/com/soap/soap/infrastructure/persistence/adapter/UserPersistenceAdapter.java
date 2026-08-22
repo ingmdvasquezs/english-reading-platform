@@ -8,6 +8,7 @@ import com.soap.soap.infrastructure.persistence.repository.JpaUserRepository;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +45,23 @@ public class UserPersistenceAdapter implements UserRepositoryPort {
       var entity = mapper.toEntity(user);
       return mapper.toDomain(repository.saveAndFlush(entity));
     } catch (DataIntegrityViolationException exception) {
-      throw new EmailAlreadyRegisteredException();
+      if (hasConstraint(exception, "uk_users_email_normalized")) {
+        throw new EmailAlreadyRegisteredException();
+      }
+      throw exception;
     }
+  }
+
+  private boolean hasConstraint(Throwable exception, String constraint) {
+    for (var cause = exception; cause != null; cause = cause.getCause()) {
+      if (cause instanceof ConstraintViolationException violation
+          && constraint.equals(violation.getConstraintName())) {
+        return true;
+      }
+      if (cause.getMessage() != null && cause.getMessage().contains(constraint)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

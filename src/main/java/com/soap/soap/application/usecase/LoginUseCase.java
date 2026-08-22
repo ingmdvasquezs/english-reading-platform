@@ -10,7 +10,6 @@ import com.soap.soap.application.port.out.UserRepositoryPort;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -20,7 +19,6 @@ public class LoginUseCase implements LoginPort {
   private final TokenProviderPort tokens;
 
   @Override
-  @Transactional(readOnly = true)
   public AccessToken login(LoginCommand command) {
     if (command == null || command.email() == null || command.password() == null)
       throw new InvalidCredentialsException();

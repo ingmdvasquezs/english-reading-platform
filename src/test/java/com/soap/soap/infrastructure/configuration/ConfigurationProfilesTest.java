@@ -13,8 +13,8 @@ class ConfigurationProfilesTest {
   private final YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
 
   @Test
-  void commonConfigurationDefaultsToTheLocalProfile() throws Exception {
-    assertThat(property("application.yaml", "spring.profiles.default")).isEqualTo("local");
+  void commonConfigurationDoesNotActivateALocalProfileImplicitly() throws Exception {
+    assertThat(property("application.yaml", "spring.profiles.default")).isNull();
     assertThat(property("application.yaml", "server.shutdown")).isEqualTo("graceful");
     assertThat(property("application.yaml", "spring.datasource.hikari.maximum-pool-size"))
         .isEqualTo("${DB_MAXIMUM_POOL_SIZE:10}");
@@ -53,7 +53,7 @@ class ConfigurationProfilesTest {
   }
 
   private String property(String resource, String name) throws Exception {
-    return String.valueOf(
-        loader.load(resource, new ClassPathResource(resource)).getFirst().getProperty(name));
+    var value = loader.load(resource, new ClassPathResource(resource)).getFirst().getProperty(name);
+    return value == null ? null : String.valueOf(value);
   }
 }

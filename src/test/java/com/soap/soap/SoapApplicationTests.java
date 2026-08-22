@@ -8,10 +8,12 @@ import static org.springframework.ws.test.server.ResponseMatchers.noFault;
 import static org.springframework.ws.test.server.ResponseMatchers.xpath;
 
 import com.soap.soap.application.exception.ConcurrentVocabularyModificationException;
+import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.DictionaryEntry;
 import com.soap.soap.application.model.PageRequest;
+import com.soap.soap.application.model.ReadingSummary;
 import com.soap.soap.application.model.WordMeaning;
 import com.soap.soap.application.port.out.DictionaryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
@@ -49,9 +51,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.ApplicationContext;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ws.context.DefaultMessageContext;
@@ -66,7 +70,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = "security.jwt.secret=test-only-secret-with-at-least-32-bytes")
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
+@ActiveProfiles("local")
 class SoapApplicationTests {
 
   @Container @ServiceConnection
@@ -633,8 +638,110 @@ class SoapApplicationTests {
     assertThat(reading.id()).isNotNull();
     assertThat(reading.createdAt()).isNotNull();
     assertThat(readings.findById(reading.id())).contains(reading);
-    assertThat(readings.findByUserId(user.id(), new PageRequest(0, 10)).content())
-        .containsExactly(reading);
+    assertThat(readings.findSummariesByUserId(user.id(), new PageRequest(0, 10)).content())
+        .singleElement()
+        .satisfies(
+            summary -> {
+              assertThat(summary.id()).isEqualTo(reading.id());
+              assertThat(summary.title()).isEqualTo(reading.title());
+              assertThat(summary.language()).isEqualTo(reading.language());
+            });
+  }
+
+  @Test
+  void postgresEmailConstraintMapsOnlyTheNormalizedEmailConflict() {
+    var email = "constraint-" + java.util.UUID.randomUUID() + "@example.com";
+    users.save(new User(null, "First", email, "hash", null));
+
+    assertThatThrownBy(
+            () -> users.save(new User(null, "Second", email.toUpperCase(), "hash", null)))
+        .isInstanceOf(EmailAlreadyRegisteredException.class);
+  }
+
+  @Test
+  void postgresUnrelatedIntegrityFailureRemainsAServerSidePersistenceFailure() {
+    assertThatThrownBy(
+            () ->
+                users.save(
+                    new User(
+                        null,
+                        "x".repeat(101),
+                        "long-name-" + java.util.UUID.randomUUID() + "@example.com",
+                        "hash",
+                        null)))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .isNotInstanceOf(EmailAlreadyRegisteredException.class);
+  }
+
+  @Test
+  @Transactional
+  void listsOnlyOwnedReadingSummariesInDescendingOrderWithPagination() {
+    var now = LocalDateTime.now();
+    var older =
+        readings.save(new Reading(null, user, "Older", "secret older", "en", now.minusMinutes(1)));
+    var newer = readings.save(new Reading(null, user, "Newer", "secret newer", "es", now));
+    var otherUser =
+        users.save(
+            new User(
+                null,
+                "Grace",
+                "grace-" + java.util.UUID.randomUUID() + "@example.com",
+                "{bcrypt}$2a$10$invalidlegacycredentialinvalidlegacycredentialinv",
+                null));
+    readings.save(new Reading(null, otherUser, "Not owned", "secret foreign", "en", null));
+
+    var firstPage = readings.findSummariesByUserId(user.id(), new PageRequest(0, 1));
+    var secondPage = readings.findSummariesByUserId(user.id(), new PageRequest(1, 1));
+
+    assertThat(firstPage.totalElements()).isEqualTo(2);
+    assertThat(firstPage.content()).extracting(ReadingSummary::id).containsExactly(newer.id());
+    assertThat(secondPage.content()).extracting(ReadingSummary::id).containsExactly(older.id());
+    assertThat(firstPage.content()).noneMatch(summary -> summary.title().equals("Not owned"));
+    assertThat(ReadingSummary.class.getRecordComponents())
+        .extracting(java.lang.reflect.RecordComponent::getName)
+        .doesNotContain("content");
+  }
+
+  @Test
+  void soapListingOmitsContentWhileGetReadingReturnsIt() {
+    var reading =
+        readings.save(new Reading(null, user, "Summary title", "full private content", "en", null));
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listUserReadingsRequest xmlns="http://soap.com/english-reading/readings">
+                        <page>0</page><size>10</size>
+                      </listUserReadingsRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='readingId']")
+                  .evaluatesTo(reading.id().toString()))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='content']").doesNotExist());
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <getReadingRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>%s</readingId>
+                      </getReadingRequest>
+                      """
+                          .formatted(reading.id()))))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("//*[local-name()='reading']/*[local-name()='content']")
+                  .evaluatesTo("full private content"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
   }
 
   @Test
