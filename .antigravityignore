@@ -1,0 +1,17 @@
+# Dependencias y entornos
+node_modules/
+vendor/
+venv/
+.env*
+
+# Salidas de compilación y empaquetado
+dist/
+build/
+*.exe
+*.dll
+
+# Logs, bases de datos y caches
+*.log
+*.sqlite
+.git/
+.cache/

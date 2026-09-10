@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: ${DOCUMENT_MULTIPART_MAX_FILE_SIZE:50MB}
+      max-request-size: ${DOCUMENT_MULTIPART_MAX_REQUEST_SIZE:51MB}
   datasource:
     hikari:
       maximum-pool-size: ${DB_MAXIMUM_POOL_SIZE:10}
@@ -59,17 +63,51 @@ security:
     expiration: ${JWT_EXPIRATION:3600s}
 
 dictionary:
-  free:
-    connect-timeout: ${DICTIONARY_FREE_CONNECT_TIMEOUT:2s}
-    read-timeout: ${DICTIONARY_FREE_READ_TIMEOUT:3s}
+  client:
+    timeout: ${DICTIONARY_CLIENT_TIMEOUT:7s}
+    max-retries: ${DICTIONARY_CLIENT_MAX_RETRIES:1}
+    retry-delay: ${DICTIONARY_CLIENT_RETRY_DELAY:400ms}
+  merriam-webster:
+    base-url: ${MERRIAM_WEBSTER_BASE_URL:https://www.dictionaryapi.com}
+    api-key: ${MERRIAM_WEBSTER_API_KEY:}
+    connect-timeout: ${MERRIAM_WEBSTER_CONNECT_TIMEOUT:2s}
+    read-timeout: ${MERRIAM_WEBSTER_READ_TIMEOUT:3s}
 
 translation:
-  libre:
-    connect-timeout: ${LIBRETRANSLATE_CONNECT_TIMEOUT:2s}
-    read-timeout: ${LIBRETRANSLATE_READ_TIMEOUT:3s}
+  client:
+    timeout: ${TRANSLATION_CLIENT_TIMEOUT:7s}
+    max-retries: ${TRANSLATION_CLIENT_MAX_RETRIES:1}
+    retry-delay: ${TRANSLATION_CLIENT_RETRY_DELAY:400ms}
+  azure:
+    base-url: ${AZURE_TRANSLATOR_BASE_URL:https://api.cognitive.microsofttranslator.com}
+    api-key: ${AZURE_TRANSLATOR_KEY:}
+    region: ${AZURE_TRANSLATOR_REGION:}
+    connect-timeout: ${AZURE_TRANSLATOR_CONNECT_TIMEOUT:2s}
+    read-timeout: ${AZURE_TRANSLATOR_READ_TIMEOUT:3s}
+
+recommendation:
+  v2:
+    shadow-enabled: ${RECOMMENDATION_V2_SHADOW_ENABLED:true}
 
 # Security hardening defaults. Override with environment-specific configuration when necessary.
 app:
+  documents:
+    storage-root: ${DOCUMENT_STORAGE_ROOT:.private-assets}
+    max-source-bytes: ${DOCUMENT_MAX_SOURCE_BYTES:52428800}
+    max-zip-entries: ${DOCUMENT_MAX_ZIP_ENTRIES:2000}
+    max-entry-bytes: ${DOCUMENT_MAX_ENTRY_BYTES:10485760}
+    max-expanded-bytes: ${DOCUMENT_MAX_EXPANDED_BYTES:157286400}
+    max-compression-ratio: ${DOCUMENT_MAX_COMPRESSION_RATIO:100}
+    max-cover-bytes: ${DOCUMENT_MAX_COVER_BYTES:10485760}
+    max-cover-pixels: ${DOCUMENT_MAX_COVER_PIXELS:25000000}
+    max-pdf-pages: ${DOCUMENT_MAX_PDF_PAGES:1000}
+    max-extracted-characters: ${DOCUMENT_MAX_EXTRACTED_CHARACTERS:5000000}
+    supported-languages: ${DOCUMENT_SUPPORTED_LANGUAGES:en}
+    executor-core-size: ${DOCUMENT_EXECUTOR_CORE_SIZE:2}
+    executor-max-size: ${DOCUMENT_EXECUTOR_MAX_SIZE:4}
+    executor-queue-capacity: ${DOCUMENT_EXECUTOR_QUEUE_CAPACITY:20}
+    orphan-minimum-age: ${DOCUMENT_ORPHAN_MINIMUM_AGE:24h}
+    reconciliation-delay: ${DOCUMENT_RECONCILIATION_DELAY:24h}
   correlation-id:
     header: X-Correlation-ID
     maximum-length: 64

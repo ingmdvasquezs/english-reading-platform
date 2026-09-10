@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.soap.soap.application.exception.ReadingAccessDeniedException;
 import com.soap.soap.application.exception.ReadingNotFoundException;
 import com.soap.soap.application.model.AccessToken;
+import com.soap.soap.application.model.LoginResult;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.ReadingSummary;
@@ -34,7 +35,9 @@ import com.soap.soap.infrastructure.soap.generated.GetReadingRequest;
 import com.soap.soap.infrastructure.soap.generated.ListUserReadingsRequest;
 import com.soap.soap.infrastructure.soap.generated.ListUserVocabularyRequest;
 import com.soap.soap.infrastructure.soap.generated.LoginRequest;
+import com.soap.soap.infrastructure.soap.generated.RecommendPlatformReadingsRequest;
 import com.soap.soap.infrastructure.soap.generated.RegisterUserRequest;
+import com.soap.soap.infrastructure.soap.generated.SetVocabularyStatusRequest;
 import com.soap.soap.infrastructure.soap.generated.VocabularyStatusType;
 import com.soap.soap.infrastructure.soap.mapper.AddWordToVocabularySoapMapper;
 import com.soap.soap.infrastructure.soap.mapper.AnalyzeReadingSoapMapper;
@@ -43,6 +46,7 @@ import com.soap.soap.infrastructure.soap.mapper.GetReadingSoapMapper;
 import com.soap.soap.infrastructure.soap.mapper.ListUserReadingsSoapMapper;
 import com.soap.soap.infrastructure.soap.mapper.ListUserVocabularySoapMapper;
 import com.soap.soap.infrastructure.soap.mapper.UserAuthenticationSoapMapper;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -76,7 +80,9 @@ class SoapEndpointsTest {
                 AddWordToVocabularyRequest.class,
                 ChangeVocabularyStatusRequest.class,
                 ListUserVocabularyRequest.class,
-                AnalyzeReadingRequest.class))
+                AnalyzeReadingRequest.class,
+                RecommendPlatformReadingsRequest.class,
+                SetVocabularyStatusRequest.class))
         .allSatisfy(
             type ->
                 assertThat(type.getMethods())
@@ -105,10 +111,11 @@ class SoapEndpointsTest {
     request.setEmail("ada@example.com");
     request.setPassword("secret123");
     when(loginPort.login(org.mockito.ArgumentMatchers.any()))
-        .thenReturn(new AccessToken("signed-jwt", "Bearer", 3600));
+        .thenReturn(new LoginResult(new AccessToken("signed-jwt", "Bearer", 3600), false));
     var response = new LoginEndpoint(loginPort, new UserAuthenticationSoapMapper()).login(request);
     assertThat(response.getAccessToken()).isEqualTo("signed-jwt");
     assertThat(response.getTokenType()).isEqualTo("Bearer");
+    assertThat(response.isOnboardingCompleted()).isFalse();
   }
 
   @BeforeEach
@@ -171,7 +178,20 @@ class SoapEndpointsTest {
     request.setPage(2);
     request.setSize(5);
     var summary =
-        new ReadingSummary(reading.id(), reading.title(), reading.language(), reading.createdAt());
+        new ReadingSummary(
+            reading.id(),
+            reading.title(),
+            reading.language(),
+            reading.createdAt(),
+            5,
+            1,
+            1,
+            1,
+            1,
+            1,
+            new BigDecimal("56.00"),
+            new BigDecimal("80.00"),
+            null);
     var page = new PageResult<>(List.of(summary), 2, 5, 11);
     when(listReadingsPort.listUserReadings(new PageRequest(2, 5))).thenReturn(page);
     var mapper = new ListUserReadingsSoapMapper();
@@ -182,6 +202,12 @@ class SoapEndpointsTest {
     assertThat(response.getSize()).isEqualTo(5);
     assertThat(response.getTotalElements()).isEqualTo(11);
     assertThat(response.getReadings()).hasSize(1);
+    assertThat(response.getReadings().getFirst().getUniqueWords()).isEqualTo(5);
+    assertThat(response.getReadings().getFirst().getUnclassifiedWords()).isEqualTo(1);
+    assertThat(response.getReadings().getFirst().getVocabularyFitPercentage())
+        .isEqualByComparingTo("56.00");
+    assertThat(response.getReadings().getFirst().getClassificationConfidencePercentage())
+        .isEqualByComparingTo("80.00");
     assertThat(response.getReadings().getFirst().getClass().getMethods())
         .noneMatch(method -> method.getName().equals("getContent"));
   }

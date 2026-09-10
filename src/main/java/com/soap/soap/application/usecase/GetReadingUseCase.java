@@ -26,7 +26,7 @@ public class GetReadingUseCase implements GetReadingPort {
     var userId = currentUser.requireUserId();
     return readings
         .findById(readingId)
-        .filter(r -> userId.equals(r.user().id()))
+        .filter(reading -> reading.isAccessibleBy(userId))
         .orElseThrow(() -> new ReadingNotFoundException(readingId));
   }
 }

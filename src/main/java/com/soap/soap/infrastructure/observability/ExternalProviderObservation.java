@@ -1,5 +1,9 @@
 package com.soap.soap.infrastructure.observability;
 
+import com.soap.soap.application.exception.DictionaryInvalidResponseException;
+import com.soap.soap.application.exception.DictionaryTimeoutException;
+import com.soap.soap.application.exception.DictionaryUnavailableException;
+import com.soap.soap.application.exception.WordNotFoundException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.net.SocketTimeoutException;
@@ -33,12 +37,20 @@ public class ExternalProviderObservation {
       if ("timeout".equals(category)) {
         meters.counter("external.provider.timeouts", "provider", provider).increment();
       }
-      LOGGER.warn(
-          "external.provider.completed provider={} outcome=failure errorCategory={} status={} durationMs={}",
-          provider,
-          category,
-          status(exception),
-          elapsedMillis(startedAt));
+      if ("not_found".equals(category)) {
+        LOGGER.info(
+            "external.provider.completed provider={} outcome=not_found status={} durationMs={}",
+            provider,
+            status(exception),
+            elapsedMillis(startedAt));
+      } else {
+        LOGGER.warn(
+            "external.provider.completed provider={} outcome=failure errorCategory={} status={} durationMs={}",
+            provider,
+            category,
+            status(exception),
+            elapsedMillis(startedAt));
+      }
       throw exception;
     }
   }
@@ -69,6 +81,22 @@ public class ExternalProviderObservation {
   }
 
   private String category(Throwable throwable) {
+    if (throwable instanceof WordNotFoundException) {
+      return "not_found";
+    }
+    if (throwable instanceof DictionaryTimeoutException) {
+      return "timeout";
+    }
+    if (throwable instanceof DictionaryInvalidResponseException) {
+      return "invalid_response";
+    }
+    if (throwable instanceof DictionaryUnavailableException) {
+      var responseException = findCause(throwable, RestClientResponseException.class);
+      return responseException != null
+              && isTransientStatus(responseException.getStatusCode().value())
+          ? "transient_provider_error"
+          : "provider_error";
+    }
     if (hasCause(throwable, SocketTimeoutException.class)) {
       return "timeout";
     }
@@ -77,6 +105,10 @@ public class ExternalProviderObservation {
       return responseException.getStatusCode().is4xxClientError() ? "http_4xx" : "http_5xx";
     }
     return "provider_error";
+  }
+
+  private boolean isTransientStatus(int status) {
+    return status == 500 || status == 502 || status == 503 || status == 504 || status == 522;
   }
 
   private String status(Throwable throwable) {

@@ -2,6 +2,7 @@ package com.soap.soap.application.service;
 
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,12 @@ public class LanguageNormalizer {
     if (!SUPPORTED_LANGUAGE.matcher(trimmed).matches()) {
       throw new InvalidApplicationArgumentException("Language format is invalid");
     }
-    return trimmed.toLowerCase(Locale.ROOT);
+    var normalized = trimmed.toLowerCase(Locale.ROOT);
+    return normalized.equals("en-us") || normalized.equals("en-gb") ? "en" : normalized;
+  }
+
+  public Set<String> equivalentLanguages(String language) {
+    var normalized = normalize(language);
+    return normalized.equals("en") ? Set.of("en", "en-us", "en-gb") : Set.of(normalized);
   }
 }

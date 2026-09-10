@@ -10,6 +10,7 @@ import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.exception.InvalidCredentialsException;
 import com.soap.soap.application.model.AccessToken;
 import com.soap.soap.application.model.InputLimits;
+import com.soap.soap.application.model.LoginResult;
 import com.soap.soap.application.port.out.PasswordEncoderPort;
 import com.soap.soap.application.port.out.TokenProviderPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -41,6 +42,7 @@ class AuthenticationUseCasesTest {
     assertThat(saved.getValue().email()).isEqualTo("ada@example.com");
     assertThat(saved.getValue().passwordHash()).isEqualTo("bcrypt-hash");
     assertThat(result.name()).isEqualTo("Ada");
+    assertThat(result.onboardingCompleted()).isFalse();
   }
 
   @Test
@@ -62,10 +64,10 @@ class AuthenticationUseCasesTest {
     when(users.findByEmail("ada@example.com")).thenReturn(Optional.of(user));
     when(passwords.matches("secret123", "hash")).thenReturn(true);
     when(tokens.create(user)).thenReturn(token);
-    assertThat(
-            new LoginUseCase(users, passwords, tokens, InputLimits.defaults())
-                .login(new LoginCommand("ADA@example.com", "secret123")))
-        .isEqualTo(token);
+    var result =
+        new LoginUseCase(users, passwords, tokens, InputLimits.defaults())
+            .login(new LoginCommand("ADA@example.com", "secret123"));
+    assertThat(result).isEqualTo(new LoginResult(token, false));
   }
 
   @Test
@@ -105,7 +107,7 @@ class AuthenticationUseCasesTest {
   void acceptsCredentialLengthsAtTheirBoundaries() {
     var email = "a".repeat(242) + "@example.com";
     var password = "x".repeat(128);
-    var user = new User(UUID.randomUUID(), "Ada", email, "hash", LocalDateTime.now());
+    var user = new User(UUID.randomUUID(), "Ada", email, "hash", LocalDateTime.now(), true);
     var token = new AccessToken("jwt", "Bearer", 3600);
     when(users.findByEmail(email)).thenReturn(Optional.of(user));
     when(passwords.matches(password, "hash")).thenReturn(true);
@@ -114,6 +116,6 @@ class AuthenticationUseCasesTest {
     assertThat(
             new LoginUseCase(users, passwords, tokens, InputLimits.defaults())
                 .login(new LoginCommand(email, password)))
-        .isEqualTo(token);
+        .isEqualTo(new LoginResult(token, true));
   }
 }

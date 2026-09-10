@@ -16,15 +16,5 @@ services:
       timeout: 5s
       retries: 5
 
-  libretranslate:
-    image: libretranslate/libretranslate:v1.9.6
-    container_name: english-reading-libretranslate
-    ports:
-      - "5000:5000"
-    command: ["--load-only", "en,es"]
-    volumes:
-      - libretranslate_data:/home/libretranslate/.local
-
 volumes:
   english_reading_data:
-  libretranslate_data:

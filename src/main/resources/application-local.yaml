@@ -14,12 +14,3 @@ security:
   jwt:
     # Development-only value. Production has no fallback.
     secret: ${JWT_SECRET:local-development-secret-change-before-production}
-
-dictionary:
-  free:
-    base-url: ${DICTIONARY_FREE_BASE_URL:https://api.dictionaryapi.dev}
-
-translation:
-  libre:
-    base-url: ${LIBRETRANSLATE_BASE_URL:http://localhost:5000}
-    api-key: ${LIBRETRANSLATE_API_KEY:}

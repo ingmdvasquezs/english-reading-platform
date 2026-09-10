@@ -58,7 +58,7 @@ class ObservabilityTest {
       assertThatThrownBy(
               () ->
                   observation.observe(
-                      "free_dictionary",
+                      "merriam_webster",
                       () -> {
                         throw new IllegalStateException("api-key=super-secret");
                       }))
@@ -87,7 +87,7 @@ class ObservabilityTest {
     assertThatThrownBy(
             () ->
                 observation.observe(
-                    "libre_translate",
+                    "azure_translator",
                     () -> {
                       throw new ResourceAccessException(
                           "request failed", new SocketTimeoutException("timed out"));
@@ -97,7 +97,7 @@ class ObservabilityTest {
     assertThat(
             registry
                 .find("external.provider.timeouts")
-                .tag("provider", "libre_translate")
+                .tag("provider", "azure_translator")
                 .counter())
         .isNotNull()
         .extracting(counter -> counter.count())

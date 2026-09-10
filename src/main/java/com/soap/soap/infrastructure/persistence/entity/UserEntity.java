@@ -25,4 +25,18 @@ public class UserEntity extends CreatedAtEntity {
 
   @Column(name = "password_hash", nullable = false, length = 100)
   private String passwordHash;
+
+  @Column(name = "onboarding_completed", nullable = false)
+  private boolean onboardingCompleted;
+
+  @Column(length = 50)
+  private String alias;
+
+  private Integer age;
+
+  @Column(name = "native_language", length = 10)
+  private String nativeLanguage;
+
+  @Column(name = "learning_language", nullable = false, length = 10)
+  private String learningLanguage;
 }

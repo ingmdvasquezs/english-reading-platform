@@ -56,3 +56,6 @@ Thumbs.db
 *~
 ### Local Maven ###
 .m2/
+
+### Private Assets / Stored Documents ###
+.private-assets/

@@ -38,7 +38,7 @@ public class AnalyzeReadingUseCase implements AnalyzeReadingPort {
     }
     var reading =
         readings.findById(readingId).orElseThrow(() -> new ReadingNotFoundException(readingId));
-    if (!userId.equals(reading.user().id())) {
+    if (!reading.isAccessibleBy(userId)) {
       throw new ReadingNotFoundException(readingId);
     }
 

@@ -15,13 +15,13 @@ security:
     secret: ${JWT_SECRET}
 
 dictionary:
-  free:
-    base-url: ${DICTIONARY_FREE_BASE_URL}
+  merriam-webster:
+    api-key: ${MERRIAM_WEBSTER_API_KEY}
 
 translation:
-  libre:
-    base-url: ${LIBRETRANSLATE_BASE_URL}
-    api-key: ${LIBRETRANSLATE_API_KEY:}
+  azure:
+    api-key: ${AZURE_TRANSLATOR_KEY}
+    region: ${AZURE_TRANSLATOR_REGION}
 
 server:
   error:

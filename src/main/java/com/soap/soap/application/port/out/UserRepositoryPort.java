@@ -12,5 +12,9 @@ public interface UserRepositoryPort {
 
   Optional<User> findByEmail(String email);
 
+  boolean existsByAliasIgnoreCaseAndIdNot(String alias, UUID id);
+
   User save(User user);
+
+  boolean markOnboardingCompleted(UUID id);
 }

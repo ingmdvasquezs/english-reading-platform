@@ -8,6 +8,7 @@ import com.soap.soap.application.model.ReaderToken;
 import com.soap.soap.application.model.ReaderTokenType;
 import com.soap.soap.application.model.ReadingReaderData;
 import com.soap.soap.application.port.in.GetReadingReaderDataPort;
+import com.soap.soap.domain.model.ReadingProgressStatus;
 import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.infrastructure.soap.exception.InvalidSoapRequestException;
 import com.soap.soap.infrastructure.soap.generated.GetReadingReaderDataRequest;
@@ -37,19 +38,28 @@ class GetReadingReaderDataEndpointTest {
                 "en",
                 List.of(
                     new ReaderToken("Hello", "hello", ReaderTokenType.WORD, VocabularyStatus.KNOWN),
-                    new ReaderToken(", ", null, ReaderTokenType.PUNCTUATION, null))));
+                    new ReaderToken(", ", null, ReaderTokenType.PUNCTUATION, null),
+                    new ReaderToken("world", "world", ReaderTokenType.WORD, null)),
+                ReadingProgressStatus.IN_PROGRESS,
+                7,
+                1));
 
     var response =
         new GetReadingReaderDataEndpoint(port, new GetReadingReaderDataSoapMapper())
             .getReadingReaderData(request);
 
     assertThat(response.getReadingId()).isEqualTo(id.toString());
-    assertThat(response.getTokens()).hasSize(2);
+    assertThat(response.getTokens()).hasSize(3);
     assertThat(response.getTokens().getFirst().getType()).isEqualTo(ReaderTokenTypeType.WORD);
     assertThat(response.getTokens().getFirst().getStatus())
         .isEqualTo(com.soap.soap.infrastructure.soap.generated.VocabularyStatusType.KNOWN);
     assertThat(response.getTokens().get(1).getNormalizedValue()).isNull();
     assertThat(response.getTokens().get(1).getStatus()).isNull();
+    assertThat(response.getTokens().get(2).getNormalizedValue()).isEqualTo("world");
+    assertThat(response.getTokens().get(2).getStatus()).isNull();
+    assertThat(response.getProgressStatus().value()).isEqualTo("IN_PROGRESS");
+    assertThat(response.getCurrentPartOrdinal()).isEqualTo(7);
+    assertThat(response.getPaginationVersion()).isEqualTo(1);
     assertThat(response.getClass().getMethods())
         .noneMatch(
             method ->

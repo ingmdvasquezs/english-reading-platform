@@ -2,8 +2,8 @@ package com.soap.soap.application.usecase;
 
 import com.soap.soap.application.command.LoginCommand;
 import com.soap.soap.application.exception.InvalidCredentialsException;
-import com.soap.soap.application.model.AccessToken;
 import com.soap.soap.application.model.InputLimits;
+import com.soap.soap.application.model.LoginResult;
 import com.soap.soap.application.port.in.LoginPort;
 import com.soap.soap.application.port.out.PasswordEncoderPort;
 import com.soap.soap.application.port.out.TokenProviderPort;
@@ -21,7 +21,7 @@ public class LoginUseCase implements LoginPort {
   private final InputLimits limits;
 
   @Override
-  public AccessToken login(LoginCommand command) {
+  public LoginResult login(LoginCommand command) {
     if (command == null
         || command.email() == null
         || command.password() == null
@@ -34,6 +34,6 @@ public class LoginUseCase implements LoginPort {
             .orElseThrow(InvalidCredentialsException::new);
     if (!passwords.matches(command.password(), user.passwordHash()))
       throw new InvalidCredentialsException();
-    return tokens.create(user);
+    return new LoginResult(tokens.create(user), user.onboardingCompleted());
   }
 }

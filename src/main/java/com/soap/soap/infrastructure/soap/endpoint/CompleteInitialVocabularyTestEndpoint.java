@@ -23,6 +23,7 @@ public class CompleteInitialVocabularyTestEndpoint {
   public CompleteInitialVocabularyTestResponse complete(
       @RequestPayload CompleteInitialVocabularyTestRequest request) {
     return mapper.toResponse(
-        port.completeInitialVocabularyTest(mapper.testId(request), request.getKnownWords()));
+        port.completeInitialVocabularyTest(
+            mapper.testId(request), mapper.classifications(request)));
   }
 }

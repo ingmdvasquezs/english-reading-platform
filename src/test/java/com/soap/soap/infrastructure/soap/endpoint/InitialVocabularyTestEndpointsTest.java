@@ -5,10 +5,14 @@ import static org.mockito.Mockito.when;
 
 import com.soap.soap.application.model.InitialVocabularyTest;
 import com.soap.soap.application.model.InitialVocabularyTestResult;
+import com.soap.soap.application.model.VocabularyClassification;
 import com.soap.soap.application.port.in.CompleteInitialVocabularyTestPort;
 import com.soap.soap.application.port.in.GetInitialVocabularyTestPort;
+import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.infrastructure.soap.generated.CompleteInitialVocabularyTestRequest;
 import com.soap.soap.infrastructure.soap.generated.GetInitialVocabularyTestRequest;
+import com.soap.soap.infrastructure.soap.generated.VocabularyClassificationType;
+import com.soap.soap.infrastructure.soap.generated.VocabularyStatusType;
 import com.soap.soap.infrastructure.soap.mapper.InitialVocabularyTestSoapMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -32,6 +36,7 @@ class InitialVocabularyTestEndpointsTest {
             .get(new GetInitialVocabularyTestRequest());
 
     assertThat(response.getTestId()).isEqualTo("v1");
+    assertThat(response.getText()).isEqualTo("Hello world");
     assertThat(response.getSelectableWords()).containsExactly("hello", "world");
     assertThat(GetInitialVocabularyTestRequest.class.getMethods())
         .noneMatch(method -> method.getName().equals("getUserId"));
@@ -41,8 +46,12 @@ class InitialVocabularyTestEndpointsTest {
   void completesTheTestThroughTheSoapPort() {
     var request = new CompleteInitialVocabularyTestRequest();
     request.setTestId("v1");
-    request.getKnownWords().add("hello");
-    when(completePort.completeInitialVocabularyTest("v1", List.of("hello")))
+    var classification = new VocabularyClassificationType();
+    classification.setWord("hello");
+    classification.setStatus(VocabularyStatusType.KNOWN);
+    request.getClassifications().add(classification);
+    when(completePort.completeInitialVocabularyTest(
+            "v1", List.of(new VocabularyClassification("hello", VocabularyStatus.KNOWN))))
         .thenReturn(new InitialVocabularyTestResult(1, List.of("hello"), 50.0));
 
     var response =

@@ -1,0 +1,85 @@
+package com.soap.soap.application.usecase;
+
+import com.soap.soap.application.command.UpdateMyProfileCommand;
+import com.soap.soap.application.exception.AliasAlreadyInUseException;
+import com.soap.soap.application.exception.InvalidApplicationArgumentException;
+import com.soap.soap.application.exception.UserNotFoundException;
+import com.soap.soap.application.model.InputLimits;
+import com.soap.soap.application.model.UserProfile;
+import com.soap.soap.application.port.in.UpdateMyProfilePort;
+import com.soap.soap.application.port.out.CurrentUserPort;
+import com.soap.soap.application.port.out.UserRepositoryPort;
+import java.util.Locale;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+@Component
+@RequiredArgsConstructor
+public class UpdateMyProfileUseCase implements UpdateMyProfilePort {
+  private static final int MAX_ALIAS_CHARACTERS = 50;
+  private static final int MIN_AGE = 5;
+  private static final int MAX_AGE = 120;
+
+  private final CurrentUserPort currentUser;
+  private final UserRepositoryPort users;
+  private final InputLimits limits;
+
+  @Override
+  @Transactional
+  public UserProfile updateMyProfile(UpdateMyProfileCommand command) {
+    if (command == null) {
+      throw new InvalidApplicationArgumentException("Command must not be null");
+    }
+    var userId = currentUser.requireUserId();
+    var user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+    var name = requiredText(command.name(), "Name", limits.maxNameCharacters());
+    var alias = optionalText(command.alias(), "Alias", MAX_ALIAS_CHARACTERS);
+    var nativeLanguage = optionalLanguage(command.nativeLanguage(), "Native language");
+    var learningLanguage = requiredLanguage(command.learningLanguage(), "Learning language");
+    if (!"en".equals(learningLanguage)) {
+      throw new InvalidApplicationArgumentException("Learning language must be en");
+    }
+    if (command.age() != null && (command.age() < MIN_AGE || command.age() > MAX_AGE)) {
+      throw new InvalidApplicationArgumentException("Age must be between 5 and 120");
+    }
+    if (alias != null && users.existsByAliasIgnoreCaseAndIdNot(alias, userId)) {
+      throw new AliasAlreadyInUseException();
+    }
+    return GetMyProfileUseCase.toProfile(
+        users.save(
+            user.updateProfile(name, alias, command.age(), nativeLanguage, learningLanguage)));
+  }
+
+  private static String requiredText(String value, String field, int maximum) {
+    if (value == null || value.isBlank()) {
+      throw new InvalidApplicationArgumentException(field + " must not be blank");
+    }
+    var normalized = value.trim();
+    if (normalized.length() > maximum) {
+      throw new InvalidApplicationArgumentException(
+          field + " must contain at most " + maximum + " characters");
+    }
+    return normalized;
+  }
+
+  private static String optionalText(String value, String field, int maximum) {
+    if (value == null) return null;
+    return requiredText(value, field, maximum);
+  }
+
+  private static String optionalLanguage(String value, String field) {
+    return value == null ? null : requiredLanguage(value, field);
+  }
+
+  private static String requiredLanguage(String value, String field) {
+    var normalized = requiredText(value, field, 10);
+    var parts = normalized.split("-", -1);
+    var language = parts[0].toLowerCase(Locale.ROOT);
+    var result = parts.length == 1 ? language : language + "-" + parts[1].toUpperCase(Locale.ROOT);
+    if (parts.length > 2 || !result.matches("[a-z]{2,3}(-[A-Z]{2,3})?")) {
+      throw new InvalidApplicationArgumentException(field + " is invalid");
+    }
+    return result;
+  }
+}

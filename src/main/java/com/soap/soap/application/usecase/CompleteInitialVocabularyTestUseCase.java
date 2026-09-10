@@ -1,9 +1,11 @@
 package com.soap.soap.application.usecase;
 
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
+import com.soap.soap.application.exception.OnboardingAlreadyCompletedException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.model.InitialVocabularyTestResult;
 import com.soap.soap.application.model.InputLimits;
+import com.soap.soap.application.model.VocabularyClassification;
 import com.soap.soap.application.port.in.CompleteInitialVocabularyTestPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.InitialVocabularyTestSourcePort;
@@ -16,7 +18,6 @@ import com.soap.soap.domain.model.VocabularyStatus;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class CompleteInitialVocabularyTestUseCase implements CompleteInitialVocabularyTestPort {
+  static final int MINIMUM_ONBOARDING_CLASSIFICATIONS = 10;
   private final UserRepositoryPort users;
   private final UserVocabularyRepositoryPort vocabulary;
   private final InitialVocabularyTestSourcePort source;
@@ -36,62 +38,92 @@ public class CompleteInitialVocabularyTestUseCase implements CompleteInitialVoca
   @Override
   @Transactional
   public InitialVocabularyTestResult completeInitialVocabularyTest(
-      String testId, Collection<String> knownWords) {
-    if (testId == null || knownWords == null) {
-      throw new InvalidApplicationArgumentException("Test id and known words must not be null");
+      String testId, Collection<VocabularyClassification> classifications) {
+    if (testId == null || classifications == null) {
+      throw new InvalidApplicationArgumentException("Test id and classifications must not be null");
     }
-    if (knownWords.size() > limits.maxOnboardingWords()) {
-      throw new InvalidApplicationArgumentException("Too many selected onboarding words");
+    if (classifications.size() > limits.maxOnboardingWords()) {
+      throw new InvalidApplicationArgumentException("Too many onboarding classifications");
     }
     var userId = currentUser.requireUserId();
     var user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+    if (user.onboardingCompleted()) {
+      throw new OnboardingAlreadyCompletedException();
+    }
     var test = source.load();
     if (!test.testId().equals(testId)) {
       throw new InvalidApplicationArgumentException("Unknown initial vocabulary test");
     }
-    var selected = new LinkedHashSet<String>();
-    try {
-      knownWords.forEach(word -> selected.add(processor.normalize(word)));
-    } catch (IllegalArgumentException exception) {
-      throw new InvalidApplicationArgumentException("Known words must not be blank");
+    var normalizedClassifications = new java.util.LinkedHashMap<String, VocabularyStatus>();
+    for (var classification : classifications) {
+      if (classification == null || classification.status() == null) {
+        throw new InvalidApplicationArgumentException(
+            "Every classification must contain a word and status");
+      }
+      try {
+        var normalized = processor.normalize(classification.word());
+        if (normalizedClassifications.putIfAbsent(normalized, classification.status()) != null) {
+          throw new InvalidApplicationArgumentException(
+              "A word must not be classified more than once");
+        }
+      } catch (InvalidApplicationArgumentException exception) {
+        throw exception;
+      } catch (IllegalArgumentException exception) {
+        throw new InvalidApplicationArgumentException("Classified words must not be blank");
+      }
     }
-    if (!new java.util.HashSet<>(test.selectableWords()).containsAll(selected)) {
-      throw new InvalidApplicationArgumentException("Every selected word must belong to the test");
+    if (normalizedClassifications.size() < MINIMUM_ONBOARDING_CLASSIFICATIONS) {
+      throw new InvalidApplicationArgumentException(
+          "At least "
+              + MINIMUM_ONBOARDING_CLASSIFICATIONS
+              + " unique vocabulary classifications are required");
     }
-    var resolvedWords = wordResolver.resolveAll(selected, "en");
-    if (resolvedWords.size() != selected.size()) {
+    if (!new java.util.HashSet<>(test.selectableWords())
+        .containsAll(normalizedClassifications.keySet())) {
+      throw new InvalidApplicationArgumentException(
+          "Every classified word must belong to the test");
+    }
+    var resolvedWords = wordResolver.resolveAll(normalizedClassifications.keySet(), "en");
+    if (resolvedWords.size() != normalizedClassifications.size()) {
       throw new IllegalStateException("Unable to resolve every onboarding word");
     }
     var existingByWordId =
         vocabulary.findByUserIdAndWordIds(
             userId, resolvedWords.values().stream().map(word -> word.id()).toList());
-    var confirmed = new java.util.ArrayList<String>();
+    var known = new java.util.ArrayList<String>();
     var changes = new java.util.ArrayList<UserVocabulary>();
     var now = LocalDateTime.now(clock);
-    for (var value : selected) {
+    for (var classificationEntry : normalizedClassifications.entrySet()) {
+      var value = classificationEntry.getKey();
+      var status = classificationEntry.getValue();
       var word = resolvedWords.get(value);
       var existing = existingByWordId.get(word.id());
-      if (existing != null && existing.status() == VocabularyStatus.IGNORED) {
+      if (existing != null && existing.status() == status) {
+        if (status == VocabularyStatus.KNOWN) {
+          known.add(value);
+        }
         continue;
       }
-      if (existing != null && existing.status() == VocabularyStatus.KNOWN) {
-        confirmed.add(value);
-        continue;
-      }
-      var entry =
+      var vocabularyEntry =
           existing != null
-              ? existing.changeStatus(VocabularyStatus.KNOWN, clock)
-              : new UserVocabulary(null, user, word, VocabularyStatus.KNOWN, now, now);
-      changes.add(entry);
-      confirmed.add(value);
+              ? existing.changeStatus(status, clock)
+              : new UserVocabulary(
+                  null, user, word, status, now, status == VocabularyStatus.KNOWN ? now : null);
+      changes.add(vocabularyEntry);
+      if (status == VocabularyStatus.KNOWN) {
+        known.add(value);
+      }
     }
     if (!changes.isEmpty()) {
       vocabulary.saveAll(changes);
     }
+    if (!users.markOnboardingCompleted(userId)) {
+      throw new OnboardingAlreadyCompletedException();
+    }
     double percentage =
         test.selectableWords().isEmpty()
             ? 0.0
-            : ((double) selected.size() / test.selectableWords().size()) * 100.0;
-    return new InitialVocabularyTestResult(confirmed.size(), confirmed, percentage);
+            : ((double) normalizedClassifications.size() / test.selectableWords().size()) * 100.0;
+    return new InitialVocabularyTestResult(normalizedClassifications.size(), known, percentage);
   }
 }

@@ -13,15 +13,22 @@ import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.DictionaryEntry;
 import com.soap.soap.application.model.PageRequest;
+import com.soap.soap.application.model.PlatformReadingSummary;
 import com.soap.soap.application.model.ReadingSummary;
 import com.soap.soap.application.model.WordMeaning;
+import com.soap.soap.application.port.in.RecommendPlatformReadingsPort;
 import com.soap.soap.application.port.out.DictionaryPort;
+import com.soap.soap.application.port.out.InitialVocabularyTestSourcePort;
+import com.soap.soap.application.port.out.ReadingCollectionRepositoryPort;
+import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.TranslationPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.port.out.WordRepositoryPort;
+import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.Reading;
+import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.User;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
@@ -40,6 +47,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import javax.xml.transform.stream.StreamSource;
@@ -52,6 +60,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.ApplicationContext;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -81,6 +90,11 @@ class SoapApplicationTests {
   @Autowired private WordRepositoryPort words;
   @Autowired private JpaWordRepository jpaWords;
   @Autowired private ReadingRepositoryPort readings;
+  @Autowired private ReadingProgressRepositoryPort readingProgress;
+  @Autowired private ReadingCollectionRepositoryPort collections;
+  @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private RecommendPlatformReadingsPort recommendPlatformReadings;
+  @Autowired private InitialVocabularyTestSourcePort initialVocabularyTestSource;
   @Autowired private UserVocabularyRepositoryPort vocabulary;
   @Autowired private ApplicationContext applicationContext;
   @Autowired private SoapExceptionResolver soapExceptionResolver;
@@ -90,6 +104,623 @@ class SoapApplicationTests {
   @MockitoBean private TranslationPort translationPort;
 
   private User user;
+
+  @Test
+  @Transactional
+  void editorialCollectionMigrationSeedsTheAuditedMembershipsWithoutDuplicates() {
+    var active = collections.findAllActive();
+
+    assertThat(active)
+        .hasSize(6)
+        .extracting(com.soap.soap.domain.model.ReadingCollection::key)
+        .containsExactly(
+            "everyday-life-human-connections",
+            "mysteries-imagination",
+            "science-technology-ideas",
+            "nature-environment",
+            "travel-places-memory",
+            "culture-work-society");
+    assertThat(active)
+        .extracting(com.soap.soap.domain.model.ReadingCollection::displayOrder)
+        .containsExactly(1, 2, 3, 4, 5, 6);
+    assertThat(active)
+        .allMatch(com.soap.soap.domain.model.ReadingCollection::active)
+        .allMatch(collection -> collection.coverKey() == null);
+    assertThat(
+            jdbcTemplate.queryForList(
+                """
+                select c.key, count(rc.reading_id) as membership_count
+                from collections c join reading_collections rc on rc.collection_id = c.id
+                group by c.key order by min(c.display_order)
+                """))
+        .extracting(row -> ((Number) row.get("membership_count")).longValue())
+        .containsExactly(11L, 14L, 20L, 18L, 19L, 33L);
+    assertThat(jdbcTemplate.queryForObject("select count(*) from reading_collections", Long.class))
+        .isEqualTo(115L);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select count(*) from (
+                  select collection_id, reading_id from reading_collections
+                  group by collection_id, reading_id having count(*) > 1
+                ) duplicates
+                """,
+                Long.class))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select count(*) from reading_collections rc
+                join readings r on r.id = rc.reading_id
+                where r.title = 'An Island Made of Fog'
+                """,
+                Long.class))
+        .isEqualTo(3L);
+
+    jdbcTemplate.update(
+        "update collections set active = false where key = ?", "mysteries-imagination");
+    assertThat(collections.findAllActive())
+        .hasSize(5)
+        .extracting(com.soap.soap.domain.model.ReadingCollection::key)
+        .doesNotContain("mysteries-imagination");
+  }
+
+  @Test
+  void collectionSoapOperationsRequireAuthenticationAndPageInEditorialOrder() {
+    var client = MockWebServiceClient.createClient(applicationContext);
+    client
+        .sendRequest(
+            withPayload(
+                source(
+                    """
+                    <listCollectionsRequest xmlns="http://soap.com/english-reading/readings"/>
+                    """)))
+        .andExpect(clientOrSenderFault());
+
+    authenticateUser();
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listCollectionsRequest xmlns="http://soap.com/english-reading/readings"/>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("count(//*[local-name()='collections'])").evaluatesTo("6"))
+          .andExpect(
+              xpath("(//*[local-name()='collections'])[1]/*[local-name()='displayOrder']")
+                  .evaluatesTo("1"));
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listCollectionReadingsRequest xmlns="http://soap.com/english-reading/readings">
+                        <collectionKey>everyday-life-human-connections</collectionKey>
+                        <page>0</page><size>2</size>
+                      </listCollectionReadingsRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='page']").evaluatesTo("0"))
+          .andExpect(xpath("//*[local-name()='size']").evaluatesTo("2"))
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("11"))
+          .andExpect(xpath("count(//*[local-name()='readings'])").evaluatesTo("2"))
+          .andExpect(
+              xpath("(//*[local-name()='readings'])[1]/*[local-name()='uniqueWords']").exists())
+          .andExpect(
+              xpath("(//*[local-name()='readings'])[1]/*[local-name()='knownWords']").exists())
+          .andExpect(
+              xpath("(//*[local-name()='readings'])[1]/*[local-name()='learningWords']").exists())
+          .andExpect(
+              xpath("(//*[local-name()='readings'])[1]/*[local-name()='explicitNewWords']")
+                  .exists())
+          .andExpect(
+              xpath("(//*[local-name()='readings'])[1]/*[local-name()='ignoredWords']").exists())
+          .andExpect(
+              xpath("(//*[local-name()='readings'])[1]/*[local-name()='unclassifiedWords']")
+                  .exists())
+          .andExpect(
+              xpath("(//*[local-name()='readings'])[1]/*[local-name()='vocabularyFitPercentage']")
+                  .exists())
+          .andExpect(
+              xpath(
+                      "(//*[local-name()='readings'])[1]/*[local-name()='classificationConfidencePercentage']")
+                  .exists())
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000001']/*[local-name()='coverKey']")
+                  .evaluatesTo("a-morning-at-the-library"));
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listCollectionReadingsRequest xmlns="http://soap.com/english-reading/readings">
+                        <collectionKey>does-not-exist</collectionKey><page>0</page><size>10</size>
+                      </listCollectionReadingsRequest>
+                      """)))
+          .andExpect(clientOrSenderFault());
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  @Transactional
+  void pedagogicalRecommendationsReinforceLearningWithoutExcessiveChallenge() {
+    var now = LocalDateTime.now();
+    for (var existing : readings.findAllPlatformReadings()) {
+      readingProgress.complete(user.id(), existing.id(), now);
+    }
+    var knownWords =
+        List.of("alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota");
+    for (var value : knownWords) {
+      var word = words.save(new Word(null, value, "ped"));
+      vocabulary.save(new UserVocabulary(null, user, word, VocabularyStatus.KNOWN, now, now));
+    }
+    for (var value : List.of("learnone", "learntwo")) {
+      var word = words.save(new Word(null, value, "ped"));
+      vocabulary.save(new UserVocabulary(null, user, word, VocabularyStatus.LEARNING, now, null));
+    }
+    var explicitNew = words.save(new Word(null, "novel", "ped"));
+    vocabulary.save(new UserVocabulary(null, user, explicitNew, VocabularyStatus.NEW, now, null));
+
+    var ideal =
+        readings.save(
+            new Reading(
+                null,
+                null,
+                "Contextual reinforcement",
+                "alpha beta gamma delta epsilon zeta learnone learntwo novel uncertain",
+                "ped",
+                now,
+                ReadingOrigin.PLATFORM,
+                com.soap.soap.domain.model.EditorialLevel.A2,
+                "Pedagogy"));
+    readings.save(
+        new Reading(
+            null,
+            null,
+            "Too easy",
+            "alpha beta gamma delta epsilon zeta eta theta iota uncertain",
+            "ped",
+            now.plusSeconds(1),
+            ReadingOrigin.PLATFORM,
+            com.soap.soap.domain.model.EditorialLevel.B1,
+            "Pedagogy"));
+    readings.save(
+        new Reading(
+            null,
+            null,
+            "Too difficult",
+            "alpha beta gamma delta learnone unknownone unknowntwo unknownthree unknownfour unknownfive",
+            "ped",
+            now.plusSeconds(2),
+            ReadingOrigin.PLATFORM,
+            com.soap.soap.domain.model.EditorialLevel.B2,
+            "Pedagogy"));
+    authenticateUser();
+    try {
+      var result = recommendPlatformReadings.recommendPlatformReadings(new PageRequest(0, 3));
+
+      assertThat(result.content().getFirst().readingId()).isEqualTo(ideal.id());
+      assertThat(result.content().getFirst().learningWords()).isEqualTo(2);
+      assertThat(result.content().getFirst().explicitNewWords()).isEqualTo(1);
+      assertThat(result.content().getFirst().unclassifiedWords()).isEqualTo(1);
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void readingProgressFlowIsPersistentIdempotentAndIndependentFromVocabulary() {
+    var reading =
+        readings.save(new Reading(null, user, "Progress flow", "Work remains here", "en", null));
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <getReadingReaderDataRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>%s</readingId>
+                      </getReadingReaderDataRequest>
+                      """
+                          .formatted(reading.id()))))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='progressStatus']").evaluatesTo("IN_PROGRESS"));
+
+      var started = readingProgress.findByUserIdAndReadingId(user.id(), reading.id()).orElseThrow();
+      assertThat(started.status().name()).isEqualTo("IN_PROGRESS");
+      assertThat(started.completedAt()).isNull();
+      assertThat(started.currentPartOrdinal()).isNull();
+      assertThat(started.paginationVersion()).isNull();
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <updateReadingProgressRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>%s</readingId>
+                        <progressStatus>IN_PROGRESS</progressStatus>
+                        <currentPartOrdinal>8</currentPartOrdinal>
+                        <paginationVersion>1</paginationVersion>
+                      </updateReadingProgressRequest>
+                      """
+                          .formatted(reading.id()))))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='currentPartOrdinal']").evaluatesTo("8"))
+          .andExpect(xpath("//*[local-name()='paginationVersion']").evaluatesTo("1"));
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <updateReadingProgressRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>%s</readingId>
+                        <progressStatus>IN_PROGRESS</progressStatus>
+                      </updateReadingProgressRequest>
+                      """
+                          .formatted(reading.id()))))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='currentPartOrdinal']").evaluatesTo("8"));
+
+      setVocabularyStatus(client, "work", "LEARNING");
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <completeReadingRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>%s</readingId>
+                      </completeReadingRequest>
+                      """
+                          .formatted(reading.id()))))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='status']").evaluatesTo("COMPLETED"));
+      var completed =
+          readingProgress.findByUserIdAndReadingId(user.id(), reading.id()).orElseThrow();
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <completeReadingRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>%s</readingId>
+                      </completeReadingRequest>
+                      """
+                          .formatted(reading.id()))))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='status']").evaluatesTo("COMPLETED"));
+      var completedAgain =
+          readingProgress.findByUserIdAndReadingId(user.id(), reading.id()).orElseThrow();
+
+      assertThat(completed.startedAt()).isEqualTo(started.startedAt());
+      assertThat(completedAgain.completedAt()).isEqualTo(completed.completedAt());
+      assertThat(completed.currentPartOrdinal()).isEqualTo(8);
+      assertThat(completed.paginationVersion()).isEqualTo(1);
+      assertThat(
+              vocabulary.findStatusesByNormalizedValues(
+                  user.id(), "en", java.util.Set.of("work", "remains")))
+          .containsEntry("work", VocabularyStatus.LEARNING)
+          .doesNotContainKey("remains");
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <getReadingReaderDataRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>%s</readingId>
+                      </getReadingReaderDataRequest>
+                      """
+                          .formatted(reading.id()))))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='progressStatus']").evaluatesTo("COMPLETED"))
+          .andExpect(xpath("//*[local-name()='currentPartOrdinal']").evaluatesTo("8"))
+          .andExpect(xpath("//*[local-name()='paginationVersion']").evaluatesTo("1"));
+      assertThat(
+              readingProgress
+                  .findByUserIdAndReadingId(user.id(), reading.id())
+                  .orElseThrow()
+                  .completedAt())
+          .isEqualTo(completed.completedAt());
+
+      var directlyCompleted =
+          readings.save(
+              new Reading(null, user, "Direct completion", "Still unclassified", "en", null));
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <completeReadingRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>%s</readingId>
+                      </completeReadingRequest>
+                      """
+                          .formatted(directlyCompleted.id()))))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='status']").evaluatesTo("COMPLETED"));
+      var directProgress =
+          readingProgress.findByUserIdAndReadingId(user.id(), directlyCompleted.id()).orElseThrow();
+      assertThat(directProgress.startedAt()).isEqualTo(directProgress.completedAt());
+      assertThat(
+              vocabulary.findStatusesByNormalizedValues(
+                  user.id(), "en", java.util.Set.of("still", "unclassified")))
+          .isEmpty();
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void readingProgressPartPairIsValidatedBySoapAndDatabase() {
+    var reading = readings.save(new Reading(null, user, "Pair validation", "Text", "en", null));
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+              <updateReadingProgressRequest xmlns="http://soap.com/english-reading/readings">
+                <readingId>%s</readingId><progressStatus>IN_PROGRESS</progressStatus>
+                <currentPartOrdinal>1</currentPartOrdinal>
+              </updateReadingProgressRequest>
+              """
+                          .formatted(reading.id()))))
+          .andExpect(clientOrSenderFault());
+      assertThat(readingProgress.findByUserIdAndReadingId(user.id(), reading.id())).isEmpty();
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+              <updateReadingProgressRequest xmlns="http://soap.com/english-reading/readings">
+                <readingId>%s</readingId><progressStatus>IN_PROGRESS</progressStatus>
+                <currentPartOrdinal>0</currentPartOrdinal><paginationVersion>1</paginationVersion>
+              </updateReadingProgressRequest>
+              """
+                          .formatted(reading.id()))))
+          .andExpect(clientOrSenderFault());
+      assertThat(readingProgress.findByUserIdAndReadingId(user.id(), reading.id())).isEmpty();
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.columns where table_name='reading_progress' and column_name in ('current_part_ordinal','pagination_version')",
+                Integer.class))
+        .isEqualTo(2);
+  }
+
+  @Test
+  @Transactional
+  void continueReadingCombinesOwnedAndPlatformProgressInStartedOrderWithPagination() {
+    var now = LocalDateTime.now();
+    var owned =
+        readings.save(new Reading(null, user, "Owned in progress", "Owned text", "en", now));
+    var platform =
+        readings.save(
+            new Reading(
+                null,
+                null,
+                "Platform in progress",
+                "Platform text",
+                "en",
+                now,
+                ReadingOrigin.PLATFORM,
+                EditorialLevel.B1,
+                "Science",
+                "continue-cover"));
+    var completed =
+        readings.save(new Reading(null, user, "Completed", "Completed text", "en", now));
+    readings.save(new Reading(null, user, "Not started", "Not started text", "en", now));
+    var otherUser =
+        users.save(
+            new User(
+                null,
+                "Other",
+                "continue-" + UUID.randomUUID() + "@example.com",
+                "{bcrypt}$2a$10$invalidlegacycredentialinvalidlegacycredentialinv",
+                null));
+    var otherReading =
+        readings.save(new Reading(null, otherUser, "Other user's reading", "Private", "en", now));
+    readingProgress.startIfAbsent(user.id(), owned.id(), now.minusMinutes(2));
+    readingProgress.startIfAbsent(user.id(), platform.id(), now.minusMinutes(1));
+    readingProgress.complete(user.id(), completed.id(), now);
+    readingProgress.startIfAbsent(otherUser.id(), otherReading.id(), now.plusMinutes(1));
+
+    var direct = readingProgress.findInProgressReadings(user.id(), new PageRequest(0, 10));
+    assertThat(direct.content())
+        .extracting(com.soap.soap.application.model.ContinueReadingItem::readingId)
+        .containsExactly(platform.id(), owned.id())
+        .doesNotHaveDuplicates();
+    assertThat(direct.totalElements()).isEqualTo(2);
+
+    var client = MockWebServiceClient.createClient(applicationContext);
+    client
+        .sendRequest(
+            withPayload(
+                source(
+                    """
+                    <listContinueReadingRequest xmlns="http://soap.com/english-reading/readings">
+                      <page>0</page><size>1</size>
+                    </listContinueReadingRequest>
+                    """)))
+        .andExpect(clientOrSenderFault());
+
+    authenticateUser();
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listContinueReadingRequest xmlns="http://soap.com/english-reading/readings">
+                        <page>0</page><size>1</size>
+                      </listContinueReadingRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("2"))
+          .andExpect(xpath("count(//*[local-name()='readings'])").evaluatesTo("1"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='readingId']")
+                  .evaluatesTo(platform.id().toString()))
+          .andExpect(xpath("//*[local-name()='origin']").evaluatesTo("PLATFORM"))
+          .andExpect(xpath("//*[local-name()='progressStatus']").evaluatesTo("IN_PROGRESS"))
+          .andExpect(xpath("//*[local-name()='coverKey']").evaluatesTo("continue-cover"))
+          .andExpect(xpath("//*[local-name()='editorialLevel']").evaluatesTo("B1"))
+          .andExpect(xpath("//*[local-name()='category']").evaluatesTo("Science"));
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listContinueReadingRequest xmlns="http://soap.com/english-reading/readings">
+                        <page>1</page><size>1</size>
+                      </listContinueReadingRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='readingId']")
+                  .evaluatesTo(owned.id().toString()))
+          .andExpect(xpath("//*[local-name()='origin']").evaluatesTo("USER"))
+          .andExpect(xpath("//*[local-name()='coverKey']").doesNotExist())
+          .andExpect(xpath("//*[local-name()='editorialLevel']").doesNotExist())
+          .andExpect(xpath("//*[local-name()='category']").doesNotExist());
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void registerLoginCompleteAndLoginAgainPersistsOnboardingForOnlyTheAuthenticatedUser()
+      throws Exception {
+    var email = "onboarding-flow-" + java.util.UUID.randomUUID() + "@example.com";
+    var otherEmail = "onboarding-other-" + java.util.UUID.randomUUID() + "@example.com";
+    var other = users.save(new User(null, "Other", otherEmail, "hash", null));
+    var register =
+        soapEnvelope(
+            "<registerUserRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                + "<name>Onboarding User</name><email>"
+                + email
+                + "</email><password>secret123</password></registerUserRequest>");
+    assertThat(postSoap(register, null).statusCode()).isEqualTo(200);
+
+    var before = loginOverHttp(email, "secret123");
+    assertThat(before.onboardingCompleted()).isFalse();
+
+    var emptyCompletion =
+        soapEnvelope(
+            "<completeInitialVocabularyTestRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                + "<testId>"
+                + initialVocabularyTestSource.load().testId()
+                + "</testId></completeInitialVocabularyTestRequest>");
+    assertThat(postSoap(emptyCompletion, before.accessToken()).statusCode()).isEqualTo(500);
+    assertThat(loginOverHttp(email, "secret123").onboardingCompleted()).isFalse();
+    assertThat(
+            vocabulary
+                .findByUserId(users.findByEmail(email).orElseThrow().id(), new PageRequest(0, 10))
+                .content())
+        .isEmpty();
+
+    var invalidCompletion =
+        soapEnvelope(
+            "<completeInitialVocabularyTestRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                + "<testId>"
+                + initialVocabularyTestSource.load().testId()
+                + "</testId>"
+                + classificationsXml(
+                    List.of(
+                        "work",
+                        "daniel",
+                        "english",
+                        "obstacle",
+                        "morning",
+                        "always",
+                        "wanted",
+                        "speak",
+                        "well"),
+                    "NEW")
+                + "<classifications><word>not-in-the-test</word><status>NEW</status>"
+                + "</classifications>"
+                + "</completeInitialVocabularyTestRequest>");
+    assertThat(postSoap(invalidCompletion, before.accessToken()).statusCode()).isEqualTo(500);
+    assertThat(loginOverHttp(email, "secret123").onboardingCompleted()).isFalse();
+
+    var completion =
+        soapEnvelope(
+            "<completeInitialVocabularyTestRequest xmlns=\"http://soap.com/english-reading/readings\">"
+                + "<testId>"
+                + initialVocabularyTestSource.load().testId()
+                + "</testId>"
+                + "<classifications><word>work</word><status>LEARNING</status></classifications>"
+                + "<classifications><word>Daniel</word><status>NEW</status></classifications>"
+                + "<classifications><word>English</word><status>KNOWN</status></classifications>"
+                + "<classifications><word>obstacle</word><status>IGNORED</status></classifications>"
+                + classificationsXml(
+                    List.of("morning", "always", "wanted", "speak", "well", "reading"), "NEW")
+                + "</completeInitialVocabularyTestRequest>");
+    assertThat(postSoap(completion, before.accessToken()).statusCode()).isEqualTo(200);
+
+    assertThat(loginOverHttp(email, "secret123").onboardingCompleted()).isTrue();
+    var completedUser = users.findByEmail(email).orElseThrow();
+    assertThat(
+            vocabulary.findStatusesByNormalizedValues(
+                completedUser.id(),
+                "en",
+                java.util.Set.of("work", "daniel", "english", "obstacle", "morning")))
+        .containsExactlyInAnyOrderEntriesOf(
+            java.util.Map.of(
+                "work", VocabularyStatus.LEARNING,
+                "daniel", VocabularyStatus.NEW,
+                "english", VocabularyStatus.KNOWN,
+                "obstacle", VocabularyStatus.IGNORED,
+                "morning", VocabularyStatus.NEW));
+    assertThat(users.findById(other.id()).orElseThrow().onboardingCompleted()).isFalse();
+    assertThat(postSoap(completion, before.accessToken()).statusCode()).isEqualTo(500);
+  }
+
+  @Test
+  void migrationSeedsTheActiveOnboardingReadingAndSoapReturnsItsPersistedContent() {
+    var persistedTest = initialVocabularyTestSource.load();
+    assertThat(persistedTest.testId()).isEqualTo("onboarding-reading-1-v1");
+    assertThat(persistedTest.text())
+        .startsWith("Daniel had always wanted to speak English well.")
+        .contains("\n\nAfter several months")
+        .endsWith("ideas that were increasingly challenging.");
+
+    authenticateUser();
+    try {
+      MockWebServiceClient.createClient(applicationContext)
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <getInitialVocabularyTestRequest xmlns="http://soap.com/english-reading/readings"/>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("/*[local-name()='getInitialVocabularyTestResponse']/*[local-name()='testId']")
+                  .evaluatesTo(persistedTest.testId()))
+          .andExpect(
+              xpath("/*[local-name()='getInitialVocabularyTestResponse']/*[local-name()='text']")
+                  .evaluatesTo(persistedTest.text()));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
 
   @Test
   void concurrentWordResolutionReturnsTheSingleDatabaseWinner() throws Exception {
@@ -205,6 +836,31 @@ class SoapApplicationTests {
     assertThat(tokenMatcher.find()).isTrue();
     return tokenMatcher.group(1);
   }
+
+  private LoginHttpResult loginOverHttp(String email, String password) throws Exception {
+    var login =
+        soapEnvelope(
+            "<loginRequest xmlns=\"http://soap.com/english-reading/readings\"><email>"
+                + email
+                + "</email><password>"
+                + password
+                + "</password></loginRequest>");
+    var response = postSoap(login, null);
+    assertThat(response.statusCode()).isEqualTo(200);
+    var tokenMatcher =
+        java.util.regex.Pattern.compile("<(?:\\w+:)?accessToken>([^<]+)</(?:\\w+:)?accessToken>")
+            .matcher(response.body());
+    var onboardingMatcher =
+        java.util.regex.Pattern.compile(
+                "<(?:\\w+:)?onboardingCompleted>(true|false)</(?:\\w+:)?onboardingCompleted>")
+            .matcher(response.body());
+    assertThat(tokenMatcher.find()).isTrue();
+    assertThat(onboardingMatcher.find()).isTrue();
+    return new LoginHttpResult(
+        tokenMatcher.group(1), Boolean.parseBoolean(onboardingMatcher.group(1)));
+  }
+
+  private record LoginHttpResult(String accessToken, boolean onboardingCompleted) {}
 
   @Test
   void correlationIdIsGeneratedReusedAndReturnedForSoapFaults() throws Exception {
@@ -440,6 +1096,18 @@ class SoapApplicationTests {
     return new StreamSource(new StringReader(payload));
   }
 
+  private String classificationsXml(List<String> values, String status) {
+    return values.stream()
+        .map(
+            value ->
+                "<classifications><word>"
+                    + value
+                    + "</word><status>"
+                    + status
+                    + "</status></classifications>")
+        .collect(java.util.stream.Collectors.joining());
+  }
+
   private void assertXmlParserRejects(String payload) throws Exception {
     var factory = new SaajSoapMessageFactory();
     factory.afterPropertiesSet();
@@ -624,6 +1292,10 @@ class SoapApplicationTests {
   }
 
   private void authenticateUser() {
+    authenticateUser(user.id());
+  }
+
+  private void authenticateUser(java.util.UUID userId) {
     var now = Instant.now();
     var jwt =
         new Jwt(
@@ -631,9 +1303,118 @@ class SoapApplicationTests {
             now,
             now.plusSeconds(60),
             Map.of("alg", "HS256"),
-            Map.of("sub", user.id().toString()));
+            Map.of("sub", userId.toString()));
     SecurityContextHolder.getContext()
         .setAuthentication(new UsernamePasswordAuthenticationToken(jwt, jwt, List.of()));
+  }
+
+  @Test
+  void profileOperationsRequireAuthentication() {
+    var client = MockWebServiceClient.createClient(applicationContext);
+
+    client
+        .sendRequest(
+            withPayload(
+                source(
+                    """
+                    <getMyProfileRequest xmlns="http://soap.com/english-reading/readings"/>
+                    """)))
+        .andExpect(clientOrSenderFault());
+    client
+        .sendRequest(
+            withPayload(
+                source(
+                    """
+                    <updateMyProfileRequest xmlns="http://soap.com/english-reading/readings"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                      <name>Ada</name><alias xsi:nil="true"/><age xsi:nil="true"/>
+                      <nativeLanguage xsi:nil="true"/><learningLanguage>en</learningLanguage>
+                    </updateMyProfileRequest>
+                    """)))
+        .andExpect(clientOrSenderFault());
+  }
+
+  @Test
+  void authenticatedUserCanUpdateGetAndClearOwnProfileOverSoap() {
+    var profileWord = words.save(new Word(null, "profileword", "en"));
+    vocabulary.save(
+        new UserVocabulary(
+            null, user, profileWord, VocabularyStatus.LEARNING, LocalDateTime.now(), null));
+    var platformReading = readings.findAllPlatformReadings().getFirst();
+    readingProgress.startIfAbsent(user.id(), platformReading.id(), LocalDateTime.now());
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <updateMyProfileRequest xmlns="http://soap.com/english-reading/readings">
+                        <name> Ada Updated </name><alias>AdaPublic</alias><age>37</age>
+                        <nativeLanguage>ES-co</nativeLanguage><learningLanguage>en</learningLanguage>
+                      </updateMyProfileRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='name']").evaluatesTo("Ada Updated"))
+          .andExpect(xpath("//*[local-name()='alias']").evaluatesTo("AdaPublic"))
+          .andExpect(xpath("//*[local-name()='nativeLanguage']").evaluatesTo("es-CO"))
+          .andExpect(xpath("//*[local-name()='email']").evaluatesTo(user.email()));
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <getMyProfileRequest xmlns="http://soap.com/english-reading/readings"/>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='alias']").evaluatesTo("AdaPublic"))
+          .andExpect(xpath("//*[local-name()='age']").evaluatesTo("37"));
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <updateMyProfileRequest xmlns="http://soap.com/english-reading/readings"
+                          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <name>Ada Updated</name><alias xsi:nil="true"/><age xsi:nil="true"/>
+                        <nativeLanguage>es</nativeLanguage><learningLanguage>en</learningLanguage>
+                      </updateMyProfileRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("count(//*[local-name()='alias'])").evaluatesTo("0"))
+          .andExpect(xpath("count(//*[local-name()='age'])").evaluatesTo("0"));
+
+      var persisted = users.findById(user.id()).orElseThrow();
+      assertThat(persisted.email()).isEqualTo(user.email());
+      assertThat(persisted.passwordHash()).isEqualTo(user.passwordHash());
+      assertThat(persisted.onboardingCompleted()).isEqualTo(user.onboardingCompleted());
+      assertThat(vocabulary.findByUserIdAndWordId(user.id(), profileWord.id())).isPresent();
+      assertThat(readingProgress.findByUserIdAndReadingId(user.id(), platformReading.id()))
+          .isPresent();
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void aliasUniquenessIsCaseInsensitiveAndAllowsMultipleNulls() {
+    var first = user.updateProfile(user.name(), "UniqueAlias", null, null, "en");
+    users.save(first);
+    var second =
+        users.save(new User(null, "Second", UUID.randomUUID() + "@example.com", "hash", null));
+
+    assertThat(users.existsByAliasIgnoreCaseAndIdNot("uniquealias", second.id())).isTrue();
+    assertThatThrownBy(
+            () -> users.save(second.updateProfile(second.name(), "UNIQUEALIAS", null, null, "en")))
+        .isInstanceOf(com.soap.soap.application.exception.AliasAlreadyInUseException.class);
+
+    var third =
+        users.save(new User(null, "Third", UUID.randomUUID() + "@example.com", "hash", null));
+    assertThat(second.alias()).isNull();
+    assertThat(third.alias()).isNull();
   }
 
   @BeforeEach
@@ -655,6 +1436,10 @@ class SoapApplicationTests {
 
     assertThat(reading.id()).isNotNull();
     assertThat(reading.createdAt()).isNotNull();
+    assertThat(reading.origin()).isEqualTo(ReadingOrigin.USER);
+    assertThat(reading.user().id()).isEqualTo(user.id());
+    assertThat(reading.editorialLevel()).isNull();
+    assertThat(reading.category()).isNull();
     assertThat(readings.findById(reading.id())).contains(reading);
     assertThat(readings.findSummariesByUserId(user.id(), new PageRequest(0, 10)).content())
         .singleElement()
@@ -664,6 +1449,314 @@ class SoapApplicationTests {
               assertThat(summary.title()).isEqualTo(reading.title());
               assertThat(summary.language()).isEqualTo(reading.language());
             });
+  }
+
+  @Test
+  @Transactional
+  void loadsTheSeededPlatformCatalogWithoutFakeOwners() {
+    var catalog = readings.findPlatformSummaries(new PageRequest(0, 100));
+
+    assertThat(catalog.totalElements()).isEqualTo(74);
+    assertThat(catalog.content())
+        .extracting(PlatformReadingSummary::title)
+        .contains(
+            "A Morning at the Library",
+            "Why Cities Need Trees",
+            "The Changing Nature of Work",
+            "When Algorithms Shape Attention",
+            "The Lost Blue Scarf",
+            "The Sparrow and the Red Cup",
+            "A Boat for the Little Island",
+            "The Garden Behind the School",
+            "The Train to Harbor Town",
+            "A Quiet Morning by the River",
+            "The Light in Room Twelve",
+            "Lunch for the Night Team",
+            "The Phone-Free Table",
+            "The Empty Lot Project",
+            "Learning to Ask Better Questions",
+            "The Road Beyond Pine Hill",
+            "The Cost of Constant Attention",
+            "A Market Changes Its Rhythm",
+            "Listening to the Forest at Night",
+            "The Key Beneath the Floor",
+            "The Museum of Unfinished Things",
+            "A City That Predicts Its Citizens",
+            "The Language of the Evening Square",
+            "The Cartographer of Vanishing Roads");
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.A1)
+        .hasSize(13);
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.A2)
+        .hasSize(13);
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.B1)
+        .hasSize(14);
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.B2)
+        .hasSize(14);
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.C1)
+        .hasSize(12);
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.C2)
+        .hasSize(8);
+    assertThat(catalog.content())
+        .allSatisfy(
+            summary -> {
+              assertThat(summary.language()).isEqualTo("en");
+              assertThat(summary.category()).isNotBlank();
+            });
+    assertThat(catalog.content()).filteredOn(summary -> summary.coverKey() != null).hasSize(63);
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.title().equals("The Camera on Platform Three"))
+        .singleElement()
+        .extracting(PlatformReadingSummary::coverKey)
+        .isEqualTo("the-camera-on-platform-three");
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.title().equals("A Morning at the Library"))
+        .singleElement()
+        .extracting(PlatformReadingSummary::coverKey)
+        .isEqualTo("a-morning-at-the-library");
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.title().equals("Why Cities Need Trees"))
+        .singleElement()
+        .extracting(PlatformReadingSummary::coverKey)
+        .isEqualTo("why-cities-need-trees");
+    assertThat(catalog.content())
+        .filteredOn(summary -> summary.title().equals("Minor Gods of the Waiting Room"))
+        .singleElement()
+        .extracting(PlatformReadingSummary::coverKey)
+        .isEqualTo("minor-gods-of-the-waiting-room");
+    var pagedIds = new java.util.ArrayList<java.util.UUID>();
+    for (var page = 0; page < 8; page++) {
+      pagedIds.addAll(
+          readings.findPlatformSummaries(new PageRequest(page, 10)).content().stream()
+              .map(PlatformReadingSummary::id)
+              .toList());
+    }
+    assertThat(pagedIds).hasSize(74).doesNotHaveDuplicates();
+
+    var platformReading =
+        readings
+            .findById(java.util.UUID.fromString("10000000-0000-0000-0000-000000000001"))
+            .orElseThrow();
+    assertThat(platformReading.origin()).isEqualTo(ReadingOrigin.PLATFORM);
+    assertThat(platformReading.user()).isNull();
+    assertThat(platformReading.editorialLevel().name()).isEqualTo("A1");
+    assertThat(platformReading.category()).isEqualTo("Daily Life");
+  }
+
+  @Test
+  void authenticatedUserCanListReadAndAnalyzePlatformCatalogEntriesOverSoap() {
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listPlatformReadingsRequest xmlns="http://soap.com/english-reading/readings">
+                        <page>0</page><size>100</size>
+                      </listPlatformReadingsRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("74"))
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000003']/*[local-name()='editorialLevel']")
+                  .evaluatesTo("B1"))
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000003']/*[local-name()='category']")
+                  .evaluatesTo("Work"))
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings'][*[local-name()='readingId']='30000000-0000-0000-0000-000000000009']/*[local-name()='coverKey']")
+                  .evaluatesTo("the-camera-on-platform-three"))
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000001']/*[local-name()='coverKey']")
+                  .evaluatesTo("a-morning-at-the-library"));
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <getReadingRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>10000000-0000-0000-0000-000000000001</readingId>
+                      </getReadingRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='reading']/*[local-name()='userId']").doesNotExist())
+          .andExpect(
+              xpath("//*[local-name()='reading']/*[local-name()='origin']")
+                  .evaluatesTo("PLATFORM"));
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <getReadingReaderDataRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>10000000-0000-0000-0000-000000000001</readingId>
+                      </getReadingReaderDataRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='title']").evaluatesTo("A Morning at the Library"));
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <analyzeReadingRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>10000000-0000-0000-0000-000000000001</readingId>
+                      </analyzeReadingRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='totalTokens']").exists());
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void recommendsSeededPlatformReadingsOverTheValidatedSoapContract() {
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <recommendPlatformReadingsRequest xmlns="http://soap.com/english-reading/readings">
+                        <page>0</page><size>2</size>
+                      </recommendPlatformReadingsRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='page']").evaluatesTo("0"))
+          .andExpect(xpath("//*[local-name()='size']").evaluatesTo("2"))
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("74"))
+          .andExpect(xpath("count(//*[local-name()='readings'])").evaluatesTo("2"))
+          .andExpect(
+              xpath("//*[local-name()='readings'][1]/*[local-name()='vocabularyFitPercentage']")
+                  .evaluatesTo("30.00"))
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings'][1]/*[local-name()='classificationConfidencePercentage']")
+                  .evaluatesTo("0.00"))
+          .andExpect(
+              xpath("//*[local-name()='readings'][1]/*[local-name()='explicitNewWords']")
+                  .evaluatesTo("0"));
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <recommendPlatformReadingsRequest xmlns="http://soap.com/english-reading/readings">
+                        <page>0</page><size>100</size>
+                      </recommendPlatformReadingsRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings'][*[local-name()='readingId']='30000000-0000-0000-0000-000000000009']/*[local-name()='coverKey']")
+                  .evaluatesTo("the-camera-on-platform-three"))
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000001']/*[local-name()='coverKey']")
+                  .evaluatesTo("a-morning-at-the-library"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void readerDataReflectsUpsertedStatusesForEveryOccurrenceAndSeparatesPlatformUsers() {
+    var platformId = "10000000-0000-0000-0000-000000000001";
+    var client = MockWebServiceClient.createClient(applicationContext);
+    authenticateUser();
+    try {
+      expectReaderStatus(client, platformId, "the", null, 3);
+      setVocabularyStatus(client, "the", "KNOWN");
+      expectReaderStatus(client, platformId, "the", "KNOWN", 3);
+      setVocabularyStatus(client, "the", "LEARNING");
+      expectReaderStatus(client, platformId, "the", "LEARNING", 3);
+
+      var other =
+          users.save(
+              new User(
+                  null,
+                  "Other Reader",
+                  "other-reader-" + java.util.UUID.randomUUID() + "@example.com",
+                  "hash",
+                  null));
+      authenticateUser(other.id());
+      expectReaderStatus(client, platformId, "the", null, 3);
+      setVocabularyStatus(client, "the", "IGNORED");
+      expectReaderStatus(client, platformId, "the", "IGNORED", 3);
+
+      authenticateUser(user.id());
+      expectReaderStatus(client, platformId, "the", "LEARNING", 3);
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  private void setVocabularyStatus(MockWebServiceClient client, String word, String status) {
+    client
+        .sendRequest(
+            withPayload(
+                source(
+                    """
+                    <setVocabularyStatusRequest xmlns="http://soap.com/english-reading/readings">
+                      <word>%s</word><language>en</language><status>%s</status>
+                    </setVocabularyStatusRequest>
+                    """
+                        .formatted(word, status))))
+        .andExpect(noFault())
+        .andExpect(xpath("//*[local-name()='entry']/*[local-name()='status']").evaluatesTo(status));
+  }
+
+  private void expectReaderStatus(
+      MockWebServiceClient client,
+      String readingId,
+      String normalizedWord,
+      String expectedStatus,
+      int occurrences) {
+    var response =
+        client.sendRequest(
+            withPayload(
+                source(
+                    """
+                    <getReadingReaderDataRequest xmlns="http://soap.com/english-reading/readings">
+                      <readingId>%s</readingId>
+                    </getReadingReaderDataRequest>
+                    """
+                        .formatted(readingId))));
+    response
+        .andExpect(noFault())
+        .andExpect(
+            xpath(
+                    "count(//*[local-name()='tokens'][*[local-name()='normalizedValue']='%s'])"
+                        .formatted(normalizedWord))
+                .evaluatesTo(Integer.toString(occurrences)));
+    var statusPath =
+        "//*[local-name()='tokens'][*[local-name()='normalizedValue']='%s']/*[local-name()='status']"
+            .formatted(normalizedWord);
+    if (expectedStatus == null) {
+      response.andExpect(xpath(statusPath).doesNotExist());
+    } else {
+      response
+          .andExpect(xpath("count(" + statusPath + ")").evaluatesTo(Integer.toString(occurrences)))
+          .andExpect(xpath(statusPath + "[1]").evaluatesTo(expectedStatus));
+    }
   }
 
   @Test
@@ -723,7 +1816,7 @@ class SoapApplicationTests {
   @Test
   void soapListingOmitsContentWhileGetReadingReturnsIt() {
     var reading =
-        readings.save(new Reading(null, user, "Summary title", "full private content", "en", null));
+        readings.save(new Reading(null, user, "Summary title", "Work work WORK other", "en", null));
     authenticateUser();
     var client = MockWebServiceClient.createClient(applicationContext);
     try {
@@ -740,8 +1833,46 @@ class SoapApplicationTests {
           .andExpect(
               xpath("//*[local-name()='readings']/*[local-name()='readingId']")
                   .evaluatesTo(reading.id().toString()))
+          .andExpect(xpath("//*[local-name()='readings']/*[local-name()='content']").doesNotExist())
           .andExpect(
-              xpath("//*[local-name()='readings']/*[local-name()='content']").doesNotExist());
+              xpath("//*[local-name()='readings']/*[local-name()='uniqueWords']").evaluatesTo("2"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='knownWords']").evaluatesTo("0"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='unclassifiedWords']")
+                  .evaluatesTo("2"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='vocabularyFitPercentage']")
+                  .evaluatesTo("30.00"))
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings']/*[local-name()='classificationConfidencePercentage']")
+                  .evaluatesTo("0.00"));
+
+      setVocabularyStatus(client, "work", "KNOWN");
+
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listUserReadingsRequest xmlns="http://soap.com/english-reading/readings">
+                        <page>0</page><size>10</size>
+                      </listUserReadingsRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='knownWords']").evaluatesTo("1"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='unclassifiedWords']")
+                  .evaluatesTo("1"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='vocabularyFitPercentage']")
+                  .evaluatesTo("65.00"))
+          .andExpect(
+              xpath(
+                      "//*[local-name()='readings']/*[local-name()='classificationConfidencePercentage']")
+                  .evaluatesTo("50.00"));
 
       client
           .sendRequest(
@@ -756,10 +1887,120 @@ class SoapApplicationTests {
           .andExpect(noFault())
           .andExpect(
               xpath("//*[local-name()='reading']/*[local-name()='content']")
-                  .evaluatesTo("full private content"));
+                  .evaluatesTo("Work work WORK other"));
     } finally {
       SecurityContextHolder.clearContext();
     }
+  }
+
+  @Test
+  void deleteReadingSoapRemovesOnlyTheOwnedTextReadingAndPreservesUnrelatedData() {
+    var target =
+        readings.save(new Reading(null, user, "Delete me", "known learning ignored", "en", null));
+    var survivor =
+        readings.save(new Reading(null, user, "Keep me", "unrelated content", "en", null));
+    var otherUser =
+        users.save(new User(null, "Grace", UUID.randomUUID() + "@example.com", "hash", null));
+    var foreign =
+        readings.save(new Reading(null, otherUser, "Foreign", "private content", "en", null));
+    readingProgress.startIfAbsent(user.id(), target.id(), LocalDateTime.now());
+
+    for (var entry :
+        List.of(
+            Map.entry("deleteknown-" + UUID.randomUUID(), VocabularyStatus.KNOWN),
+            Map.entry("deletelearning-" + UUID.randomUUID(), VocabularyStatus.LEARNING),
+            Map.entry("deleteignored-" + UUID.randomUUID(), VocabularyStatus.IGNORED))) {
+      var word = words.save(new Word(null, entry.getKey(), "en"));
+      var learnedAt = entry.getValue() == VocabularyStatus.KNOWN ? LocalDateTime.now() : null;
+      vocabulary.save(
+          new UserVocabulary(null, user, word, entry.getValue(), LocalDateTime.now(), learnedAt));
+    }
+    var vocabularyBefore = vocabulary.findByUserId(user.id(), new PageRequest(0, 100)).content();
+    var platformCountBefore = readings.findAllPlatformReadings().size();
+    var membershipsBefore =
+        jdbcTemplate.queryForObject("select count(*) from reading_collections", Long.class);
+    var documentsBefore =
+        jdbcTemplate.queryForObject("select count(*) from imported_documents", Long.class);
+
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <deleteReadingRequest xmlns="http://soap.com/english-reading/readings">
+                        <readingId>%s</readingId>
+                      </deleteReadingRequest>
+                      """
+                          .formatted(target.id()))))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='success']").evaluatesTo("true"));
+
+      assertThat(readings.findById(target.id())).isEmpty();
+      assertThat(readingProgress.findByUserIdAndReadingId(user.id(), target.id())).isEmpty();
+      assertThat(readings.findById(survivor.id())).isPresent();
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listUserReadingsRequest xmlns="http://soap.com/english-reading/readings">
+                        <page>0</page><size>100</size>
+                      </listUserReadingsRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(
+              xpath(
+                      "count(//*[local-name()='readings'][*[local-name()='readingId']='%s'])"
+                          .formatted(target.id()))
+                  .evaluatesTo("0"))
+          .andExpect(
+              xpath(
+                      "count(//*[local-name()='readings'][*[local-name()='readingId']='%s'])"
+                          .formatted(survivor.id()))
+                  .evaluatesTo("1"));
+      assertThat(vocabulary.findByUserId(user.id(), new PageRequest(0, 100)).content())
+          .containsAll(vocabularyBefore);
+      assertThat(readings.findAllPlatformReadings()).hasSize(platformCountBefore);
+      assertThat(
+              jdbcTemplate.queryForObject("select count(*) from reading_collections", Long.class))
+          .isEqualTo(membershipsBefore);
+      assertThat(jdbcTemplate.queryForObject("select count(*) from imported_documents", Long.class))
+          .isEqualTo(documentsBefore);
+
+      for (var protectedId :
+          List.of(target.id(), foreign.id(), readings.findAllPlatformReadings().getFirst().id())) {
+        client
+            .sendRequest(
+                withPayload(
+                    source(
+                        """
+                        <deleteReadingRequest xmlns="http://soap.com/english-reading/readings">
+                          <readingId>%s</readingId>
+                        </deleteReadingRequest>
+                        """
+                            .formatted(protectedId))))
+            .andExpect(clientOrSenderFault());
+      }
+      assertThat(readings.findById(foreign.id())).isPresent();
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+
+    client
+        .sendRequest(
+            withPayload(
+                source(
+                    """
+                    <deleteReadingRequest xmlns="http://soap.com/english-reading/readings">
+                      <readingId>%s</readingId>
+                    </deleteReadingRequest>
+                    """
+                        .formatted(survivor.id()))))
+        .andExpect(clientOrSenderFault());
+    assertThat(readings.findById(survivor.id())).isPresent();
   }
 
   @Test

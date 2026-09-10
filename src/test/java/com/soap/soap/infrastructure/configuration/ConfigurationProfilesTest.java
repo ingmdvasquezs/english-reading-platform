@@ -26,8 +26,10 @@ class ConfigurationProfilesTest {
   void localProfileContainsOnlyDevelopmentEndpointsAndCredentials() throws Exception {
     assertThat(property("application-local.yaml", "spring.datasource.url"))
         .isEqualTo("${DB_URL:jdbc:postgresql://localhost:5432/english_reading}");
-    assertThat(property("application-local.yaml", "translation.libre.base-url"))
-        .isEqualTo("${LIBRETRANSLATE_BASE_URL:http://localhost:5000}");
+    assertThat(property("application.yaml", "dictionary.merriam-webster.base-url"))
+        .isEqualTo("${MERRIAM_WEBSTER_BASE_URL:https://www.dictionaryapi.com}");
+    assertThat(property("application.yaml", "translation.azure.base-url"))
+        .isEqualTo("${AZURE_TRANSLATOR_BASE_URL:https://api.cognitive.microsofttranslator.com}");
     assertThat(property("application-local.yaml", "management.endpoints.web.exposure.include"))
         .isEqualTo("health,info,prometheus");
   }
@@ -39,6 +41,10 @@ class ConfigurationProfilesTest {
 
     assertThat(databasePassword).isEqualTo("${DB_PASSWORD}").doesNotContain("english_password");
     assertThat(jwtSecret).isEqualTo("${JWT_SECRET}");
+    assertThat(property("application-prod.yaml", "dictionary.merriam-webster.api-key"))
+        .isEqualTo("${MERRIAM_WEBSTER_API_KEY}");
+    assertThat(property("application-prod.yaml", "translation.azure.api-key"))
+        .isEqualTo("${AZURE_TRANSLATOR_KEY}");
     assertThat(property("application-prod.yaml", "spring.datasource.url"))
         .doesNotContain("localhost");
     assertThat(property("application-prod.yaml", "management.endpoints.web.exposure.include"))

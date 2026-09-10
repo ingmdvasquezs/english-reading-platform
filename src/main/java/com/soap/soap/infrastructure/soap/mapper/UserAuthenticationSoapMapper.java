@@ -2,7 +2,7 @@ package com.soap.soap.infrastructure.soap.mapper;
 
 import com.soap.soap.application.command.LoginCommand;
 import com.soap.soap.application.command.RegisterUserCommand;
-import com.soap.soap.application.model.AccessToken;
+import com.soap.soap.application.model.LoginResult;
 import com.soap.soap.domain.model.User;
 import com.soap.soap.infrastructure.soap.generated.LoginRequest;
 import com.soap.soap.infrastructure.soap.generated.LoginResponse;
@@ -37,11 +37,13 @@ public class UserAuthenticationSoapMapper {
     return response;
   }
 
-  public LoginResponse toResponse(AccessToken token) {
+  public LoginResponse toResponse(LoginResult result) {
     var response = new LoginResponse();
+    var token = result.accessToken();
     response.setAccessToken(token.value());
     response.setTokenType(token.tokenType());
     response.setExpiresIn(token.expiresIn());
+    response.setOnboardingCompleted(result.onboardingCompleted());
     return response;
   }
 }

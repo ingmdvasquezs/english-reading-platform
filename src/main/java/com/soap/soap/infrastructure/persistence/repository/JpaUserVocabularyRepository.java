@@ -29,11 +29,11 @@ public interface JpaUserVocabularyRepository extends JpaRepository<UserVocabular
       from UserVocabularyEntity uv
       join uv.word w
       where uv.user.id = :userId
-        and w.language = :language
+        and lower(w.language) in :languages
         and w.normalizedValue in :normalizedValues
       """)
   List<UserVocabularyEntity> findByNormalizedValues(
       @Param("userId") UUID userId,
-      @Param("language") String language,
+      @Param("languages") Collection<String> languages,
       @Param("normalizedValues") Collection<String> normalizedValues);
 }

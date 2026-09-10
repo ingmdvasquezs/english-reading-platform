@@ -3,228 +3,307 @@ package com.soap.soap.infrastructure.http;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
-import static org.springframework.http.HttpMethod.GET;
-import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.ExpectedCount.once;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
-import com.soap.soap.application.exception.ExternalProviderException;
-import com.soap.soap.application.exception.WordNotFoundException;
-import com.soap.soap.infrastructure.http.adapter.FreeDictionaryAdapter;
-import com.soap.soap.infrastructure.http.adapter.LibreTranslateAdapter;
-import com.soap.soap.infrastructure.http.configuration.ExternalProviderLimits;
-import com.soap.soap.infrastructure.http.configuration.LimitedResponseBodyInterceptor;
+import com.soap.soap.application.exception.*;
+import com.soap.soap.infrastructure.http.adapter.*;
+import com.soap.soap.infrastructure.http.configuration.*;
+import com.soap.soap.infrastructure.observability.ExternalProviderObservation;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.SocketTimeoutException;
+import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.client.*;
 
 class ExternalAdaptersTest {
+  private static final String KEY = "test-merriam-key";
+
   @Test
-  void eachProviderAdapterHasExactlyOneSpringInjectionConstructor() {
-    assertThat(
-            java.util.stream.Stream.of(FreeDictionaryAdapter.class, LibreTranslateAdapter.class)
-                .map(
-                    type ->
-                        java.util.Arrays.stream(type.getConstructors())
-                            .filter(constructor -> constructor.isAnnotationPresent(Autowired.class))
-                            .count()))
-        .containsExactly(1L, 1L);
+  void representativeCommonDirectEntriesSucceed() {
+    for (var word : List.of("grandmother", "walk")) {
+      var context =
+          dictionary(
+              "[{\"meta\":{\"id\":\""
+                  + word
+                  + ":1\"},\"fl\":\"noun\",\"shortdef\":[\"a valid definition\"]}]",
+              word);
+      assertThat(context.adapter.lookup(word, "en").meanings()).isNotEmpty();
+      context.server.verify();
+    }
   }
 
   @Test
-  void mapsDictionaryPhoneticAudioMeaningsAndLimitsDefinitions() {
+  void merriamMapsMultipleEntriesAndAllSupportedFields() {
+    var json =
+        """
+        [{"meta":{"id":"apple:1"},"hwi":{"hw":"ap*ple","prs":[{"ipa":"ˈæpəl","sound":{"audio":"apple001"}}]},"fl":"noun",
+        "def":[{"sseq":[[["sense",{"dt":[["text","{bc}a round {it}fruit{/it}"],["vis",[{"t":"{it}fresh apples{/it}"}]]]}]]]}]},
+        {"meta":{"id":"apple:2"},"fl":"verb","shortdef":["to furnish with apples"]}]
+        """;
+    var c = dictionary(json, "apple");
+    var result = c.adapter.lookup("apple", "en");
+    assertThat(result.word()).isEqualTo("apple");
+    assertThat(result.phonetic()).isEqualTo("ˈæpəl");
+    assertThat(result.audioUrl()).endsWith("/a/apple001.mp3");
+    assertThat(result.meanings()).extracting("partOfSpeech").containsExactly("noun", "verb");
+    assertThat(result.meanings().getFirst().definitions().getFirst().definition())
+        .isEqualTo("a round fruit");
+    assertThat(result.meanings().getFirst().definitions().getFirst().example())
+        .isEqualTo("fresh apples");
+    c.server.verify();
+  }
+
+  @Test
+  void merriamHandlesFallbackMissingOptionalFieldsSuggestionsEmptyAndMalformed() {
+    var c =
+        dictionary(
+            "[{\"meta\":{\"id\":\"plain:1\"},\"fl\":\"noun\",\"shortdef\":[\"simple\"]}]", "plain");
+    var result = c.adapter.lookup("plain", "en");
+    assertThat(result.phonetic()).isNull();
+    assertThat(result.audioUrl()).isNull();
+    assertThat(result.meanings().getFirst().definitions().getFirst().definition())
+        .isEqualTo("simple");
+    for (var value : List.of("[]", "[\"apple\",\"apply\"]"))
+      assertDictionaryFailure(value, WordNotFoundException.class);
+    for (var value : List.of("{}", "not-json"))
+      assertDictionaryFailure(value, DictionaryInvalidResponseException.class);
+  }
+
+  @Test
+  void commonWordsWithMoreEntriesThanTheOutputLimitRemainValid() {
+    var entries =
+        java.util.stream.IntStream.rangeClosed(1, 8)
+            .mapToObj(
+                number ->
+                    "{\"meta\":{\"id\":\"leave:"
+                        + number
+                        + "\"},\"fl\":\"verb\",\"shortdef\":[\"definition "
+                        + number
+                        + "\"]}")
+            .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+    var context = dictionary(entries, "leave");
+
+    var result = context.adapter.lookup("leave", "en");
+
+    assertThat(result.word()).isEqualTo("leave");
+    assertThat(result.meanings()).isNotEmpty();
+    context.server.verify();
+  }
+
+  @Test
+  void resolvesConservativeInflectionSuggestionWithOnlyOneFollowUp() {
     var builder = RestClient.builder().baseUrl("https://dictionary.test");
     var server = MockRestServiceServer.bindTo(builder).build();
     server
-        .expect(once(), requestTo("https://dictionary.test/api/v2/entries/en/bridge"))
-        .andExpect(method(GET))
+        .expect(once(), requestTo(url("walks")))
+        .andRespond(withSuccess("[\"walk\",\"walls\"]", MediaType.APPLICATION_JSON));
+    server
+        .expect(once(), requestTo(url("walk")))
         .andRespond(
             withSuccess(
-                """
-                [{"word":"bridge","phonetics":[{"text":"/brɪdʒ/","audio":"//audio.test/bridge.mp3"}],
-                  "meanings":[{"partOfSpeech":"noun","definitions":[
-                    {"definition":"d1","example":"e1"},{"definition":"d2"},
-                    {"definition":"d3"},{"definition":"d4"}]},
-                    {"partOfSpeech":"verb","definitions":[{"definition":"connect"}]}]}]
-                """,
+                "[{\"meta\":{\"id\":\"walk:1\"},\"fl\":\"verb\",\"shortdef\":[\"to move on foot\"]}]",
                 MediaType.APPLICATION_JSON));
 
-    var result = new FreeDictionaryAdapter(builder.build()).lookup("bridge", "en");
+    var result = adapter(builder).lookup("walks", "en");
 
-    assertThat(result.phonetic()).isEqualTo("/brɪdʒ/");
-    assertThat(result.audioUrl()).isEqualTo("https://audio.test/bridge.mp3");
-    assertThat(result.meanings()).hasSize(2);
-    assertThat(result.meanings().getFirst().definitions()).hasSize(3);
+    assertThat(result.word()).isEqualTo("walk");
     server.verify();
   }
 
   @Test
-  void toleratesMissingPhoneticAndAudio() {
+  void resolvesExplicitMerriamCrossReferenceAndNeverFollowsASecondReference() {
     var builder = RestClient.builder().baseUrl("https://dictionary.test");
     var server = MockRestServiceServer.bindTo(builder).build();
     server
-        .expect(requestTo("https://dictionary.test/api/v2/entries/en/plain"))
-        .andRespond(
-            withSuccess("[{\"word\":\"plain\",\"meanings\":[]}]", MediaType.APPLICATION_JSON));
-
-    var result = new FreeDictionaryAdapter(builder.build()).lookup("plain", "en");
-
-    assertThat(result.phonetic()).isNull();
-    assertThat(result.audioUrl()).isNull();
-  }
-
-  @Test
-  void malformedDictionaryResponseBecomesAProviderFailure() {
-    var builder = RestClient.builder().baseUrl("https://dictionary.test");
-    var server = MockRestServiceServer.bindTo(builder).build();
-    server
-        .expect(requestTo("https://dictionary.test/api/v2/entries/en/broken"))
-        .andRespond(withSuccess("[{\"unexpected\":true}]", MediaType.APPLICATION_JSON));
-
-    assertThatThrownBy(() -> new FreeDictionaryAdapter(builder.build()).lookup("broken", "en"))
-        .isInstanceOf(ExternalProviderException.class)
-        .hasMessage("Dictionary provider is unavailable");
-  }
-
-  @Test
-  void mapsDictionaryNotFoundAndProviderFailures() {
-    assertDictionaryFailure(withResourceNotFound(), WordNotFoundException.class);
-    assertDictionaryFailure(withServerError(), ExternalProviderException.class);
-    assertDictionaryFailure(
-        request -> {
-          throw new ResourceAccessException("timeout", new SocketTimeoutException());
-        },
-        ExternalProviderException.class);
-  }
-
-  @Test
-  void rejectsAnOversizedDictionaryBodyBeforeJsonMapping() {
-    var builder =
-        RestClient.builder()
-            .baseUrl("https://dictionary.test")
-            .requestInterceptor(new LimitedResponseBodyInterceptor(100));
-    var server = MockRestServiceServer.bindTo(builder).build();
-    server
-        .expect(requestTo("https://dictionary.test/api/v2/entries/en/large"))
+        .expect(once(), requestTo(url("made")))
         .andRespond(
             withSuccess(
-                "[{\"word\":\"large\",\"padding\":\"" + "x".repeat(500) + "\"}]",
+                "[{\"meta\":{\"id\":\"made\"},\"cxs\":[{\"cxl\":\"past tense of\",\"cxtis\":[{\"cxt\":\"make\"}]}]}]",
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(once(), requestTo(url("make")))
+        .andRespond(
+            withSuccess(
+                "[{\"meta\":{\"id\":\"make\"},\"fl\":\"verb\",\"shortdef\":[\"to create\"]}]",
                 MediaType.APPLICATION_JSON));
 
-    assertThatThrownBy(() -> new FreeDictionaryAdapter(builder.build()).lookup("large", "en"))
-        .isInstanceOf(ExternalProviderException.class);
+    assertThat(adapter(builder).lookup("made", "en").word()).isEqualTo("make");
+    server.verify();
+
+    var unresolved = RestClient.builder().baseUrl("https://dictionary.test");
+    var unresolvedServer = MockRestServiceServer.bindTo(unresolved).build();
+    unresolvedServer
+        .expect(once(), requestTo(url("running")))
+        .andRespond(withSuccess("[\"run\"]", MediaType.APPLICATION_JSON));
+    unresolvedServer
+        .expect(once(), requestTo(url("run")))
+        .andRespond(withSuccess("[\"running\"]", MediaType.APPLICATION_JSON));
+    assertThatThrownBy(() -> adapter(unresolved).lookup("running", "en"))
+        .isInstanceOf(WordNotFoundException.class);
+    unresolvedServer.verify();
   }
 
   @Test
-  void rejectsTooManyMeaningsAndOverlongDefinitions() {
-    assertDictionaryPayloadRejected(
-        "[{\"word\":\"large\",\"meanings\":["
-            + java.util.stream.IntStream.range(0, 21)
-                .mapToObj(
-                    index -> "{\"partOfSpeech\":\"noun\",\"definitions\":[{\"definition\":\"d\"}]}")
-                .collect(java.util.stream.Collectors.joining(","))
-            + "]}]");
-    assertDictionaryPayloadRejected(
-        "[{\"word\":\"large\",\"meanings\":[{\"partOfSpeech\":\"noun\","
-            + "\"definitions\":[{\"definition\":\""
-            + "d".repeat(2_001)
-            + "\"}]}]}]");
-  }
-
-  @Test
-  void rejectsAnOverlongTranslation() {
-    var builder = RestClient.builder().baseUrl("https://translate.test");
-    var server = MockRestServiceServer.bindTo(builder).build();
-    server
-        .expect(requestTo("https://translate.test/translate"))
-        .andRespond(
-            withSuccess(
-                "{\"translatedText\":\"" + "x".repeat(10_001) + "\"}", MediaType.APPLICATION_JSON));
-
-    assertThatThrownBy(
-            () -> new LibreTranslateAdapter(builder.build(), "").translate("bridge", "en", "es"))
-        .isInstanceOf(ExternalProviderException.class);
-  }
-
-  @Test
-  void translatesWithoutAnApiKey() {
-    assertTranslationRequest("", false);
-  }
-
-  @Test
-  void translatesWithAConfiguredApiKey() {
-    assertTranslationRequest("secret-key", true);
-  }
-
-  @Test
-  void mapsTranslationTimeoutAndServerErrorToProviderFailure() {
-    assertTranslationFailure(withServerError());
-    assertTranslationFailure(
+  void merriamRetriesTimeoutAndTransientStatusButNotClientStatus() {
+    assertDictionaryRetry(withStatus(HttpStatus.BAD_GATEWAY));
+    assertDictionaryRetry(
         request -> {
           throw new ResourceAccessException("timeout", new SocketTimeoutException());
         });
-  }
-
-  private void assertTranslationRequest(String apiKey, boolean expectsKey) {
-    var builder = RestClient.builder().baseUrl("https://translate.test");
-    var server = MockRestServiceServer.bindTo(builder).build();
-    var expectation =
-        server.expect(requestTo("https://translate.test/translate")).andExpect(method(POST));
-    if (expectsKey) {
-      expectation.andExpect(content().string(containsString("\"api_key\":\"secret-key\"")));
-    } else {
-      expectation.andExpect(content().string(org.hamcrest.Matchers.not(containsString("api_key"))));
+    for (var status :
+        List.of(
+            HttpStatus.BAD_REQUEST,
+            HttpStatus.UNAUTHORIZED,
+            HttpStatus.FORBIDDEN,
+            HttpStatus.TOO_MANY_REQUESTS)) {
+      var b = RestClient.builder().baseUrl("https://dictionary.test");
+      var s = MockRestServiceServer.bindTo(b).build();
+      s.expect(once(), requestTo(url("bad"))).andRespond(withStatus(status));
+      assertThatThrownBy(() -> adapter(b).lookup("bad", "en"))
+          .isInstanceOf(DictionaryUnavailableException.class);
+      s.verify();
     }
-    expectation.andRespond(
-        withSuccess("{\"translatedText\":\"puente\"}", MediaType.APPLICATION_JSON));
-
-    assertThat(new LibreTranslateAdapter(builder.build(), apiKey).translate("bridge", "en", "es"))
-        .isEqualTo("puente");
-    server.verify();
   }
 
-  private void assertDictionaryFailure(
-      org.springframework.test.web.client.ResponseCreator response,
-      Class<? extends Throwable> expected) {
-    var builder = RestClient.builder().baseUrl("https://dictionary.test");
-    var server = MockRestServiceServer.bindTo(builder).build();
-    server
-        .expect(requestTo("https://dictionary.test/api/v2/entries/en/missing"))
-        .andRespond(response);
-    assertThatThrownBy(() -> new FreeDictionaryAdapter(builder.build()).lookup("missing", "en"))
-        .isInstanceOf(expected);
+  @Test
+  void twoMerriamTimeoutsBecomeControlledTimeout() {
+    var b = RestClient.builder().baseUrl("https://dictionary.test");
+    var s = MockRestServiceServer.bindTo(b).build();
+    var timeout =
+        (org.springframework.test.web.client.ResponseCreator)
+            request -> {
+              throw new ResourceAccessException("timeout", new SocketTimeoutException());
+            };
+    s.expect(once(), requestTo(url("slow"))).andRespond(timeout);
+    s.expect(once(), requestTo(url("slow"))).andRespond(timeout);
+    assertThatThrownBy(() -> adapter(b).lookup("slow", "en"))
+        .isInstanceOf(DictionaryTimeoutException.class);
+    s.verify();
   }
 
-  private void assertDictionaryPayloadRejected(String payload) {
-    var builder = RestClient.builder().baseUrl("https://dictionary.test");
-    var server = MockRestServiceServer.bindTo(builder).build();
-    server
-        .expect(requestTo("https://dictionary.test/api/v2/entries/en/large"))
-        .andRespond(withSuccess(payload, MediaType.APPLICATION_JSON));
+  @Test
+  void azureSendsV3RequestHeadersBodyAndMapsUnicode() {
+    var b = RestClient.builder().baseUrl("https://translate.test");
+    var s = MockRestServiceServer.bindTo(b).build();
+    s.expect(once(), requestTo(azureUrl()))
+        .andExpect(method(HttpMethod.POST))
+        .andExpect(header("Ocp-Apim-Subscription-Key", "test-azure-key"))
+        .andExpect(header("Ocp-Apim-Subscription-Region", "eastus2"))
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().string(containsString("\"Text\":\"although\"")))
+        .andRespond(
+            withSuccess(
+                "[{\"translations\":[{\"text\":\"aunque también\",\"to\":\"es\"}]}]",
+                MediaType.APPLICATION_JSON));
+    assertThat(azure(b).translate("although", "en", "es")).isEqualTo("aunque también");
+    s.verify();
+  }
+
+  @Test
+  void azureRejectsInvalidPayloadConfigurationAndDoesNotRetryClientErrors() {
+    for (var payload :
+        List.of(
+            "[]",
+            "[{\"translations\":[]}]",
+            "[{\"translations\":[{\"text\":\"\"}]}]",
+            "not-json")) {
+      var b = RestClient.builder().baseUrl("https://translate.test");
+      var s = MockRestServiceServer.bindTo(b).build();
+      s.expect(once(), requestTo(azureUrl()))
+          .andRespond(withSuccess(payload, MediaType.APPLICATION_JSON));
+      assertThatThrownBy(() -> azure(b).translate("word", "en", "es"))
+          .isInstanceOf(ExternalProviderException.class);
+      s.verify();
+    }
     assertThatThrownBy(
             () ->
-                new FreeDictionaryAdapter(builder.build(), ExternalProviderLimits.defaults())
-                    .lookup("large", "en"))
+                new AzureTranslatorAdapter(RestClient.create(), "", "eastus2")
+                    .translate("x", "en", "es"))
         .isInstanceOf(ExternalProviderException.class);
+    for (var status :
+        List.of(
+            HttpStatus.BAD_REQUEST,
+            HttpStatus.UNAUTHORIZED,
+            HttpStatus.FORBIDDEN,
+            HttpStatus.TOO_MANY_REQUESTS)) assertAzureStatus(status, false);
   }
 
-  private void assertTranslationFailure(
-      org.springframework.test.web.client.ResponseCreator response) {
-    var builder = RestClient.builder().baseUrl("https://translate.test");
-    var server = MockRestServiceServer.bindTo(builder).build();
-    server.expect(requestTo("https://translate.test/translate")).andRespond(response);
-    assertThatThrownBy(
-            () -> new LibreTranslateAdapter(builder.build(), "").translate("bridge", "en", "es"))
-        .isInstanceOf(ExternalProviderException.class)
-        .hasMessage("Translation provider is unavailable");
+  @Test
+  void azureRetriesOnlyTransientStatuses() {
+    assertAzureStatus(HttpStatus.INTERNAL_SERVER_ERROR, true);
+    assertAzureStatus(HttpStatus.SERVICE_UNAVAILABLE, true);
   }
+
+  private void assertAzureStatus(HttpStatus status, boolean retry) {
+    var b = RestClient.builder().baseUrl("https://translate.test");
+    var s = MockRestServiceServer.bindTo(b).build();
+    s.expect(once(), requestTo(azureUrl())).andRespond(withStatus(status));
+    if (retry)
+      s.expect(once(), requestTo(azureUrl()))
+          .andRespond(
+              withSuccess(
+                  "[{\"translations\":[{\"text\":\"palabra\"}]}]", MediaType.APPLICATION_JSON));
+    if (retry) assertThat(azure(b).translate("word", "en", "es")).isEqualTo("palabra");
+    else
+      assertThatThrownBy(() -> azure(b).translate("word", "en", "es"))
+          .isInstanceOf(ExternalProviderException.class);
+    s.verify();
+  }
+
+  private void assertDictionaryRetry(org.springframework.test.web.client.ResponseCreator first) {
+    var b = RestClient.builder().baseUrl("https://dictionary.test");
+    var s = MockRestServiceServer.bindTo(b).build();
+    s.expect(once(), requestTo(url("bridge"))).andRespond(first);
+    s.expect(once(), requestTo(url("bridge")))
+        .andRespond(withSuccess("[{\"meta\":{\"id\":\"bridge:1\"}}]", MediaType.APPLICATION_JSON));
+    assertThat(adapter(b).lookup("bridge", "en").word()).isEqualTo("bridge");
+    s.verify();
+  }
+
+  private void assertDictionaryFailure(String json, Class<? extends Throwable> type) {
+    var c = dictionary(json, "missing");
+    assertThatThrownBy(() -> c.adapter.lookup("missing", "en")).isInstanceOf(type);
+    c.server.verify();
+  }
+
+  private Context dictionary(String json, String word) {
+    var b = RestClient.builder().baseUrl("https://dictionary.test");
+    var s = MockRestServiceServer.bindTo(b).build();
+    s.expect(once(), requestTo(url(word)))
+        .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+    return new Context(adapter(b), s);
+  }
+
+  private MerriamWebsterDictionaryAdapter adapter(RestClient.Builder b) {
+    return new MerriamWebsterDictionaryAdapter(
+        b.build(),
+        KEY,
+        ExternalProviderLimits.defaults(),
+        new DictionaryClientPolicy(Duration.ofSeconds(7), 1, Duration.ZERO));
+  }
+
+  private AzureTranslatorAdapter azure(RestClient.Builder b) {
+    return new AzureTranslatorAdapter(
+        b.build(),
+        "test-azure-key",
+        "eastus2",
+        ExternalProviderLimits.defaults(),
+        new TranslationClientPolicy(Duration.ofSeconds(7), 1, Duration.ZERO),
+        new ExternalProviderObservation(new SimpleMeterRegistry()));
+  }
+
+  private String url(String word) {
+    return "https://dictionary.test/api/v3/references/learners/json/" + word + "?key=" + KEY;
+  }
+
+  private String azureUrl() {
+    return "https://translate.test/translate?api-version=3.0&from=en&to=es";
+  }
+
+  private record Context(MerriamWebsterDictionaryAdapter adapter, MockRestServiceServer server) {}
 }

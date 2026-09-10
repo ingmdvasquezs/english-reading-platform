@@ -1,11 +1,17 @@
 package com.soap.soap.infrastructure.soap.resolver;
 
+import com.soap.soap.application.exception.AliasAlreadyInUseException;
 import com.soap.soap.application.exception.AuthenticationRequiredException;
+import com.soap.soap.application.exception.CollectionNotFoundException;
 import com.soap.soap.application.exception.ConcurrentVocabularyModificationException;
+import com.soap.soap.application.exception.DictionaryInvalidResponseException;
+import com.soap.soap.application.exception.DictionaryTimeoutException;
+import com.soap.soap.application.exception.DictionaryUnavailableException;
 import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.InvalidCredentialsException;
+import com.soap.soap.application.exception.OnboardingAlreadyCompletedException;
 import com.soap.soap.application.exception.ReadingAccessDeniedException;
 import com.soap.soap.application.exception.ReadingNotFoundException;
 import com.soap.soap.application.exception.UserNotFoundException;
@@ -19,11 +25,14 @@ import java.util.List;
 public final class SoapFaultClassifier {
   private static final List<Class<? extends Exception>> CLIENT_EXCEPTION_TYPES =
       List.of(
+          AliasAlreadyInUseException.class,
+          CollectionNotFoundException.class,
           AuthenticationRequiredException.class,
           EmailAlreadyRegisteredException.class,
           ConcurrentVocabularyModificationException.class,
           InvalidApplicationArgumentException.class,
           InvalidCredentialsException.class,
+          OnboardingAlreadyCompletedException.class,
           ReadingAccessDeniedException.class,
           ReadingNotFoundException.class,
           UserNotFoundException.class,
@@ -44,6 +53,15 @@ public final class SoapFaultClassifier {
   }
 
   public static String category(Exception exception) {
+    if (exception instanceof DictionaryTimeoutException) {
+      return "dictionary_timeout";
+    }
+    if (exception instanceof DictionaryInvalidResponseException) {
+      return "dictionary_invalid_response";
+    }
+    if (exception instanceof DictionaryUnavailableException) {
+      return "dictionary_unavailable";
+    }
     if (exception instanceof ExternalProviderException) {
       return "external_provider";
     }
@@ -53,13 +71,16 @@ public final class SoapFaultClassifier {
     }
     if (exception instanceof ConcurrentVocabularyModificationException
         || exception instanceof WordAlreadyInVocabularyException
+        || exception instanceof OnboardingAlreadyCompletedException
+        || exception instanceof AliasAlreadyInUseException
         || exception instanceof EmailAlreadyRegisteredException) {
       return "conflict";
     }
     if (exception instanceof ReadingAccessDeniedException) {
       return "access_denied";
     }
-    if (exception instanceof ReadingNotFoundException
+    if (exception instanceof CollectionNotFoundException
+        || exception instanceof ReadingNotFoundException
         || exception instanceof UserNotFoundException
         || exception instanceof VocabularyEntryNotFoundException
         || exception instanceof WordNotFoundException) {

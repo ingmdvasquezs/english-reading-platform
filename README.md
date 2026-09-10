@@ -14,8 +14,9 @@ docker compose up -d
 ```
 
 No existe un perfil implícito: `local` debe activarse expresamente. Ese perfil usa PostgreSQL en
-`localhost:5432`, LibreTranslate en `localhost:5000` y un secreto JWT exclusivamente de
-desarrollo. El servicio SOAP se publica en `/ws` y el WSDL en `/ws/readings.wsdl`.
+`localhost:5432` y un secreto JWT exclusivamente de desarrollo. Para probar `lookupWord` deben
+definirse las credenciales externas descritas abajo. El servicio SOAP se publica en `/ws` y el
+WSDL en `/ws/readings.wsdl`.
 
 ## Producción
 
@@ -23,12 +24,13 @@ Activar con `SPRING_PROFILES_ACTIVE=prod`. Variables obligatorias:
 
 - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
 - `JWT_SECRET` (mínimo 32 bytes UTF-8)
-- `DICTIONARY_FREE_BASE_URL`
-- `LIBRETRANSLATE_BASE_URL`
+- `MERRIAM_WEBSTER_API_KEY`
+- `AZURE_TRANSLATOR_KEY`
+- `AZURE_TRANSLATOR_REGION`
 
 Variables operativas opcionales:
 
-- `LIBRETRANSLATE_API_KEY`, `JWT_EXPIRATION`
+- `JWT_EXPIRATION`
 - `DB_MAXIMUM_POOL_SIZE` (10), `DB_MINIMUM_IDLE` (2)
 - `DB_CONNECTION_TIMEOUT` (30000 ms), `DB_IDLE_TIMEOUT` (600000 ms),
   `DB_MAX_LIFETIME` (1800000 ms)

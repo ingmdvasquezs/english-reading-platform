@@ -5,6 +5,7 @@ import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
+import com.soap.soap.application.service.LanguageNormalizer;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.infrastructure.persistence.mapper.UserVocabularyEntityMapper;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositoryPort {
   private final JpaUserVocabularyRepository repository;
   private final UserVocabularyEntityMapper mapper;
+  private final LanguageNormalizer languages;
 
   @Override
   @Transactional(readOnly = true)
@@ -51,10 +53,17 @@ public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositor
   @Transactional(readOnly = true)
   public Map<String, VocabularyStatus> findStatusesByNormalizedValues(
       UUID userId, String language, Collection<String> normalizedValues) {
-    return repository.findByNormalizedValues(userId, language, normalizedValues).stream()
-        .collect(
-            Collectors.toUnmodifiableMap(
-                entry -> entry.getWord().getNormalizedValue(), entry -> entry.getStatus()));
+    var canonical = languages.normalize(language);
+    var result = new java.util.LinkedHashMap<String, VocabularyStatus>();
+    repository
+        .findByNormalizedValues(userId, languages.equivalentLanguages(canonical), normalizedValues)
+        .stream()
+        .sorted(
+            java.util.Comparator.comparingInt(
+                entry -> entry.getWord().getLanguage().equalsIgnoreCase(canonical) ? 0 : 1))
+        .forEach(
+            entry -> result.putIfAbsent(entry.getWord().getNormalizedValue(), entry.getStatus()));
+    return Map.copyOf(result);
   }
 
   @Override

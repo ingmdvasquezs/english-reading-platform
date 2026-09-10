@@ -40,20 +40,36 @@ public class ExternalHttpConfiguration {
         audioUrlCharacters);
   }
 
-  @Bean("freeDictionaryRestClient")
-  RestClient freeDictionaryRestClient(
-      @Value("${dictionary.free.base-url}") String baseUrl,
-      @Value("${dictionary.free.connect-timeout}") Duration connectTimeout,
-      @Value("${dictionary.free.read-timeout}") Duration readTimeout,
+  @Bean("merriamWebsterRestClient")
+  RestClient merriamWebsterRestClient(
+      @Value("${dictionary.merriam-webster.base-url}") String baseUrl,
+      @Value("${dictionary.merriam-webster.connect-timeout}") Duration connectTimeout,
+      @Value("${dictionary.merriam-webster.read-timeout}") Duration readTimeout,
       ExternalProviderLimits limits) {
     return client(baseUrl, connectTimeout, readTimeout, limits.dictionaryBodyBytes());
   }
 
-  @Bean("libreTranslateRestClient")
-  RestClient libreTranslateRestClient(
-      @Value("${translation.libre.base-url}") String baseUrl,
-      @Value("${translation.libre.connect-timeout}") Duration connectTimeout,
-      @Value("${translation.libre.read-timeout}") Duration readTimeout,
+  @Bean
+  DictionaryClientPolicy dictionaryClientPolicy(
+      @Value("${dictionary.client.timeout:7s}") Duration timeout,
+      @Value("${dictionary.client.max-retries:1}") int maxRetries,
+      @Value("${dictionary.client.retry-delay:400ms}") Duration retryDelay) {
+    return new DictionaryClientPolicy(timeout, maxRetries, retryDelay);
+  }
+
+  @Bean
+  TranslationClientPolicy translationClientPolicy(
+      @Value("${translation.client.timeout:7s}") Duration timeout,
+      @Value("${translation.client.max-retries:1}") int maxRetries,
+      @Value("${translation.client.retry-delay:400ms}") Duration retryDelay) {
+    return new TranslationClientPolicy(timeout, maxRetries, retryDelay);
+  }
+
+  @Bean("azureTranslatorRestClient")
+  RestClient azureTranslatorRestClient(
+      @Value("${translation.azure.base-url}") String baseUrl,
+      @Value("${translation.azure.connect-timeout}") Duration connectTimeout,
+      @Value("${translation.azure.read-timeout}") Duration readTimeout,
       ExternalProviderLimits limits) {
     return client(baseUrl, connectTimeout, readTimeout, limits.translationBodyBytes());
   }

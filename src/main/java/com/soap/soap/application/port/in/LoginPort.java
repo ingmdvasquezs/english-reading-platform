@@ -1,8 +1,8 @@
 package com.soap.soap.application.port.in;
 
 import com.soap.soap.application.command.LoginCommand;
-import com.soap.soap.application.model.AccessToken;
+import com.soap.soap.application.model.LoginResult;
 
 public interface LoginPort {
-  AccessToken login(LoginCommand command);
+  LoginResult login(LoginCommand command);
 }

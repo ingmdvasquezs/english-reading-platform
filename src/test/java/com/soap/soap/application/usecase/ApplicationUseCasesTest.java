@@ -18,8 +18,10 @@ import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.PlatformReadingSummary;
 import com.soap.soap.application.model.ReadingSummary;
 import com.soap.soap.application.port.out.CurrentUserPort;
+import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
@@ -27,8 +29,11 @@ import com.soap.soap.application.port.out.WordRepositoryPort;
 import com.soap.soap.application.service.LanguageNormalizer;
 import com.soap.soap.application.service.ReadingAnalyzer;
 import com.soap.soap.application.service.TextWordProcessor;
+import com.soap.soap.application.service.VocabularyCompatibilityCalculator;
 import com.soap.soap.application.service.WordResolver;
+import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.Reading;
+import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.User;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
@@ -56,6 +61,7 @@ class ApplicationUseCasesTest {
   @Mock private UserRepositoryPort users;
   @Mock private WordRepositoryPort words;
   @Mock private ReadingRepositoryPort readings;
+  @Mock private ReadingProgressRepositoryPort progress;
   @Mock private UserVocabularyRepositoryPort vocabulary;
   @Mock private CurrentUserPort currentUser;
 
@@ -83,6 +89,10 @@ class ApplicationUseCasesTest {
     assertThat(result.title()).isEqualTo("Title");
     assertThat(result.content()).isEqualTo("Content");
     assertThat(result.language()).isEqualTo("en");
+    assertThat(result.origin()).isEqualTo(ReadingOrigin.USER);
+    assertThat(result.user()).isEqualTo(user);
+    assertThat(result.editorialLevel()).isNull();
+    assertThat(result.category()).isNull();
   }
 
   @Test
@@ -219,14 +229,65 @@ class ApplicationUseCasesTest {
   }
 
   @Test
+  void analyzesAPlatformReadingForAnAuthenticatedUser() {
+    var reading =
+        new Reading(
+            UUID.randomUUID(),
+            null,
+            "Platform",
+            "Hello world",
+            "en",
+            LocalDateTime.now(),
+            ReadingOrigin.PLATFORM,
+            EditorialLevel.A2,
+            "Science");
+    when(users.existsById(user.id())).thenReturn(true);
+    when(readings.findById(reading.id())).thenReturn(Optional.of(reading));
+    when(vocabulary.findStatusesByNormalizedValues(user.id(), "en", Set.of("hello", "world")))
+        .thenReturn(Map.of("hello", VocabularyStatus.KNOWN));
+
+    var analysis =
+        new AnalyzeReadingUseCase(
+                users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+            .analyzeReading(reading.id());
+
+    assertThat(analysis.knownWords()).isEqualTo(1);
+    assertThat(analysis.unknownWords()).isEqualTo(1);
+  }
+
+  @Test
   void listsReadingsUsingApplicationPagination() {
     var request = new PageRequest(1, 10);
+    var source = new PageResult<Reading>(List.of(), 1, 10, 12);
     var expected = new PageResult<ReadingSummary>(List.of(), 1, 10, 12);
     when(users.existsById(user.id())).thenReturn(true);
-    when(readings.findSummariesByUserId(user.id(), request)).thenReturn(expected);
+    when(readings.findUserReadingsByUserId(user.id(), request)).thenReturn(source);
 
-    assertThat(new ListUserReadingsUseCase(users, readings, currentUser).listUserReadings(request))
+    assertThat(
+            new ListUserReadingsUseCase(
+                    users,
+                    readings,
+                    progress,
+                    vocabulary,
+                    processor,
+                    new VocabularyCompatibilityCalculator(),
+                    currentUser)
+                .listUserReadings(request))
         .isEqualTo(expected);
+  }
+
+  @Test
+  void listsOnlyPlatformSummariesUsingApplicationPagination() {
+    var request = new PageRequest(0, 10);
+    var expected = new PageResult<PlatformReadingSummary>(List.of(), 0, 10, 4);
+    when(users.existsById(user.id())).thenReturn(true);
+    when(readings.findPlatformSummaries(request)).thenReturn(expected);
+
+    assertThat(
+            new ListPlatformReadingsUseCase(users, readings, progress, currentUser)
+                .listPlatformReadings(request))
+        .isEqualTo(expected);
+    verify(readings).findPlatformSummaries(request);
   }
 
   @Test

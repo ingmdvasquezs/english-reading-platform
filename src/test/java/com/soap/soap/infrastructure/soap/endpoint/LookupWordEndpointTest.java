@@ -39,6 +39,9 @@ class LookupWordEndpointTest {
 
     assertThat(response.getTranslation()).isEqualTo("puente");
     assertThat(response.getPhonetic()).isEqualTo("/brɪdʒ/");
+    assertThat(response.getAudioUrl())
+        .isEqualTo("https://audio.test/bridge.mp3")
+        .doesNotContain("[", "](");
     assertThat(response.getMeanings().getFirst().getDefinitions().getFirst().getExample())
         .isEqualTo("cross the bridge");
     assertThat(LookupWordRequest.class.getMethods())

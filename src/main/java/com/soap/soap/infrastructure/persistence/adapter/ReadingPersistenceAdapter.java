@@ -2,11 +2,13 @@ package com.soap.soap.infrastructure.persistence.adapter;
 
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.PlatformReadingSummary;
 import com.soap.soap.application.model.ReadingSummary;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.infrastructure.persistence.mapper.ReadingEntityMapper;
 import com.soap.soap.infrastructure.persistence.repository.JpaReadingRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -48,8 +50,59 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public PageResult<Reading> findUserReadingsByUserId(UUID userId, PageRequest pageRequest) {
+    var page =
+        repository.findUserReadingsByUserId(
+            userId,
+            org.springframework.data.domain.PageRequest.of(pageRequest.page(), pageRequest.size()));
+    return new PageResult<>(
+        page.getContent().stream().map(mapper::toDomain).toList(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PageResult<PlatformReadingSummary> findPlatformSummaries(PageRequest pageRequest) {
+    var page =
+        repository.findPlatformSummaries(
+            org.springframework.data.domain.PageRequest.of(pageRequest.page(), pageRequest.size()));
+    return new PageResult<>(
+        page.getContent().stream()
+            .map(
+                summary ->
+                    new PlatformReadingSummary(
+                        summary.getId(),
+                        summary.getTitle(),
+                        summary.getLanguage(),
+                        summary.getEditorialLevel(),
+                        summary.getCategory(),
+                        summary.getCreatedAt(),
+                        null,
+                        summary.getCoverKey()))
+            .toList(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<Reading> findAllPlatformReadings() {
+    return repository.findAllPlatformReadings().stream().map(mapper::toDomain).toList();
+  }
+
+  @Override
   @Transactional
   public Reading save(Reading reading) {
     return mapper.toDomain(repository.save(mapper.toEntity(reading)));
+  }
+
+  @Override
+  @Transactional
+  public void deleteById(UUID id) {
+    repository.deleteById(id);
   }
 }

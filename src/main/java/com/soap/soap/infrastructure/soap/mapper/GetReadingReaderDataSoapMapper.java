@@ -5,6 +5,7 @@ import com.soap.soap.infrastructure.soap.generated.GetReadingReaderDataRequest;
 import com.soap.soap.infrastructure.soap.generated.GetReadingReaderDataResponse;
 import com.soap.soap.infrastructure.soap.generated.ReaderTokenType;
 import com.soap.soap.infrastructure.soap.generated.ReaderTokenTypeType;
+import com.soap.soap.infrastructure.soap.generated.ReadingProgressStatusType;
 import com.soap.soap.infrastructure.soap.generated.VocabularyStatusType;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -20,6 +21,11 @@ public class GetReadingReaderDataSoapMapper extends SoapMapperSupport {
     response.setReadingId(data.readingId().toString());
     response.setTitle(data.title());
     response.setLanguage(data.language());
+    if (data.progressStatus() != null) {
+      response.setProgressStatus(ReadingProgressStatusType.fromValue(data.progressStatus().name()));
+    }
+    response.setCurrentPartOrdinal(data.currentPartOrdinal());
+    response.setPaginationVersion(data.paginationVersion());
     data.tokens()
         .forEach(
             token -> {

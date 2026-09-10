@@ -16,7 +16,6 @@ class TransactionBoundaryTest {
     assertNotTransactional(LoginUseCase.class, "login", LoginCommand.class);
     assertNotTransactional(RegisterUserUseCase.class, "registerUser", RegisterUserCommand.class);
     assertNotTransactional(AnalyzeReadingUseCase.class, "analyzeReading", UUID.class);
-    assertNotTransactional(GetReadingReaderDataUseCase.class, "getReadingReaderData", UUID.class);
   }
 
   @Test
@@ -29,6 +28,16 @@ class TransactionBoundaryTest {
     assertThat(
             RegisterReadingUseCase.class
                 .getMethod("registerReading", RegisterReadingCommand.class)
+                .getAnnotation(Transactional.class))
+        .isNotNull();
+    assertThat(
+            GetReadingReaderDataUseCase.class
+                .getMethod("getReadingReaderData", UUID.class)
+                .getAnnotation(Transactional.class))
+        .isNotNull();
+    assertThat(
+            CompleteReadingUseCase.class
+                .getMethod("completeReading", UUID.class)
                 .getAnnotation(Transactional.class))
         .isNotNull();
   }

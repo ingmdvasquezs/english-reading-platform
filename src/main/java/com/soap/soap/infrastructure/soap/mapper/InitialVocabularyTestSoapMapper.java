@@ -2,6 +2,8 @@ package com.soap.soap.infrastructure.soap.mapper;
 
 import com.soap.soap.application.model.InitialVocabularyTest;
 import com.soap.soap.application.model.InitialVocabularyTestResult;
+import com.soap.soap.application.model.VocabularyClassification;
+import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.infrastructure.soap.generated.CompleteInitialVocabularyTestRequest;
 import com.soap.soap.infrastructure.soap.generated.CompleteInitialVocabularyTestResponse;
 import com.soap.soap.infrastructure.soap.generated.GetInitialVocabularyTestResponse;
@@ -27,5 +29,18 @@ public class InitialVocabularyTestSoapMapper {
 
   public String testId(CompleteInitialVocabularyTestRequest request) {
     return request.getTestId();
+  }
+
+  public java.util.List<VocabularyClassification> classifications(
+      CompleteInitialVocabularyTestRequest request) {
+    return request.getClassifications().stream()
+        .map(
+            classification ->
+                new VocabularyClassification(
+                    classification.getWord(),
+                    classification.getStatus() == null
+                        ? null
+                        : VocabularyStatus.valueOf(classification.getStatus().value())))
+        .toList();
   }
 }

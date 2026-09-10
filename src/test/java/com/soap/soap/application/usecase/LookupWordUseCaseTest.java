@@ -2,11 +2,13 @@ package com.soap.soap.application.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.soap.soap.application.exception.AuthenticationRequiredException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
+import com.soap.soap.application.exception.WordNotFoundException;
 import com.soap.soap.application.model.DictionaryEntry;
 import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.model.WordDefinition;
@@ -59,6 +61,17 @@ class LookupWordUseCaseTest {
     assertThatThrownBy(() -> useCase().lookupWord("bridge"))
         .isInstanceOf(AuthenticationRequiredException.class);
     verify(currentUser).requireUserId();
+  }
+
+  @Test
+  void doesNotCallAzureWhenDictionaryReportsWordNotFound() {
+    when(currentUser.requireUserId()).thenReturn(UUID.randomUUID());
+    when(dictionary.lookup("missing", "en")).thenThrow(new WordNotFoundException("missing"));
+
+    assertThatThrownBy(() -> useCase().lookupWord("missing"))
+        .isInstanceOf(WordNotFoundException.class);
+
+    verify(translation, never()).translate("missing", "en", "es");
   }
 
   private LookupWordUseCase useCase() {

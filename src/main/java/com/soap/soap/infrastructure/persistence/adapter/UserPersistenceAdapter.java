@@ -1,5 +1,6 @@
 package com.soap.soap.infrastructure.persistence.adapter;
 
+import com.soap.soap.application.exception.AliasAlreadyInUseException;
 import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.domain.model.User;
@@ -39,6 +40,12 @@ public class UserPersistenceAdapter implements UserRepositoryPort {
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public boolean existsByAliasIgnoreCaseAndIdNot(String alias, UUID id) {
+    return repository.existsByAliasIgnoreCaseAndIdNot(alias, id);
+  }
+
+  @Override
   @Transactional
   public User save(User user) {
     try {
@@ -48,8 +55,17 @@ public class UserPersistenceAdapter implements UserRepositoryPort {
       if (hasConstraint(exception, "uk_users_email_normalized")) {
         throw new EmailAlreadyRegisteredException();
       }
+      if (hasConstraint(exception, "uk_users_alias_normalized")) {
+        throw new AliasAlreadyInUseException();
+      }
       throw exception;
     }
+  }
+
+  @Override
+  @Transactional
+  public boolean markOnboardingCompleted(UUID id) {
+    return repository.markOnboardingCompleted(id) == 1;
   }
 
   private boolean hasConstraint(Throwable exception, String constraint) {

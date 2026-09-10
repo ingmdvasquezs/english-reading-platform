@@ -49,15 +49,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     } catch (JwtException exception) {
       meters.counter("security.authentication.failures", "reason", "invalid_token").increment();
       SecurityContextHolder.clearContext();
-      rejectInvalidToken(response);
+      rejectInvalidToken(request, response);
     }
   }
 
-  private void rejectInvalidToken(HttpServletResponse response) throws IOException {
+  private void rejectInvalidToken(HttpServletRequest request, HttpServletResponse response)
+      throws IOException {
     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-    response.setContentType("text/plain");
+    boolean rest = request.getRequestURI().startsWith("/api/v1/");
+    response.setContentType(rest ? "application/json" : "text/plain");
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    response.getWriter().write("Invalid bearer token");
+    response
+        .getWriter()
+        .write(
+            rest
+                ? "{\"code\":\"INVALID_TOKEN\",\"message\":\"The bearer token is invalid.\"}"
+                : "Invalid bearer token");
     response.flushBuffer();
   }
 }

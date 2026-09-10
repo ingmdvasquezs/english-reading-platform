@@ -28,6 +28,47 @@
         <xs:pattern value="[A-Za-z]{2,3}(-[A-Za-z]{2,3})?"/>
         <xs:maxLength value="10"/>
     </xs:restriction></xs:simpleType>
+    <xs:simpleType name="aliasType"><xs:restriction base="xs:string">
+        <xs:minLength value="1"/><xs:maxLength value="50"/>
+    </xs:restriction></xs:simpleType>
+    <xs:simpleType name="ageType"><xs:restriction base="xs:int">
+        <xs:minInclusive value="5"/><xs:maxInclusive value="120"/>
+    </xs:restriction></xs:simpleType>
+
+    <xs:complexType name="userProfileType">
+        <xs:sequence>
+            <xs:element name="name" type="tns:nameType"/>
+            <xs:element name="alias" type="tns:aliasType" minOccurs="0"/>
+            <xs:element name="age" type="tns:ageType" minOccurs="0"/>
+            <xs:element name="nativeLanguage" type="tns:languageType" minOccurs="0"/>
+            <xs:element name="learningLanguage" type="tns:languageType"/>
+            <xs:element name="email" type="tns:emailType"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="getMyProfileRequest">
+        <xs:complexType/>
+    </xs:element>
+    <xs:element name="getMyProfileResponse">
+        <xs:complexType><xs:complexContent>
+            <xs:extension base="tns:userProfileType"/>
+        </xs:complexContent></xs:complexType>
+    </xs:element>
+    <xs:element name="updateMyProfileRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="name" type="tns:nameType"/>
+            <!-- Present with xsi:nil=true clears the value; a concrete value sets it. -->
+            <xs:element name="alias" type="tns:aliasType" nillable="true"/>
+            <xs:element name="age" type="tns:ageType" nillable="true"/>
+            <xs:element name="nativeLanguage" type="tns:languageType" nillable="true"/>
+            <xs:element name="learningLanguage" type="tns:languageType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="updateMyProfileResponse">
+        <xs:complexType><xs:complexContent>
+            <xs:extension base="tns:userProfileType"/>
+        </xs:complexContent></xs:complexType>
+    </xs:element>
 
     <xs:element name="registerUserRequest">
         <xs:complexType><xs:sequence>
@@ -55,6 +96,7 @@
             <xs:element name="accessToken" type="xs:string"/>
             <xs:element name="tokenType" type="xs:string"/>
             <xs:element name="expiresIn" type="xs:long"/>
+            <xs:element name="onboardingCompleted" type="xs:boolean"/>
         </xs:sequence></xs:complexType>
     </xs:element>
 
@@ -87,6 +129,38 @@
         </xs:restriction>
     </xs:simpleType>
 
+    <xs:simpleType name="readingOriginType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="PLATFORM"/>
+            <xs:enumeration value="USER"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="readingProgressStatusType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="IN_PROGRESS"/>
+            <xs:enumeration value="COMPLETED"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="editorialLevelType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="A1"/>
+            <xs:enumeration value="A2"/>
+            <xs:enumeration value="B1"/>
+            <xs:enumeration value="B2"/>
+            <xs:enumeration value="C1"/>
+            <xs:enumeration value="C2"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="vocabularyClassificationType">
+        <xs:sequence>
+            <xs:element name="word" type="tns:wordType"/>
+            <xs:element name="status" type="tns:vocabularyStatusType"/>
+        </xs:sequence>
+    </xs:complexType>
+
     <xs:simpleType name="readerTokenTypeType">
         <xs:restriction base="xs:string">
             <xs:enumeration value="WORD"/>
@@ -112,13 +186,29 @@
         </xs:sequence>
     </xs:complexType>
 
+    <xs:complexType name="continueReadingItemType">
+        <xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="origin" type="tns:readingOriginType"/>
+            <xs:element name="progressStatus" type="tns:readingProgressStatusType"/>
+            <xs:element name="coverKey" type="xs:string" minOccurs="0"/>
+            <xs:element name="editorialLevel" type="tns:editorialLevelType" minOccurs="0"/>
+            <xs:element name="category" type="xs:string" minOccurs="0"/>
+            <xs:element name="startedAt" type="xs:dateTime"/>
+        </xs:sequence>
+    </xs:complexType>
+
     <xs:complexType name="readingType">
         <xs:sequence>
             <xs:element name="readingId" type="xs:string"/>
-            <xs:element name="userId" type="xs:string"/>
+            <xs:element name="userId" type="xs:string" minOccurs="0"/>
             <xs:element name="title" type="xs:string"/>
             <xs:element name="content" type="xs:string"/>
             <xs:element name="language" type="xs:string"/>
+            <xs:element name="origin" type="tns:readingOriginType"/>
+            <xs:element name="editorialLevel" type="tns:editorialLevelType" minOccurs="0"/>
+            <xs:element name="category" type="xs:string" minOccurs="0"/>
             <xs:element name="createdAt" type="xs:dateTime" minOccurs="0"/>
         </xs:sequence>
     </xs:complexType>
@@ -129,6 +219,59 @@
             <xs:element name="title" type="xs:string"/>
             <xs:element name="language" type="xs:string"/>
             <xs:element name="createdAt" type="xs:dateTime" minOccurs="0"/>
+            <xs:element name="uniqueWords" type="xs:int" minOccurs="0"/>
+            <xs:element name="knownWords" type="xs:int" minOccurs="0"/>
+            <xs:element name="learningWords" type="xs:int" minOccurs="0"/>
+            <xs:element name="explicitNewWords" type="xs:int" minOccurs="0"/>
+            <xs:element name="ignoredWords" type="xs:int" minOccurs="0"/>
+            <xs:element name="unclassifiedWords" type="xs:int" minOccurs="0"/>
+            <xs:element name="progressStatus" type="tns:readingProgressStatusType" minOccurs="0"/>
+            <xs:element name="vocabularyFitPercentage" type="xs:decimal" minOccurs="0"/>
+            <xs:element name="classificationConfidencePercentage" type="xs:decimal" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="platformReadingSummaryType">
+        <xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="language" type="xs:string"/>
+            <xs:element name="editorialLevel" type="tns:editorialLevelType"/>
+            <xs:element name="category" type="xs:string"/>
+            <xs:element name="createdAt" type="xs:dateTime" minOccurs="0"/>
+            <xs:element name="progressStatus" type="tns:readingProgressStatusType" minOccurs="0"/>
+            <xs:element name="coverKey" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="collectionType">
+        <xs:sequence>
+            <xs:element name="key" type="xs:string"/>
+            <xs:element name="displayName" type="xs:string"/>
+            <xs:element name="description" type="xs:string"/>
+            <xs:element name="displayOrder" type="xs:int"/>
+            <xs:element name="coverKey" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="recommendedPlatformReadingType">
+        <xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="language" type="xs:string"/>
+            <xs:element name="editorialLevel" type="tns:editorialLevelType"/>
+            <xs:element name="category" type="xs:string"/>
+            <xs:element name="createdAt" type="xs:dateTime" minOccurs="0"/>
+            <xs:element name="uniqueWords" type="xs:int"/>
+            <xs:element name="knownWords" type="xs:int"/>
+            <xs:element name="learningWords" type="xs:int"/>
+            <xs:element name="explicitNewWords" type="xs:int"/>
+            <xs:element name="ignoredWords" type="xs:int"/>
+            <xs:element name="unclassifiedWords" type="xs:int"/>
+            <xs:element name="vocabularyFitPercentage" type="xs:decimal"/>
+            <xs:element name="classificationConfidencePercentage" type="xs:decimal"/>
+            <xs:element name="progressStatus" type="tns:readingProgressStatusType" minOccurs="0"/>
+            <xs:element name="coverKey" type="xs:string" minOccurs="0"/>
         </xs:sequence>
     </xs:complexType>
 
@@ -167,6 +310,53 @@
             <xs:element name="title" type="xs:string"/>
             <xs:element name="language" type="xs:string"/>
             <xs:element name="tokens" type="tns:readerTokenType" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="progressStatus" type="tns:readingProgressStatusType" minOccurs="0"/>
+            <xs:element name="currentPartOrdinal" type="xs:int" minOccurs="0"/>
+            <xs:element name="paginationVersion" type="xs:int" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="updateReadingProgressRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="progressStatus" type="tns:readingProgressStatusType"/>
+            <xs:element name="currentPartOrdinal" type="xs:int" minOccurs="0"/>
+            <xs:element name="paginationVersion" type="xs:int" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="updateReadingProgressResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="progressStatus" type="tns:readingProgressStatusType"/>
+            <xs:element name="startedAt" type="xs:dateTime"/>
+            <xs:element name="completedAt" type="xs:dateTime" minOccurs="0"/>
+            <xs:element name="currentPartOrdinal" type="xs:int" minOccurs="0"/>
+            <xs:element name="paginationVersion" type="xs:int" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="completeReadingRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="completeReadingResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="status" type="tns:readingProgressStatusType"/>
+            <xs:element name="startedAt" type="xs:dateTime"/>
+            <xs:element name="completedAt" type="xs:dateTime"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="deleteReadingRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="deleteReadingResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="success" type="xs:boolean"/>
         </xs:sequence></xs:complexType>
     </xs:element>
 
@@ -179,6 +369,64 @@
     <xs:element name="listUserReadingsResponse">
         <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
             <xs:element name="readings" type="tns:readingSummaryType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
+    </xs:element>
+
+    <xs:element name="listContinueReadingRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="page" type="xs:int"/>
+            <xs:element name="size" type="xs:int"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="listContinueReadingResponse">
+        <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
+            <xs:element name="readings" type="tns:continueReadingItemType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
+    </xs:element>
+
+    <xs:element name="listPlatformReadingsRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="page" type="xs:int"/>
+            <xs:element name="size" type="xs:int"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="listPlatformReadingsResponse">
+        <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
+            <xs:element name="readings" type="tns:platformReadingSummaryType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
+    </xs:element>
+
+    <xs:element name="listCollectionsRequest">
+        <xs:complexType/>
+    </xs:element>
+    <xs:element name="listCollectionsResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="collections" type="tns:collectionType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="listCollectionReadingsRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="collectionKey" type="xs:string"/>
+            <xs:element name="page" type="xs:int"/>
+            <xs:element name="size" type="xs:int"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="listCollectionReadingsResponse">
+        <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
+            <xs:element name="readings" type="tns:recommendedPlatformReadingType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
+    </xs:element>
+
+    <xs:element name="recommendPlatformReadingsRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="page" type="xs:int"/>
+            <xs:element name="size" type="xs:int"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="recommendPlatformReadingsResponse">
+        <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
+            <xs:element name="readings" type="tns:recommendedPlatformReadingType" minOccurs="0" maxOccurs="unbounded"/>
         </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
     </xs:element>
 
@@ -202,6 +450,19 @@
         </xs:sequence></xs:complexType>
     </xs:element>
     <xs:element name="changeVocabularyStatusResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="entry" type="tns:vocabularyEntryType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="setVocabularyStatusRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="word" type="tns:wordType"/>
+            <xs:element name="language" type="tns:languageType"/>
+            <xs:element name="status" type="tns:vocabularyStatusType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="setVocabularyStatusResponse">
         <xs:complexType><xs:sequence>
             <xs:element name="entry" type="tns:vocabularyEntryType"/>
         </xs:sequence></xs:complexType>
@@ -257,7 +518,7 @@
     <xs:element name="completeInitialVocabularyTestRequest">
         <xs:complexType><xs:sequence>
             <xs:element name="testId" type="xs:string"/>
-            <xs:element name="knownWords" type="tns:wordType" minOccurs="0" maxOccurs="100"/>
+            <xs:element name="classifications" type="tns:vocabularyClassificationType" minOccurs="0" maxOccurs="100"/>
         </xs:sequence></xs:complexType>
     </xs:element>
     <xs:element name="completeInitialVocabularyTestResponse">

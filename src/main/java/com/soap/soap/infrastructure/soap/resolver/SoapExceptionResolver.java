@@ -1,5 +1,8 @@
 package com.soap.soap.infrastructure.soap.resolver;
 
+import com.soap.soap.application.exception.DictionaryInvalidResponseException;
+import com.soap.soap.application.exception.DictionaryTimeoutException;
+import com.soap.soap.application.exception.DictionaryUnavailableException;
 import com.soap.soap.application.exception.ExternalProviderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +15,15 @@ public class SoapExceptionResolver extends SoapFaultMappingExceptionResolver {
   @Override
   protected SoapFaultDefinition getFaultDefinition(Object endpoint, Exception exception) {
     var category = SoapFaultClassifier.category(exception);
+    if (exception instanceof DictionaryTimeoutException
+        || exception instanceof DictionaryUnavailableException
+        || exception instanceof DictionaryInvalidResponseException) {
+      LOGGER.warn("soap.fault category={}", category);
+      var controlled = new SoapFaultDefinition();
+      controlled.setFaultCode(SoapFaultDefinition.SERVER);
+      controlled.setFaultStringOrReason(exception.getMessage());
+      return controlled;
+    }
     if (!SoapFaultClassifier.isClientFault(exception)) {
       if (exception instanceof ExternalProviderException) {
         // Provider observation already recorded the safe failure details; its cause may contain a

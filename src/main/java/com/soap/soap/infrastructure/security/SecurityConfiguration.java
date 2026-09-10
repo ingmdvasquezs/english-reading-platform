@@ -70,11 +70,15 @@ public class SecurityConfiguration {
   }
 
   @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter)
+  SecurityFilterChain securityFilterChain(
+      HttpSecurity http,
+      JwtAuthenticationFilter jwtFilter,
+      com.soap.soap.infrastructure.rest.RestAuthenticationEntryPoint restEntryPoint)
       throws Exception {
     return http.csrf(csrf -> csrf.disable())
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .exceptionHandling(errors -> errors.authenticationEntryPoint(restEntryPoint))
         // SOAP login and protected operations share /ws. Operation-level authentication is
         // enforced by SoapSecurityInterceptor without parsing XML in this HTTP filter chain.
         .authorizeHttpRequests(
@@ -83,6 +87,8 @@ public class SecurityConfiguration {
                     .requestMatchers(
                         "/ws/**", "/actuator/health/**", "/actuator/info", "/actuator/prometheus")
                     .permitAll()
+                    .requestMatchers("/api/v1/**")
+                    .authenticated()
                     .anyRequest()
                     .denyAll())
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

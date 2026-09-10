@@ -4,14 +4,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.soap.soap.application.exception.DictionaryTimeoutException;
+import com.soap.soap.application.exception.DictionaryUnavailableException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.VocabularyEntryNotFoundException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.ws.soap.server.endpoint.SoapFaultDefinition;
 
 class SoapExceptionResolverLoggingTest {
+
+  @Test
+  void dictionaryFailuresHaveControlledSafeServerFaultReasons() {
+    var resolver = new SoapExceptionResolver();
+
+    var timeout = resolver.getFaultDefinition(null, new DictionaryTimeoutException(null));
+    var unavailable = resolver.getFaultDefinition(null, new DictionaryUnavailableException(null));
+
+    assertThat(timeout.getFaultCode()).isEqualTo(SoapFaultDefinition.SERVER);
+    assertThat(timeout.getFaultStringOrReason()).isEqualTo("DICTIONARY_TIMEOUT");
+    assertThat(unavailable.getFaultCode()).isEqualTo(SoapFaultDefinition.SERVER);
+    assertThat(unavailable.getFaultStringOrReason()).isEqualTo("DICTIONARY_UNAVAILABLE");
+  }
 
   @Test
   void expectedClientFaultLogsOnlyCategoryAndExceptionType() {

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.soap.soap.application.model.AccessToken;
+import com.soap.soap.application.model.LoginResult;
 import com.soap.soap.application.port.in.LoginPort;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
@@ -43,9 +44,24 @@ class RateLimitHttpE2ETest {
   @MockitoBean private LoginPort loginPort;
 
   @Test
+  void documentRestApiRequiresJwtAndUsesJsonErrorContract() throws Exception {
+    var response =
+        HttpClient.newHttpClient()
+            .send(
+                HttpRequest.newBuilder(URI.create(baseUrl() + "/api/v1/documents")).GET().build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+    assertThat(response.statusCode()).isEqualTo(401);
+    assertThat(response.headers().firstValue("content-type").orElse(""))
+        .contains("application/json");
+    assertThat(response.body()).contains("AUTHENTICATION_REQUIRED").doesNotContain("stackTrace");
+  }
+
+  @Test
   void loginRateLimitReturnsCommittedHttp429WithoutDispatchingToSoapOrTheUseCase()
       throws Exception {
-    when(loginPort.login(any())).thenReturn(new AccessToken("test-token", "Bearer", 3600));
+    when(loginPort.login(any()))
+        .thenReturn(new LoginResult(new AccessToken("test-token", "Bearer", 3600), false));
     var client = HttpClient.newHttpClient();
 
     var first = postLogin(client);
@@ -65,6 +81,10 @@ class RateLimitHttpE2ETest {
     var counter = meters.find("security.rate_limited").tag("policy", "login").counter();
     assertThat(counter).isNotNull();
     assertThat(counter.count()).isEqualTo(2.0);
+  }
+
+  private String baseUrl() {
+    return "http://localhost:" + serverPort;
   }
 
   @Test
