@@ -81,15 +81,13 @@ public interface JpaUserVocabularyRepository extends JpaRepository<UserVocabular
       join uv.word w
       where uv.user.id = :userId
         and (
-          (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status != com.soap.soap.domain.model.VocabularyStatus.IGNORED)
+          (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status not in (com.soap.soap.domain.model.VocabularyStatus.IGNORED, com.soap.soap.domain.model.VocabularyStatus.NEW))
           or (uv.status = com.soap.soap.domain.model.VocabularyStatus.LEARNING and uv.nextReviewAt is null)
-          or (uv.status = com.soap.soap.domain.model.VocabularyStatus.NEW and uv.nextReviewAt is null)
         )
       order by
         case
-          when (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status != com.soap.soap.domain.model.VocabularyStatus.IGNORED) then 1
+          when (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status not in (com.soap.soap.domain.model.VocabularyStatus.IGNORED, com.soap.soap.domain.model.VocabularyStatus.NEW)) then 1
           when (uv.status = com.soap.soap.domain.model.VocabularyStatus.LEARNING and uv.nextReviewAt is null) then 2
-          when (uv.status = com.soap.soap.domain.model.VocabularyStatus.NEW and uv.nextReviewAt is null) then 3
           else 99
         end asc,
         uv.nextReviewAt asc nulls last,
@@ -106,7 +104,7 @@ public interface JpaUserVocabularyRepository extends JpaRepository<UserVocabular
       where uv.user.id = :userId
         and uv.nextReviewAt is not null
         and uv.nextReviewAt <= :now
-        and uv.status != com.soap.soap.domain.model.VocabularyStatus.IGNORED
+        and uv.status not in (com.soap.soap.domain.model.VocabularyStatus.IGNORED, com.soap.soap.domain.model.VocabularyStatus.NEW)
       """)
   long countDueWords(@Param("userId") UUID userId, @Param("now") java.time.LocalDateTime now);
 
@@ -116,9 +114,8 @@ public interface JpaUserVocabularyRepository extends JpaRepository<UserVocabular
       from UserVocabularyEntity uv
       where uv.user.id = :userId
         and (
-          (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status != com.soap.soap.domain.model.VocabularyStatus.IGNORED)
+          (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status not in (com.soap.soap.domain.model.VocabularyStatus.IGNORED, com.soap.soap.domain.model.VocabularyStatus.NEW))
           or (uv.status = com.soap.soap.domain.model.VocabularyStatus.LEARNING and uv.nextReviewAt is null)
-          or (uv.status = com.soap.soap.domain.model.VocabularyStatus.NEW and uv.nextReviewAt is null)
         )
       """)
   long countTotalReviewableWords(

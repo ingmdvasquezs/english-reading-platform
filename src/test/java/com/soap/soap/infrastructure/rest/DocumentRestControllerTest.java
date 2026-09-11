@@ -207,6 +207,71 @@ class DocumentRestControllerTest {
         .andExpect(jsonPath("$.code").value("DOCUMENT_ALREADY_IMPORTED"));
   }
 
+  @Test
+  void tokenResponsePreservesNullVocabularyStatusWhenUnclassified() {
+    var token =
+        new com.soap.soap.application.model.ReaderToken(
+            "harbour", "harbour", com.soap.soap.application.model.ReaderTokenType.WORD, null);
+    var response = DocumentRestController.TokenResponse.from(token);
+    org.assertj.core.api.Assertions.assertThat(response.vocabularyStatus()).isNull();
+    org.assertj.core.api.Assertions.assertThat(response.value()).isEqualTo("harbour");
+  }
+
+  @Test
+  void tokenResponsePreservesPersistedNewStatus() {
+    var token =
+        new com.soap.soap.application.model.ReaderToken(
+            "harbour",
+            "harbour",
+            com.soap.soap.application.model.ReaderTokenType.WORD,
+            com.soap.soap.domain.model.VocabularyStatus.NEW);
+    var response = DocumentRestController.TokenResponse.from(token);
+    org.assertj.core.api.Assertions.assertThat(response.vocabularyStatus()).isEqualTo("NEW");
+  }
+
+  @Test
+  void unitReaderEndpointReturnsNullForUnclassifiedAndNewForPersistedNew() throws Exception {
+    var documentId = UUID.randomUUID();
+    var sectionId = UUID.randomUUID();
+    var unitId = UUID.randomUUID();
+    var unclassifiedToken =
+        new com.soap.soap.application.model.ReaderToken(
+            "harbour", "harbour", com.soap.soap.application.model.ReaderTokenType.WORD, null);
+    var persistedNewToken =
+        new com.soap.soap.application.model.ReaderToken(
+            "market",
+            "market",
+            com.soap.soap.application.model.ReaderTokenType.WORD,
+            com.soap.soap.domain.model.VocabularyStatus.NEW);
+    var readerData =
+        new com.soap.soap.application.model.DocumentUnitReaderData(
+            documentId,
+            sectionId,
+            "Chapter 1",
+            1,
+            1,
+            unitId,
+            1,
+            1,
+            1,
+            1,
+            null,
+            null,
+            "harbour market",
+            List.of(unclassifiedToken, persistedNewToken),
+            null);
+
+    when(queries.unit(documentId, unitId)).thenReturn(readerData);
+
+    mvc.perform(get("/api/v1/documents/{id}/units/{unitId}", documentId, unitId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.tokens[0].value").value("harbour"))
+        .andExpect(
+            jsonPath("$.tokens[0].vocabularyStatus").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.tokens[1].value").value("market"))
+        .andExpect(jsonPath("$.tokens[1].vocabularyStatus").value("NEW"));
+  }
+
   private ImportedDocument document(UUID id, UUID ownerId, String coverKey) {
     var now = LocalDateTime.now();
     return new ImportedDocument(

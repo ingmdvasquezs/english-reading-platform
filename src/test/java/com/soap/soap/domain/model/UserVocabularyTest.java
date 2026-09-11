@@ -102,13 +102,48 @@ class UserVocabularyTest {
             pastReview,
             nowUtc.plusDays(1));
 
-    // manual -> KNOWN: reviewStage = max(1, actual), nextReviewAt = null, lastReviewedAt preserved
+    // manual -> KNOWN: reviewStage = max(3, actual), nextReviewAt scheduled (+14d for stage 3, +30d
+    // for stage 4/5), lastReviewedAt preserved
     var toKnown = base.changeStatus(VocabularyStatus.KNOWN, clock);
     assertThat(toKnown.status()).isEqualTo(VocabularyStatus.KNOWN);
     assertThat(toKnown.reviewStage()).isEqualTo(3);
-    assertThat(toKnown.nextReviewAt()).isNull();
+    assertThat(toKnown.nextReviewAt()).isEqualTo(nowUtc.plusDays(14));
     assertThat(toKnown.lastReviewedAt()).isEqualTo(pastReview);
     assertThat(toKnown.learnedAt()).isEqualTo(nowUtc);
+
+    // manual -> KNOWN with stage 4 preserves stage 4 and schedules +30 days
+    var stage4Base =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            firstSeenAt,
+            null,
+            0L,
+            4,
+            pastReview,
+            nowUtc);
+    var toKnownStage4 = stage4Base.changeStatus(VocabularyStatus.KNOWN, clock);
+    assertThat(toKnownStage4.reviewStage()).isEqualTo(4);
+    assertThat(toKnownStage4.nextReviewAt()).isEqualTo(nowUtc.plusDays(30));
+
+    // manual -> KNOWN with stage 0 promotes to stage 3 and schedules +14 days
+    var stage0Base =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            firstSeenAt,
+            null,
+            0L,
+            0,
+            null,
+            nowUtc);
+    var toKnownStage0 = stage0Base.changeStatus(VocabularyStatus.KNOWN, clock);
+    assertThat(toKnownStage0.reviewStage()).isEqualTo(3);
+    assertThat(toKnownStage0.nextReviewAt()).isEqualTo(nowUtc.plusDays(14));
 
     // manual -> LEARNING: reviewStage = 0, nextReviewAt = nowUtc, lastReviewedAt = null
     var toLearning = toKnown.changeStatus(VocabularyStatus.LEARNING, clock);

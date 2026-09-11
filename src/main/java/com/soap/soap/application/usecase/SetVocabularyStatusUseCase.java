@@ -51,8 +51,13 @@ public class SetVocabularyStatusUseCase implements SetVocabularyStatusPort {
       return vocabulary.save(existing.orElseThrow().changeStatus(command.status(), clock));
     }
     var nowUtc = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
-    int reviewStage = (command.status() == VocabularyStatus.KNOWN) ? 1 : 0;
-    LocalDateTime nextReview = (command.status() == VocabularyStatus.LEARNING) ? nowUtc : null;
+    int reviewStage = (command.status() == VocabularyStatus.KNOWN) ? 3 : 0;
+    LocalDateTime nextReview =
+        switch (command.status()) {
+          case LEARNING -> nowUtc;
+          case KNOWN -> nowUtc.plusDays(14);
+          case NEW, IGNORED -> null;
+        };
     var learnedAt = command.status() == VocabularyStatus.KNOWN ? nowUtc : null;
     return vocabulary.save(
         new UserVocabulary(

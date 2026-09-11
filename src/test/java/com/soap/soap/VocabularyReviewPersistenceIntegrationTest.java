@@ -150,17 +150,16 @@ class VocabularyReviewPersistenceIntegrationTest {
             null,
             null));
 
-    // Assert counts
+    // Assert counts: NEW is excluded from reviewable words
     assertThat(vocabulary.countDueWords(userA.id(), nowUtc)).isEqualTo(2L);
-    assertThat(vocabulary.countTotalReviewableWords(userA.id(), nowUtc)).isEqualTo(4L);
+    assertThat(vocabulary.countTotalReviewableWords(userA.id(), nowUtc)).isEqualTo(3L);
 
-    // Assert candidate order: Due1 (earlier nextReviewAt), Due2, Learning, New
+    // Assert candidate order: Due1 (earlier nextReviewAt), Due2, Learning (NEW is excluded)
     var candidates = vocabulary.findReviewCandidates(userA.id(), nowUtc, 10);
-    assertThat(candidates).hasSize(4);
+    assertThat(candidates).hasSize(3);
     assertThat(candidates.get(0).word().normalizedValue()).isEqualTo("dueone");
     assertThat(candidates.get(1).word().normalizedValue()).isEqualTo("duetwo");
     assertThat(candidates.get(2).word().normalizedValue()).isEqualTo("learningunprog");
-    assertThat(candidates.get(3).word().normalizedValue()).isEqualTo("newunprog");
 
     // Test limit 2
     var limited = vocabulary.findReviewCandidates(userA.id(), nowUtc, 2);
@@ -219,11 +218,11 @@ class VocabularyReviewPersistenceIntegrationTest {
     assertThat(forgot.nextReviewAt()).isEqualTo(nowUtc.plusDays(1));
     assertThat(forgot.learnedAt()).isNull();
 
-    // Manual transition to KNOWN: reviewStage = max(1, actual) = 1, nextReviewAt = null
+    // Manual transition to KNOWN: reviewStage = max(3, actual) = 3, nextReviewAt = +14 days
     var manualKnown = vocabulary.save(forgot.changeStatus(VocabularyStatus.KNOWN, clock));
     assertThat(manualKnown.status()).isEqualTo(VocabularyStatus.KNOWN);
-    assertThat(manualKnown.reviewStage()).isEqualTo(1);
-    assertThat(manualKnown.nextReviewAt()).isNull();
+    assertThat(manualKnown.reviewStage()).isEqualTo(3);
+    assertThat(manualKnown.nextReviewAt()).isEqualTo(nowUtc.plusDays(14));
     assertThat(manualKnown.learnedAt()).isEqualTo(nowUtc);
   }
 }

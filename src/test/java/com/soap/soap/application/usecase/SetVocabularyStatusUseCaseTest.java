@@ -113,7 +113,73 @@ class SetVocabularyStatusUseCaseTest {
 
     assertThat(explicitNew.status()).isEqualTo(VocabularyStatus.NEW);
     assertThat(explicitNew.learnedAt()).isNull();
+    assertThat(explicitNew.reviewStage()).isEqualTo(0);
+    assertThat(explicitNew.nextReviewAt()).isNull();
+
     assertThat(known.status()).isEqualTo(VocabularyStatus.KNOWN);
     assertThat(known.learnedAt()).isEqualTo(LocalDateTime.parse("2026-08-30T12:00:00"));
+    assertThat(known.reviewStage()).isEqualTo(3);
+    assertThat(known.nextReviewAt())
+        .isEqualTo(LocalDateTime.parse("2026-08-30T12:00:00").plusDays(14));
+  }
+
+  @Test
+  void manualStatusTransitionsScheduleReviewsAccordingToDomainRules() {
+    when(vocabulary.findByUserIdAndWordId(user.id(), word.id())).thenReturn(Optional.empty());
+    when(vocabulary.save(org.mockito.ArgumentMatchers.any()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var nowUtc = LocalDateTime.parse("2026-08-30T12:00:00");
+
+    // 1. Manual LEARNING on brand new: stage 0, due immediately
+    var learning =
+        useCase.setVocabularyStatus(
+            new SetVocabularyStatusCommand("learning", "en", VocabularyStatus.LEARNING));
+    assertThat(learning.status()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(learning.reviewStage()).isEqualTo(0);
+    assertThat(learning.nextReviewAt()).isEqualTo(nowUtc);
+    assertThat(learning.lastReviewedAt()).isNull();
+
+    // 2. Manual NEW on brand new: stage 0, nextReviewAt null
+    var newEntry =
+        useCase.setVocabularyStatus(
+            new SetVocabularyStatusCommand("learning", "en", VocabularyStatus.NEW));
+    assertThat(newEntry.status()).isEqualTo(VocabularyStatus.NEW);
+    assertThat(newEntry.reviewStage()).isEqualTo(0);
+    assertThat(newEntry.nextReviewAt()).isNull();
+    assertThat(newEntry.lastReviewedAt()).isNull();
+
+    // 3. Manual IGNORED on brand new: stage 0, nextReviewAt null
+    var ignored =
+        useCase.setVocabularyStatus(
+            new SetVocabularyStatusCommand("learning", "en", VocabularyStatus.IGNORED));
+    assertThat(ignored.status()).isEqualTo(VocabularyStatus.IGNORED);
+    assertThat(ignored.reviewStage()).isEqualTo(0);
+    assertThat(ignored.nextReviewAt()).isNull();
+    assertThat(ignored.lastReviewedAt()).isNull();
+
+    // 4. Manual KNOWN on existing entry with stage 4: preserves stage 4, schedules +30 days
+    var existingStage4 =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            nowUtc.minusDays(30),
+            null,
+            0L,
+            4,
+            nowUtc.minusDays(5),
+            nowUtc);
+    when(vocabulary.findByUserIdAndWordId(user.id(), word.id()))
+        .thenReturn(Optional.of(existingStage4));
+
+    var updatedStage4 =
+        useCase.setVocabularyStatus(
+            new SetVocabularyStatusCommand("learning", "en", VocabularyStatus.KNOWN));
+    assertThat(updatedStage4.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(updatedStage4.reviewStage()).isEqualTo(4);
+    assertThat(updatedStage4.nextReviewAt()).isEqualTo(nowUtc.plusDays(30));
+    assertThat(updatedStage4.lastReviewedAt()).isEqualTo(nowUtc.minusDays(5));
   }
 }

@@ -277,7 +277,7 @@ public class DocumentRestController {
           value.value(),
           value.normalizedValue(),
           value.type().name(),
-          value.status() == null ? "NEW" : value.status().name());
+          value.status() == null ? null : value.status().name());
     }
   }
 

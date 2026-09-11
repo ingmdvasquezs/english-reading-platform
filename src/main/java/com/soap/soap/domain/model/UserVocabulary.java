@@ -64,7 +64,8 @@ public record UserVocabulary(
       case KNOWN -> {
         var newLearnedAt =
             (status == VocabularyStatus.KNOWN && learnedAt != null) ? learnedAt : nowUtc;
-        var newStage = Math.max(1, reviewStage);
+        var newStage = Math.max(3, reviewStage);
+        var nextReview = (newStage == 3) ? nowUtc.plusDays(14) : nowUtc.plusDays(30);
         yield new UserVocabulary(
             id,
             user,
@@ -75,7 +76,7 @@ public record UserVocabulary(
             version,
             newStage,
             lastReviewedAt,
-            null);
+            nextReview);
       }
       case LEARNING ->
           new UserVocabulary(
