@@ -288,6 +288,16 @@
         </xs:sequence>
     </xs:complexType>
 
+    <xs:complexType name="vocabularySummaryType">
+        <xs:sequence>
+            <xs:element name="totalCount" type="xs:long"/>
+            <xs:element name="newCount" type="xs:long"/>
+            <xs:element name="learningCount" type="xs:long"/>
+            <xs:element name="knownCount" type="xs:long"/>
+            <xs:element name="ignoredCount" type="xs:long"/>
+        </xs:sequence>
+    </xs:complexType>
+
     <xs:element name="getReadingRequest">
         <xs:complexType><xs:sequence>
             <xs:element name="readingId" type="xs:string"/>
@@ -472,10 +482,13 @@
         <xs:complexType><xs:sequence>
             <xs:element name="page" type="xs:int"/>
             <xs:element name="size" type="xs:int"/>
+            <xs:element name="status" type="tns:vocabularyStatusType" minOccurs="0"/>
+            <xs:element name="search" type="xs:string" minOccurs="0"/>
         </xs:sequence></xs:complexType>
     </xs:element>
     <xs:element name="listUserVocabularyResponse">
         <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
+            <xs:element name="summary" type="tns:vocabularySummaryType" minOccurs="0"/>
             <xs:element name="entries" type="tns:vocabularyEntryType" minOccurs="0" maxOccurs="unbounded"/>
         </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
     </xs:element>

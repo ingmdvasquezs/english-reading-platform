@@ -2,7 +2,9 @@ package com.soap.soap.application.port.out;
 
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.VocabularySummary;
 import com.soap.soap.domain.model.UserVocabulary;
+import com.soap.soap.domain.model.VocabularyStatus;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -14,7 +16,12 @@ public interface UserVocabularyRepositoryPort {
 
   PageResult<UserVocabulary> findByUserId(UUID userId, PageRequest pageRequest);
 
-  Map<String, com.soap.soap.domain.model.VocabularyStatus> findStatusesByNormalizedValues(
+  PageResult<UserVocabulary> findByUserIdAndCriteria(
+      UUID userId, VocabularyStatus status, String searchPrefix, PageRequest pageRequest);
+
+  VocabularySummary countSummaryByUserId(UUID userId);
+
+  Map<String, VocabularyStatus> findStatusesByNormalizedValues(
       UUID userId, String language, Collection<String> normalizedValues);
 
   Map<UUID, UserVocabulary> findByUserIdAndWordIds(UUID userId, Collection<UUID> wordIds);

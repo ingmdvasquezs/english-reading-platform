@@ -36,4 +36,40 @@ public interface JpaUserVocabularyRepository extends JpaRepository<UserVocabular
       @Param("userId") UUID userId,
       @Param("languages") Collection<String> languages,
       @Param("normalizedValues") Collection<String> normalizedValues);
+
+  @Query(
+      """
+      select uv.status, count(uv)
+      from UserVocabularyEntity uv
+      where uv.user.id = :userId
+      group by uv.status
+      """)
+  List<Object[]> countGroupedByStatus(@Param("userId") UUID userId);
+
+  @EntityGraph(attributePaths = {"user", "word"})
+  @Query(
+      value =
+          """
+          select uv
+          from UserVocabularyEntity uv
+          join uv.word w
+          where uv.user.id = :userId
+            and (:status is null or uv.status = :status)
+            and (:searchPattern is null or w.normalizedValue like :searchPattern)
+          order by uv.firstSeenAt desc, w.normalizedValue asc
+          """,
+      countQuery =
+          """
+          select count(uv)
+          from UserVocabularyEntity uv
+          join uv.word w
+          where uv.user.id = :userId
+            and (:status is null or uv.status = :status)
+            and (:searchPattern is null or w.normalizedValue like :searchPattern)
+          """)
+  Page<UserVocabularyEntity> findByCriteria(
+      @Param("userId") UUID userId,
+      @Param("status") com.soap.soap.domain.model.VocabularyStatus status,
+      @Param("searchPattern") String searchPattern,
+      Pageable pageable);
 }

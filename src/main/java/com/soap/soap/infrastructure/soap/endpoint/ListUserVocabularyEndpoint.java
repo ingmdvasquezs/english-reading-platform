@@ -22,6 +22,6 @@ public class ListUserVocabularyEndpoint {
   @ResponsePayload
   public ListUserVocabularyResponse listUserVocabulary(
       @RequestPayload ListUserVocabularyRequest request) {
-    return mapper.toResponse(port.listUserVocabulary(mapper.toPageRequest(request)));
+    return mapper.toResponse(port.listUserVocabulary(mapper.toQuery(request)));
   }
 }

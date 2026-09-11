@@ -12,6 +12,9 @@ import com.soap.soap.application.model.LoginResult;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.ReadingSummary;
+import com.soap.soap.application.model.UserVocabularyPage;
+import com.soap.soap.application.model.VocabularyQuery;
+import com.soap.soap.application.model.VocabularySummary;
 import com.soap.soap.application.port.in.AddWordToVocabularyPort;
 import com.soap.soap.application.port.in.AnalyzeReadingPort;
 import com.soap.soap.application.port.in.ChangeVocabularyStatusPort;
@@ -249,8 +252,12 @@ class SoapEndpointsTest {
     var request = new ListUserVocabularyRequest();
     request.setPage(1);
     request.setSize(20);
-    when(listVocabularyPort.listUserVocabulary(new PageRequest(1, 20)))
-        .thenReturn(new PageResult<>(List.of(vocabulary), 1, 20, 21));
+    when(listVocabularyPort.listUserVocabulary(
+            new VocabularyQuery(new PageRequest(1, 20), null, null)))
+        .thenReturn(
+            new UserVocabularyPage(
+                new PageResult<>(List.of(vocabulary), 1, 20, 21),
+                new VocabularySummary(21, 5, 6, 8, 2)));
 
     var response =
         new ListUserVocabularyEndpoint(listVocabularyPort, new ListUserVocabularySoapMapper())
@@ -258,6 +265,12 @@ class SoapEndpointsTest {
 
     assertThat(response.getTotalElements()).isEqualTo(21);
     assertThat(response.getEntries()).hasSize(1);
+    assertThat(response.getSummary()).isNotNull();
+    assertThat(response.getSummary().getTotalCount()).isEqualTo(21);
+    assertThat(response.getSummary().getNewCount()).isEqualTo(5);
+    assertThat(response.getSummary().getLearningCount()).isEqualTo(6);
+    assertThat(response.getSummary().getKnownCount()).isEqualTo(8);
+    assertThat(response.getSummary().getIgnoredCount()).isEqualTo(2);
   }
 
   @Test

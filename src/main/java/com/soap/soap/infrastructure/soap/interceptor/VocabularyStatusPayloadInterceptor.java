@@ -36,6 +36,9 @@ public class VocabularyStatusPayloadInterceptor extends EndpointInterceptorAdapt
 
     var fields = payload.getElementsByTagNameNS(payload.getNamespaceURI(), fieldName);
     if (fields.getLength() == 0 || fields.item(0).getTextContent().isBlank()) {
+      if ("listUserVocabularyRequest".equals(payload.getLocalName())) {
+        return true;
+      }
       throw new InvalidSoapRequestException("Vocabulary status must not be null", null);
     }
     var value = fields.item(0).getTextContent().trim();
@@ -47,7 +50,7 @@ public class VocabularyStatusPayloadInterceptor extends EndpointInterceptorAdapt
 
   private String statusFieldName(String payloadName) {
     return switch (payloadName) {
-      case "changeVocabularyStatusRequest" -> "status";
+      case "changeVocabularyStatusRequest", "listUserVocabularyRequest" -> "status";
       case "addWordToVocabularyRequest" -> "initialStatus";
       default -> null;
     };

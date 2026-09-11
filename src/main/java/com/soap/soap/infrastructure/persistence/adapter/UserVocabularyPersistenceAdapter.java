@@ -4,6 +4,7 @@ import com.soap.soap.application.exception.ConcurrentVocabularyModificationExcep
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.VocabularySummary;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.service.LanguageNormalizer;
 import com.soap.soap.domain.model.UserVocabulary;
@@ -38,15 +39,44 @@ public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositor
   @Override
   @Transactional(readOnly = true)
   public PageResult<UserVocabulary> findByUserId(UUID userId, PageRequest pageRequest) {
-    var page =
-        repository.findByUserIdOrderByFirstSeenAtDesc(
-            userId,
-            org.springframework.data.domain.PageRequest.of(pageRequest.page(), pageRequest.size()));
+    return findByUserIdAndCriteria(userId, null, null, pageRequest);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PageResult<UserVocabulary> findByUserIdAndCriteria(
+      UUID userId, VocabularyStatus status, String searchPrefix, PageRequest pageRequest) {
+    var pageable =
+        org.springframework.data.domain.PageRequest.of(pageRequest.page(), pageRequest.size());
+    String searchPattern =
+        (searchPrefix != null && !searchPrefix.isEmpty()) ? searchPrefix + "%" : null;
+    var page = repository.findByCriteria(userId, status, searchPattern, pageable);
     return new PageResult<>(
         page.getContent().stream().map(mapper::toDomain).toList(),
         page.getNumber(),
         page.getSize(),
         page.getTotalElements());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public VocabularySummary countSummaryByUserId(UUID userId) {
+    long newCount = 0;
+    long learningCount = 0;
+    long knownCount = 0;
+    long ignoredCount = 0;
+    for (Object[] row : repository.countGroupedByStatus(userId)) {
+      var status = (VocabularyStatus) row[0];
+      var count = ((Number) row[1]).longValue();
+      switch (status) {
+        case NEW -> newCount = count;
+        case LEARNING -> learningCount = count;
+        case KNOWN -> knownCount = count;
+        case IGNORED -> ignoredCount = count;
+      }
+    }
+    long totalCount = newCount + learningCount + knownCount + ignoredCount;
+    return new VocabularySummary(totalCount, newCount, learningCount, knownCount, ignoredCount);
   }
 
   @Override

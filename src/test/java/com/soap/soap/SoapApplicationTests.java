@@ -947,6 +947,214 @@ class SoapApplicationTests {
   }
 
   @Test
+  void listUserVocabularySupportsLegacyRequestAndReturnsSummary() {
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      setVocabularyStatus(client, "journey", "LEARNING");
+      setVocabularyStatus(client, "book", "KNOWN");
+
+      var legacyPayload =
+          """
+          <listUserVocabularyRequest xmlns="http://soap.com/english-reading/readings">
+            <page>0</page>
+            <size>10</size>
+          </listUserVocabularyRequest>
+          """;
+
+      client
+          .sendRequest(withPayload(source(legacyPayload)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='page']").evaluatesTo("0"))
+          .andExpect(xpath("//*[local-name()='size']").evaluatesTo("10"))
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("2"))
+          .andExpect(
+              xpath("//*[local-name()='summary']/*[local-name()='totalCount']").evaluatesTo("2"))
+          .andExpect(
+              xpath("//*[local-name()='summary']/*[local-name()='learningCount']").evaluatesTo("1"))
+          .andExpect(
+              xpath("//*[local-name()='summary']/*[local-name()='knownCount']").evaluatesTo("1"))
+          .andExpect(
+              xpath("//*[local-name()='summary']/*[local-name()='newCount']").evaluatesTo("0"))
+          .andExpect(
+              xpath("//*[local-name()='summary']/*[local-name()='ignoredCount']").evaluatesTo("0"))
+          .andExpect(xpath("count(//*[local-name()='entries'])").evaluatesTo("2"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void listUserVocabularyFiltersByStatusWhilePreservingGlobalSummary() {
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      setVocabularyStatus(client, "filterjourney", "LEARNING");
+      setVocabularyStatus(client, "filterbook", "KNOWN");
+
+      var filterPayload =
+          """
+          <listUserVocabularyRequest xmlns="http://soap.com/english-reading/readings">
+            <page>0</page>
+            <size>10</size>
+            <status>LEARNING</status>
+          </listUserVocabularyRequest>
+          """;
+
+      client
+          .sendRequest(withPayload(source(filterPayload)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("1"))
+          .andExpect(xpath("count(//*[local-name()='entries'])").evaluatesTo("1"))
+          .andExpect(
+              xpath("//*[local-name()='entries'][1]/*[local-name()='word']")
+                  .evaluatesTo("filterjourney"))
+          .andExpect(
+              xpath("//*[local-name()='entries'][1]/*[local-name()='status']")
+                  .evaluatesTo("LEARNING"))
+          .andExpect(
+              xpath("//*[local-name()='summary']/*[local-name()='totalCount']").evaluatesTo("2"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void listUserVocabularySearchesByPrefixCaseInsensitively() {
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      setVocabularyStatus(client, "prefixone", "LEARNING");
+      setVocabularyStatus(client, "prefixtwo", "KNOWN");
+      setVocabularyStatus(client, "otherword", "NEW");
+
+      var searchPayload =
+          """
+          <listUserVocabularyRequest xmlns="http://soap.com/english-reading/readings">
+            <page>0</page>
+            <size>10</size>
+            <search>  Prefix  </search>
+          </listUserVocabularyRequest>
+          """;
+
+      client
+          .sendRequest(withPayload(source(searchPayload)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("2"))
+          .andExpect(xpath("count(//*[local-name()='entries'])").evaluatesTo("2"))
+          .andExpect(
+              xpath("//*[local-name()='summary']/*[local-name()='totalCount']").evaluatesTo("3"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void listUserVocabularyCombinesStatusAndSearchCriteria() {
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      setVocabularyStatus(client, "combinearrival", "LEARNING");
+      setVocabularyStatus(client, "combineapply", "KNOWN");
+
+      var matchPayload =
+          """
+          <listUserVocabularyRequest xmlns="http://soap.com/english-reading/readings">
+            <page>0</page>
+            <size>10</size>
+            <status>LEARNING</status>
+            <search>combine</search>
+          </listUserVocabularyRequest>
+          """;
+
+      client
+          .sendRequest(withPayload(source(matchPayload)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("1"))
+          .andExpect(
+              xpath("//*[local-name()='entries'][1]/*[local-name()='word']")
+                  .evaluatesTo("combinearrival"));
+
+      var noMatchPayload =
+          """
+          <listUserVocabularyRequest xmlns="http://soap.com/english-reading/readings">
+            <page>0</page>
+            <size>10</size>
+            <status>NEW</status>
+            <search>combine</search>
+          </listUserVocabularyRequest>
+          """;
+
+      client
+          .sendRequest(withPayload(source(noMatchPayload)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("0"))
+          .andExpect(xpath("count(//*[local-name()='entries'])").evaluatesTo("0"))
+          .andExpect(
+              xpath("//*[local-name()='summary']/*[local-name()='totalCount']").evaluatesTo("2"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void listUserVocabularyRejectsInvalidStatusWithClientFault() {
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      var invalidStatusPayload =
+          """
+          <listUserVocabularyRequest xmlns="http://soap.com/english-reading/readings">
+            <page>0</page>
+            <size>10</size>
+            <status>MASTERED</status>
+          </listUserVocabularyRequest>
+          """;
+
+      client
+          .sendRequest(withPayload(source(invalidStatusPayload)))
+          .andExpect(clientOrSenderFault("Invalid vocabulary status: MASTERED"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void setVocabularyStatusReflectsImmediatelyInListUserVocabulary() {
+    authenticateUser();
+    var client = MockWebServiceClient.createClient(applicationContext);
+    try {
+      setVocabularyStatus(client, "mutableword", "NEW");
+
+      var listPayload =
+          """
+          <listUserVocabularyRequest xmlns="http://soap.com/english-reading/readings">
+            <page>0</page>
+            <size>10</size>
+            <search>mutableword</search>
+          </listUserVocabularyRequest>
+          """;
+
+      client
+          .sendRequest(withPayload(source(listPayload)))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("//*[local-name()='entries'][1]/*[local-name()='status']").evaluatesTo("NEW"));
+
+      setVocabularyStatus(client, "mutableword", "LEARNING");
+
+      client
+          .sendRequest(withPayload(source(listPayload)))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("//*[local-name()='entries'][1]/*[local-name()='status']")
+                  .evaluatesTo("LEARNING"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
   void unexpectedExceptionsRemainServerFaults() {
     var messageFactory = new SaajSoapMessageFactory();
     messageFactory.afterPropertiesSet();
