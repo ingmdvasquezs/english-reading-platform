@@ -15,6 +15,7 @@ import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,8 +50,21 @@ public class SetVocabularyStatusUseCase implements SetVocabularyStatusPort {
     if (existing.isPresent()) {
       return vocabulary.save(existing.orElseThrow().changeStatus(command.status(), clock));
     }
-    var now = LocalDateTime.now(clock);
-    var learnedAt = command.status() == VocabularyStatus.KNOWN ? now : null;
-    return vocabulary.save(new UserVocabulary(null, user, word, command.status(), now, learnedAt));
+    var nowUtc = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+    int reviewStage = (command.status() == VocabularyStatus.KNOWN) ? 1 : 0;
+    LocalDateTime nextReview = (command.status() == VocabularyStatus.LEARNING) ? nowUtc : null;
+    var learnedAt = command.status() == VocabularyStatus.KNOWN ? nowUtc : null;
+    return vocabulary.save(
+        new UserVocabulary(
+            null,
+            user,
+            word,
+            command.status(),
+            nowUtc,
+            learnedAt,
+            null,
+            reviewStage,
+            null,
+            nextReview));
   }
 }

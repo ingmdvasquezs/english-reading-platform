@@ -12,6 +12,10 @@ class LanguageNormalizerTest {
     assertThat(normalizer.normalize("en")).isEqualTo("en");
     assertThat(normalizer.normalize("EN-us")).isEqualTo("en");
     assertThat(normalizer.normalize("en-GB")).isEqualTo("en");
+    assertThat(normalizer.normalize("en-CA")).isEqualTo("en");
+    assertThat(normalizer.normalize("en-AU")).isEqualTo("en");
+    assertThat(normalizer.normalize("en_US")).isEqualTo("en");
+    assertThat(normalizer.normalize("en_gb")).isEqualTo("en");
     assertThat(normalizer.equivalentLanguages("en-US"))
         .containsExactlyInAnyOrder("en", "en-us", "en-gb");
   }

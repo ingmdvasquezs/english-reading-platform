@@ -72,4 +72,55 @@ public interface JpaUserVocabularyRepository extends JpaRepository<UserVocabular
       @Param("status") com.soap.soap.domain.model.VocabularyStatus status,
       @Param("searchPattern") String searchPattern,
       Pageable pageable);
+
+  @EntityGraph(attributePaths = {"user", "word"})
+  @Query(
+      """
+      select uv
+      from UserVocabularyEntity uv
+      join uv.word w
+      where uv.user.id = :userId
+        and (
+          (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status != com.soap.soap.domain.model.VocabularyStatus.IGNORED)
+          or (uv.status = com.soap.soap.domain.model.VocabularyStatus.LEARNING and uv.nextReviewAt is null)
+          or (uv.status = com.soap.soap.domain.model.VocabularyStatus.NEW and uv.nextReviewAt is null)
+        )
+      order by
+        case
+          when (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status != com.soap.soap.domain.model.VocabularyStatus.IGNORED) then 1
+          when (uv.status = com.soap.soap.domain.model.VocabularyStatus.LEARNING and uv.nextReviewAt is null) then 2
+          when (uv.status = com.soap.soap.domain.model.VocabularyStatus.NEW and uv.nextReviewAt is null) then 3
+          else 99
+        end asc,
+        uv.nextReviewAt asc nulls last,
+        uv.firstSeenAt desc,
+        w.normalizedValue asc
+      """)
+  List<UserVocabularyEntity> findReviewCandidates(
+      @Param("userId") UUID userId, @Param("now") java.time.LocalDateTime now, Pageable pageable);
+
+  @Query(
+      """
+      select count(uv)
+      from UserVocabularyEntity uv
+      where uv.user.id = :userId
+        and uv.nextReviewAt is not null
+        and uv.nextReviewAt <= :now
+        and uv.status != com.soap.soap.domain.model.VocabularyStatus.IGNORED
+      """)
+  long countDueWords(@Param("userId") UUID userId, @Param("now") java.time.LocalDateTime now);
+
+  @Query(
+      """
+      select count(uv)
+      from UserVocabularyEntity uv
+      where uv.user.id = :userId
+        and (
+          (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status != com.soap.soap.domain.model.VocabularyStatus.IGNORED)
+          or (uv.status = com.soap.soap.domain.model.VocabularyStatus.LEARNING and uv.nextReviewAt is null)
+          or (uv.status = com.soap.soap.domain.model.VocabularyStatus.NEW and uv.nextReviewAt is null)
+        )
+      """)
+  long countTotalReviewableWords(
+      @Param("userId") UUID userId, @Param("now") java.time.LocalDateTime now);
 }

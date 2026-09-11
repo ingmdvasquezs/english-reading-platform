@@ -61,17 +61,28 @@ public class AzureTranslatorAdapter implements TranslationPort {
 
   @Override
   public String translate(String text, String sourceLanguage, String targetLanguage) {
-    return observation.observe(
-        "azure_translator", () -> translateWithRetry(text, sourceLanguage, targetLanguage));
+    var list = translateBatch(List.of(text), sourceLanguage, targetLanguage);
+    return list.isEmpty() ? "" : list.getFirst();
   }
 
-  private String translateWithRetry(String text, String sourceLanguage, String targetLanguage) {
+  @Override
+  public List<String> translateBatch(
+      List<String> texts, String sourceLanguage, String targetLanguage) {
+    if (texts == null || texts.isEmpty()) {
+      return List.of();
+    }
+    return observation.observe(
+        "azure_translator", () -> translateBatchWithRetry(texts, sourceLanguage, targetLanguage));
+  }
+
+  private List<String> translateBatchWithRetry(
+      List<String> texts, String sourceLanguage, String targetLanguage) {
     requireConfiguration();
     var deadline = System.nanoTime() + policy.timeout().toNanos();
     RuntimeException last = null;
     for (var attempt = 0; attempt <= policy.maxRetries(); attempt++) {
       try {
-        return request(text, sourceLanguage, targetLanguage);
+        return requestBatch(texts, sourceLanguage, targetLanguage);
       } catch (RetryableTranslationException exception) {
         last = exception;
         if (attempt == policy.maxRetries()
@@ -83,8 +94,14 @@ public class AzureTranslatorAdapter implements TranslationPort {
     throw failure(last == null ? null : last.getCause());
   }
 
-  private String request(String text, String sourceLanguage, String targetLanguage) {
+  private List<String> requestBatch(
+      List<String> texts, String sourceLanguage, String targetLanguage) {
     try {
+      var requestBody =
+          texts.stream()
+              .map(text -> (Map<String, String>) Map.of("Text", text != null ? text : ""))
+              .toList();
+
       var response =
           client
               .post()
@@ -99,19 +116,28 @@ public class AzureTranslatorAdapter implements TranslationPort {
               .contentType(MediaType.APPLICATION_JSON)
               .header("Ocp-Apim-Subscription-Key", apiKey)
               .header("Ocp-Apim-Subscription-Region", region)
-              .body(List.of(Map.of("Text", text)))
+              .body(requestBody)
               .retrieve()
               .body(AzureTranslationResponse[].class);
-      if (response == null
-          || response.length == 0
-          || response[0] == null
-          || response[0].translations() == null
-          || response[0].translations().isEmpty()) throw failure(null);
-      var translated = response[0].translations().getFirst().text();
-      if (translated == null
-          || translated.isBlank()
-          || translated.length() > limits.maximumTranslationCharacters()) throw failure(null);
-      return translated;
+      if (response == null || response.length < texts.size()) {
+        throw failure(null);
+      }
+      var results = new java.util.ArrayList<String>(texts.size());
+      for (int i = 0; i < texts.size(); i++) {
+        var item = response[i];
+        if (item == null || item.translations() == null || item.translations().isEmpty()) {
+          throw failure(null);
+        }
+        var translated = item.translations().getFirst().text();
+        if (translated == null) {
+          results.add("");
+        } else if (translated.length() > limits.maximumTranslationCharacters()) {
+          throw failure(null);
+        } else {
+          results.add(translated);
+        }
+      }
+      return results;
     } catch (RestClientResponseException exception) {
       if (retryable(exception.getStatusCode().value()))
         throw new RetryableTranslationException(exception);

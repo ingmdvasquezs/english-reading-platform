@@ -138,6 +138,28 @@ public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositor
     }
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public java.util.List<UserVocabulary> findReviewCandidates(
+      UUID userId, java.time.LocalDateTime now, int limit) {
+    var pageable = org.springframework.data.domain.PageRequest.of(0, limit);
+    return repository.findReviewCandidates(userId, now, pageable).stream()
+        .map(mapper::toDomain)
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public long countDueWords(UUID userId, java.time.LocalDateTime now) {
+    return repository.countDueWords(userId, now);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public long countTotalReviewableWords(UUID userId, java.time.LocalDateTime now) {
+    return repository.countTotalReviewableWords(userId, now);
+  }
+
   private boolean hasConstraint(Throwable exception, String constraint) {
     for (var cause = exception; cause != null; cause = cause.getCause()) {
       if (cause instanceof ConstraintViolationException violation

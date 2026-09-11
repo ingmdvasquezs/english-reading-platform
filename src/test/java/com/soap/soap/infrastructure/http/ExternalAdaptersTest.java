@@ -206,12 +206,7 @@ class ExternalAdaptersTest {
 
   @Test
   void azureRejectsInvalidPayloadConfigurationAndDoesNotRetryClientErrors() {
-    for (var payload :
-        List.of(
-            "[]",
-            "[{\"translations\":[]}]",
-            "[{\"translations\":[{\"text\":\"\"}]}]",
-            "not-json")) {
+    for (var payload : List.of("[]", "[{\"translations\":[]}]", "not-json")) {
       var b = RestClient.builder().baseUrl("https://translate.test");
       var s = MockRestServiceServer.bindTo(b).build();
       s.expect(once(), requestTo(azureUrl()))
@@ -231,6 +226,38 @@ class ExternalAdaptersTest {
             HttpStatus.UNAUTHORIZED,
             HttpStatus.FORBIDDEN,
             HttpStatus.TOO_MANY_REQUESTS)) assertAzureStatus(status, false);
+  }
+
+  @Test
+  void azureHandlesEmptyTranslationAndBatchTranslationGracefully() {
+    var b = RestClient.builder().baseUrl("https://translate.test");
+    var s = MockRestServiceServer.bindTo(b).build();
+    s.expect(once(), requestTo(azureUrl()))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(
+            withSuccess(
+                "[{\"translations\":[{\"text\":\"\",\"to\":\"es\"}]}]",
+                MediaType.APPLICATION_JSON));
+    assertThat(azure(b).translate("would", "en", "es")).isEmpty();
+    s.verify();
+
+    var b2 = RestClient.builder().baseUrl("https://translate.test");
+    var s2 = MockRestServiceServer.bindTo(b2).build();
+    s2.expect(once(), requestTo(azureUrl()))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(
+            withSuccess(
+                """
+                [
+                  {"translations":[{"text":"","to":"es"}]},
+                  {"translations":[{"text":"Me gustaría viajar.","to":"es"}]}
+                ]
+                """,
+                MediaType.APPLICATION_JSON));
+    var batchResult =
+        azure(b2).translateBatch(List.of("would", "I would like to travel."), "en", "es");
+    assertThat(batchResult).containsExactly("", "Me gustaría viajar.");
+    s2.verify();
   }
 
   @Test

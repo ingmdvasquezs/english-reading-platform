@@ -31,6 +31,7 @@ public class LookupWordSoapMapper {
                         var soapDefinition = new LookupWordResponse.Meanings.Definitions();
                         soapDefinition.setDefinition(definition.definition());
                         soapDefinition.setExample(definition.example());
+                        soapDefinition.setExampleTranslation(definition.exampleTranslation());
                         soapMeaning.getDefinitions().add(soapDefinition);
                       });
               response.getMeanings().add(soapMeaning);

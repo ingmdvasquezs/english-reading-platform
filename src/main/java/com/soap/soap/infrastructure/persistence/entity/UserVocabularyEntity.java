@@ -42,5 +42,12 @@ public class UserVocabularyEntity {
 
   private LocalDateTime learnedAt;
 
+  @Column(nullable = false)
+  private int reviewStage;
+
+  private LocalDateTime lastReviewedAt;
+
+  private LocalDateTime nextReviewAt;
+
   @Version private Long version;
 }

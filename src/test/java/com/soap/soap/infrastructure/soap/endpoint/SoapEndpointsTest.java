@@ -85,7 +85,9 @@ class SoapEndpointsTest {
                 ListUserVocabularyRequest.class,
                 AnalyzeReadingRequest.class,
                 RecommendPlatformReadingsRequest.class,
-                SetVocabularyStatusRequest.class))
+                SetVocabularyStatusRequest.class,
+                com.soap.soap.infrastructure.soap.generated.PrepareVocabularyReviewRequest.class,
+                com.soap.soap.infrastructure.soap.generated.RecordVocabularyReviewRequest.class))
         .allSatisfy(
             type ->
                 assertThat(type.getMethods())

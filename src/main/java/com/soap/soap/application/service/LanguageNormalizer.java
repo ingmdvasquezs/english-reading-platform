@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class LanguageNormalizer {
   private static final Pattern SUPPORTED_LANGUAGE =
-      Pattern.compile("[A-Za-z]{2,3}(?:-[A-Za-z]{2,3})?");
+      Pattern.compile("[A-Za-z]{2,3}(?:[-_][A-Za-z]{2,3})?");
 
   public String normalize(String language) {
     if (language == null || language.isBlank()) {
@@ -20,7 +20,10 @@ public class LanguageNormalizer {
       throw new InvalidApplicationArgumentException("Language format is invalid");
     }
     var normalized = trimmed.toLowerCase(Locale.ROOT);
-    return normalized.equals("en-us") || normalized.equals("en-gb") ? "en" : normalized;
+    if (normalized.equals("en") || normalized.startsWith("en-") || normalized.startsWith("en_")) {
+      return "en";
+    }
+    return normalized;
   }
 
   public Set<String> equivalentLanguages(String language) {

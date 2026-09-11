@@ -1478,6 +1478,8 @@ class SoapApplicationTests {
     org.mockito.Mockito.when(dictionaryPort.lookup("bridge", "en"))
         .thenReturn(new DictionaryEntry("bridge", null, null, List.<WordMeaning>of()));
     org.mockito.Mockito.when(translationPort.translate("bridge", "en", "es")).thenReturn("puente");
+    org.mockito.Mockito.when(translationPort.translateBatch(List.of("bridge"), "en", "es"))
+        .thenReturn(List.of("puente"));
 
     try {
       MockWebServiceClient.createClient(applicationContext)
@@ -1486,6 +1488,130 @@ class SoapApplicationTests {
           .andExpect(
               xpath("/*[local-name()='lookupWordResponse']/*[local-name()='translation']")
                   .evaluatesTo("puente"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void lookupWordWouldWithEmptyTranslationReturnsSuccessWithoutServerFault() {
+    var now = Instant.now();
+    var jwt =
+        new Jwt(
+            "token",
+            now,
+            now.plusSeconds(60),
+            Map.of("alg", "none"),
+            Map.of("sub", user.id().toString()));
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken(jwt, jwt, List.of()));
+    org.mockito.Mockito.when(dictionaryPort.lookup("would", "en"))
+        .thenReturn(new DictionaryEntry("would", "/wʊd/", "audio-url", List.<WordMeaning>of()));
+    org.mockito.Mockito.when(translationPort.translateBatch(List.of("would"), "en", "es"))
+        .thenReturn(List.of(""));
+
+    try {
+      MockWebServiceClient.createClient(applicationContext)
+          .sendRequest(
+              withPayload(
+                  new StreamSource(
+                      new StringReader(
+                          """
+                          <lookupWordRequest xmlns="http://soap.com/english-reading/readings">
+                            <word>would</word>
+                          </lookupWordRequest>
+                          """))))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("/*[local-name()='lookupWordResponse']/*[local-name()='word']")
+                  .evaluatesTo("would"))
+          .andExpect(
+              xpath("/*[local-name()='lookupWordResponse']/*[local-name()='phonetic']")
+                  .evaluatesTo("/wʊd/"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
+  void prepareAndRecordVocabularyReviewEndToEndOverSoap() {
+    var now = Instant.now();
+    var jwt =
+        new Jwt(
+            "token",
+            now,
+            now.plusSeconds(60),
+            Map.of("alg", "none"),
+            Map.of("sub", user.id().toString()));
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken(jwt, jwt, List.of()));
+
+    var word = words.resolve("soapreviewword", "en");
+    var nowUtc = LocalDateTime.now();
+    vocabulary.save(
+        new UserVocabulary(
+            null,
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            nowUtc.minusDays(3),
+            null,
+            0L,
+            0,
+            null,
+            nowUtc.minusHours(1)));
+
+    try {
+      var client = MockWebServiceClient.createClient(applicationContext);
+
+      // 1. Prepare review
+      client
+          .sendRequest(
+              withPayload(
+                  new StreamSource(
+                      new StringReader(
+                          """
+                          <prepareVocabularyReviewRequest xmlns="http://soap.com/english-reading/readings">
+                            <size>10</size>
+                          </prepareVocabularyReviewRequest>
+                          """))))
+          .andExpect(noFault())
+          .andExpect(
+              xpath("/*[local-name()='prepareVocabularyReviewResponse']/*[local-name()='dueCount']")
+                  .evaluatesTo("1"))
+          .andExpect(
+              xpath(
+                      "/*[local-name()='prepareVocabularyReviewResponse']/*[local-name()='entries'][1]/*[local-name()='word']")
+                  .evaluatesTo("soapreviewword"));
+
+      // 2. Record review: REMEMBERED -> transitions to KNOWN
+      client
+          .sendRequest(
+              withPayload(
+                  new StreamSource(
+                      new StringReader(
+                          """
+                          <recordVocabularyReviewRequest xmlns="http://soap.com/english-reading/readings">
+                            <wordId>%s</wordId>
+                            <assessment>REMEMBERED</assessment>
+                          </recordVocabularyReviewRequest>
+                          """
+                              .formatted(word.id())))))
+          .andExpect(noFault())
+          .andExpect(
+              xpath(
+                      "/*[local-name()='recordVocabularyReviewResponse']/*[local-name()='entry']/*[local-name()='wordId']")
+                  .evaluatesTo(word.id().toString()))
+          .andExpect(
+              xpath(
+                      "/*[local-name()='recordVocabularyReviewResponse']/*[local-name()='entry']/*[local-name()='status']")
+                  .evaluatesTo("KNOWN"));
+
+      // 3. Verify in database
+      var updated = vocabulary.findByUserIdAndWordId(user.id(), word.id()).orElseThrow();
+      assertThat(updated.status()).isEqualTo(VocabularyStatus.KNOWN);
+      assertThat(updated.reviewStage()).isEqualTo(1);
+      assertThat(updated.nextReviewAt()).isAfter(nowUtc);
     } finally {
       SecurityContextHolder.clearContext();
     }

@@ -551,7 +551,7 @@
         <xs:complexType><xs:sequence>
             <xs:element name="word" type="xs:string"/>
             <xs:element name="normalizedWord" type="xs:string"/>
-            <xs:element name="translation" type="xs:string"/>
+            <xs:element name="translation" type="xs:string" minOccurs="0"/>
             <xs:element name="phonetic" type="xs:string" minOccurs="0"/>
             <xs:element name="audioUrl" type="xs:string" minOccurs="0"/>
             <xs:element name="meanings" minOccurs="0" maxOccurs="unbounded">
@@ -561,10 +561,68 @@
                         <xs:complexType><xs:sequence>
                             <xs:element name="definition" type="xs:string"/>
                             <xs:element name="example" type="xs:string" minOccurs="0"/>
+                            <xs:element name="exampleTranslation" type="xs:string" minOccurs="0"/>
                         </xs:sequence></xs:complexType>
                     </xs:element>
                 </xs:sequence></xs:complexType>
             </xs:element>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:simpleType name="reviewAssessmentType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="FORGOT"/>
+            <xs:enumeration value="STRUGGLED"/>
+            <xs:enumeration value="REMEMBERED"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="reviewBatchSizeType">
+        <xs:restriction base="xs:int">
+            <xs:enumeration value="10"/>
+            <xs:enumeration value="20"/>
+            <xs:enumeration value="30"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="reviewItemType">
+        <xs:sequence>
+            <xs:element name="wordId" type="xs:string"/>
+            <xs:element name="word" type="tns:wordType"/>
+            <xs:element name="language" type="tns:languageType"/>
+            <xs:element name="status" type="tns:vocabularyStatusType"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="reviewResultType">
+        <xs:sequence>
+            <xs:element name="wordId" type="xs:string"/>
+            <xs:element name="status" type="tns:vocabularyStatusType"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="prepareVocabularyReviewRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="size" type="tns:reviewBatchSizeType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="prepareVocabularyReviewResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="dueCount" type="xs:long"/>
+            <xs:element name="totalReviewableCount" type="xs:long"/>
+            <xs:element name="entries" type="tns:reviewItemType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="recordVocabularyReviewRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="wordId" type="xs:string"/>
+            <xs:element name="assessment" type="tns:reviewAssessmentType"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="recordVocabularyReviewResponse">
+        <xs:complexType><xs:sequence>
+            <xs:element name="entry" type="tns:reviewResultType"/>
         </xs:sequence></xs:complexType>
     </xs:element>
 

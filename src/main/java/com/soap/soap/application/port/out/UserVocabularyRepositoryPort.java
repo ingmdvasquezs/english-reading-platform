@@ -29,4 +29,11 @@ public interface UserVocabularyRepositoryPort {
   UserVocabulary save(UserVocabulary vocabulary);
 
   Collection<UserVocabulary> saveAll(Collection<UserVocabulary> vocabulary);
+
+  java.util.List<UserVocabulary> findReviewCandidates(
+      UUID userId, java.time.LocalDateTime now, int limit);
+
+  long countDueWords(UUID userId, java.time.LocalDateTime now);
+
+  long countTotalReviewableWords(UUID userId, java.time.LocalDateTime now);
 }
