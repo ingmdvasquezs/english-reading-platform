@@ -2,6 +2,7 @@ package com.soap.soap.application.usecase;
 
 import com.soap.soap.application.exception.DocumentAlreadyImportedException;
 import com.soap.soap.application.exception.DocumentImportException;
+import com.soap.soap.application.exception.DuplicateActiveDocumentSourceException;
 import com.soap.soap.application.exception.ImportCapacityExceededException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.model.AcceptedDocumentImport;
@@ -30,7 +31,6 @@ import java.util.concurrent.RejectedExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -99,7 +99,7 @@ public class AcceptDocumentImportUseCase {
                   DocumentChunker.VERSION,
                   now,
                   now));
-    } catch (DataIntegrityViolationException exception) {
+    } catch (DuplicateActiveDocumentSourceException exception) {
       throw duplicateAfterRace(userId, sourceSha256, exception);
     }
     var documentId = processing.id();
@@ -140,7 +140,7 @@ public class AcceptDocumentImportUseCase {
   }
 
   private DocumentAlreadyImportedException duplicateAfterRace(
-      UUID userId, String sourceSha256, DataIntegrityViolationException cause) {
+      UUID userId, String sourceSha256, DuplicateActiveDocumentSourceException cause) {
     return documents
         .findByOwnerAndSourceSha256AndStatusIn(
             userId,

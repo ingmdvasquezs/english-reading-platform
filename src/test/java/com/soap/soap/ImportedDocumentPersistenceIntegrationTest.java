@@ -3,6 +3,7 @@ package com.soap.soap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.soap.soap.application.exception.DuplicateActiveDocumentSourceException;
 import com.soap.soap.application.port.out.DocumentProgressRepositoryPort;
 import com.soap.soap.application.port.out.ImportedDocumentRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -130,7 +131,7 @@ class ImportedDocumentPersistenceIntegrationTest {
   @Test
   void databaseRejectsSameActiveSourceForSameUser() {
     assertThatThrownBy(() -> documents.saveDocument(document(owner.id(), "fr")))
-        .isInstanceOf(DataIntegrityViolationException.class);
+        .isInstanceOf(DuplicateActiveDocumentSourceException.class);
   }
 
   @Test
@@ -248,6 +249,61 @@ class ImportedDocumentPersistenceIntegrationTest {
 
     assertThatThrownBy(() -> progress.save(saved.moveTo(secondUnit.id(), openedAt.plusMinutes(1))))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+  }
+
+  @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void concurrentDuplicateActiveSourceInsertsProduceExactlyOneWinnerAndOneDuplicateException()
+      throws Exception {
+    var raceUser =
+        users.save(
+            new User(
+                null, "Race Owner", "race-" + UUID.randomUUID() + "@example.com", "hash", null));
+    var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+    var ready = new java.util.concurrent.CountDownLatch(2);
+    var start = new java.util.concurrent.CountDownLatch(1);
+
+    var docToInsert = document(raceUser.id(), "de");
+
+    java.util.concurrent.Callable<Object> task =
+        () -> {
+          ready.countDown();
+          if (!start.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+            throw new IllegalStateException("Timeout waiting for start");
+          }
+          return documents.saveDocument(docToInsert);
+        };
+
+    var future1 = executor.submit(task);
+    var future2 = executor.submit(task);
+
+    assertThat(ready.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+    start.countDown();
+
+    var results = new java.util.ArrayList<Object>();
+    for (var future : List.of(future1, future2)) {
+      try {
+        results.add(future.get(10, java.util.concurrent.TimeUnit.SECONDS));
+      } catch (java.util.concurrent.ExecutionException e) {
+        results.add(e.getCause());
+      }
+    }
+    executor.shutdown();
+
+    var successCount = results.stream().filter(ImportedDocument.class::isInstance).count();
+    var duplicateCount =
+        results.stream().filter(DuplicateActiveDocumentSourceException.class::isInstance).count();
+
+    assertThat(successCount).isEqualTo(1);
+    assertThat(duplicateCount).isEqualTo(1);
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM imported_documents WHERE user_id = ? AND deduplication_sha256 = ?",
+                Integer.class,
+                raceUser.id(),
+                docToInsert.sourceSha256()))
+        .isEqualTo(1);
   }
 
   private ImportedDocument document(UUID ownerId, String language) {

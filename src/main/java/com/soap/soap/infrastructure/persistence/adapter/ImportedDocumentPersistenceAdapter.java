@@ -1,5 +1,6 @@
 package com.soap.soap.infrastructure.persistence.adapter;
 
+import com.soap.soap.application.exception.DuplicateActiveDocumentSourceException;
 import com.soap.soap.application.model.DocumentSectionNavigation;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
@@ -18,6 +19,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,19 +37,27 @@ public class ImportedDocumentPersistenceAdapter implements ImportedDocumentRepos
   @Override
   @Transactional
   public ImportedDocument saveDocument(ImportedDocument document) {
-    var entity = documentMapper.toEntity(document);
-    if (document.importStatus() == DocumentImportStatus.FAILED) {
-      entity.setDeduplicationSha256(null);
-    } else if (document.id() == null) {
-      entity.setDeduplicationSha256(document.sourceSha256());
-    } else {
-      documents
-          .findById(document.id())
-          .ifPresentOrElse(
-              existing -> entity.setDeduplicationSha256(existing.getDeduplicationSha256()),
-              () -> entity.setDeduplicationSha256(document.sourceSha256()));
+    try {
+      var entity = documentMapper.toEntity(document);
+      if (document.importStatus() == DocumentImportStatus.FAILED) {
+        entity.setDeduplicationSha256(null);
+      } else if (document.id() == null) {
+        entity.setDeduplicationSha256(document.sourceSha256());
+      } else {
+        documents
+            .findById(document.id())
+            .ifPresentOrElse(
+                existing -> entity.setDeduplicationSha256(existing.getDeduplicationSha256()),
+                () -> entity.setDeduplicationSha256(document.sourceSha256()));
+      }
+      return documentMapper.toDomain(documents.saveAndFlush(entity));
+    } catch (DataIntegrityViolationException exception) {
+      if (hasConstraint(exception, "uk_imported_documents_user_active_source")) {
+        throw new DuplicateActiveDocumentSourceException(
+            "Active document source already exists for user", exception);
+      }
+      throw exception;
     }
-    return documentMapper.toDomain(documents.saveAndFlush(entity));
   }
 
   @Override
@@ -191,5 +202,36 @@ public class ImportedDocumentPersistenceAdapter implements ImportedDocumentRepos
                     document.getSourceAssetKey(), document.getCoverAssetKey()))
         .filter(java.util.Objects::nonNull)
         .collect(java.util.stream.Collectors.toUnmodifiableSet());
+  }
+
+  private boolean hasConstraint(Throwable exception, String constraint) {
+    boolean foundStructuredConstraintName = false;
+    for (var cause = exception; cause != null; cause = cause.getCause()) {
+      if (cause instanceof ConstraintViolationException violation
+          && violation.getConstraintName() != null) {
+        foundStructuredConstraintName = true;
+        var name = violation.getConstraintName();
+        int dotIndex = name.lastIndexOf('.');
+        if (dotIndex >= 0) {
+          name = name.substring(dotIndex + 1);
+        }
+        if (name.equalsIgnoreCase(constraint)) {
+          return true;
+        }
+      }
+    }
+    if (foundStructuredConstraintName) {
+      return false;
+    }
+    var pattern =
+        java.util.regex.Pattern.compile(
+            "\\b" + java.util.regex.Pattern.quote(constraint) + "\\b",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+    for (var cause = exception; cause != null; cause = cause.getCause()) {
+      if (cause.getMessage() != null && pattern.matcher(cause.getMessage()).find()) {
+        return true;
+      }
+    }
+    return false;
   }
 }

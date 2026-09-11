@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.soap.soap.application.exception.DocumentAlreadyImportedException;
 import com.soap.soap.application.exception.DocumentImportException;
+import com.soap.soap.application.exception.DuplicateActiveDocumentSourceException;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.DocumentAssetStoragePort;
 import com.soap.soap.application.port.out.ImportedDocumentRepositoryPort;
@@ -34,7 +35,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class AcceptDocumentImportUseCaseTest {
@@ -174,7 +174,7 @@ class AcceptDocumentImportUseCaseTest {
     var winner = existing(DocumentImportStatus.PROCESSING);
     when(documents.findByOwnerAndSourceSha256AndStatusIn(any(), any(), any()))
         .thenReturn(Optional.empty(), Optional.of(winner));
-    org.mockito.Mockito.doThrow(new DataIntegrityViolationException("unique active source"))
+    org.mockito.Mockito.doThrow(new DuplicateActiveDocumentSourceException("unique active source"))
         .when(documents)
         .saveDocument(any());
 
@@ -183,6 +183,21 @@ class AcceptDocumentImportUseCaseTest {
         .isInstanceOfSatisfying(
             DocumentAlreadyImportedException.class,
             exception -> assertThat(exception.existingDocumentId()).isEqualTo(winner.id()));
+    verify(storage, never()).storeSource(any(), any(), any());
+  }
+
+  @Test
+  void nonDuplicatePersistenceExceptionPropagatesAndNeverStoresSource(@TempDir Path directory)
+      throws Exception {
+    var source = Files.writeString(directory.resolve("book.epub"), "same source");
+    org.mockito.Mockito.doThrow(new IllegalStateException("foreign key or db error"))
+        .when(documents)
+        .saveDocument(any());
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> useCase(submitted::set).accept(source, "book.epub", null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("foreign key or db error");
     verify(storage, never()).storeSource(any(), any(), any());
   }
 
