@@ -154,6 +154,17 @@
         </xs:restriction>
     </xs:simpleType>
 
+    <xs:simpleType name="recommendationReasonCodeType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="CONTINUE_READING"/>
+            <xs:enumeration value="DISCOVERY"/>
+            <xs:enumeration value="HIGH_VOCABULARY_MATCH"/>
+            <xs:enumeration value="PRACTICE_VOCABULARY"/>
+            <xs:enumeration value="BALANCED_CHALLENGE"/>
+            <xs:enumeration value="MORE_CHALLENGING"/>
+        </xs:restriction>
+    </xs:simpleType>
+
     <xs:complexType name="vocabularyClassificationType">
         <xs:sequence>
             <xs:element name="word" type="tns:wordType"/>
@@ -272,6 +283,7 @@
             <xs:element name="classificationConfidencePercentage" type="xs:decimal"/>
             <xs:element name="progressStatus" type="tns:readingProgressStatusType" minOccurs="0"/>
             <xs:element name="coverKey" type="xs:string" minOccurs="0"/>
+            <xs:element name="reasonCode" type="tns:recommendationReasonCodeType" minOccurs="0"/>
         </xs:sequence>
     </xs:complexType>
 

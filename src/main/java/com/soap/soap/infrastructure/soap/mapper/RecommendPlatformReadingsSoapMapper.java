@@ -7,6 +7,7 @@ import com.soap.soap.infrastructure.soap.generated.EditorialLevelType;
 import com.soap.soap.infrastructure.soap.generated.ReadingProgressStatusType;
 import com.soap.soap.infrastructure.soap.generated.RecommendPlatformReadingsRequest;
 import com.soap.soap.infrastructure.soap.generated.RecommendPlatformReadingsResponse;
+import com.soap.soap.infrastructure.soap.generated.RecommendationReasonCodeType;
 import com.soap.soap.infrastructure.soap.generated.RecommendedPlatformReadingType;
 import org.springframework.stereotype.Component;
 
@@ -44,6 +45,9 @@ public class RecommendPlatformReadingsSoapMapper extends SoapMapperSupport {
     if (reading.progressStatus() != null) {
       result.setProgressStatus(
           ReadingProgressStatusType.fromValue(reading.progressStatus().name()));
+    }
+    if (reading.reasonCode() != null) {
+      result.setReasonCode(RecommendationReasonCodeType.fromValue(reading.reasonCode().name()));
     }
     result.setCoverKey(reading.coverKey());
     return result;

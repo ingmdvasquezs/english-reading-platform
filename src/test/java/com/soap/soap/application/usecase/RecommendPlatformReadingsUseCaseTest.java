@@ -25,6 +25,7 @@ import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.ReadingProgress;
 import com.soap.soap.domain.model.ReadingProgressStatus;
+import com.soap.soap.domain.model.RecommendationReasonCode;
 import com.soap.soap.domain.model.User;
 import com.soap.soap.domain.model.VocabularyStatus;
 import java.time.LocalDateTime;
@@ -117,6 +118,12 @@ class RecommendPlatformReadingsUseCaseTest {
         .isEqualByComparingTo("28.57");
     assertThat(result.content().get(2).progressStatus()).isEqualTo(ReadingProgressStatus.COMPLETED);
     assertThat(result.content().getFirst().progressStatus()).isNull();
+    assertThat(result.content().getFirst().reasonCode())
+        .isEqualTo(RecommendationReasonCode.DISCOVERY);
+    assertThat(result.content().get(1).reasonCode())
+        .isEqualTo(RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
+    assertThat(result.content().get(2).reasonCode())
+        .isEqualTo(RecommendationReasonCode.MORE_CHALLENGING);
     verify(vocabulary)
         .findStatusesByNormalizedValues(
             eq(userId), eq("en"), org.mockito.ArgumentMatchers.anyCollection());
@@ -356,6 +363,80 @@ class RecommendPlatformReadingsUseCaseTest {
   private ReadingProgress completed(Reading reading) {
     return ReadingProgress.completed(
         userId, reading.id(), LocalDateTime.now(), LocalDateTime.now());
+  }
+
+  @Test
+  void rankingOrderRemainsIdenticalAndUnchangedByReasonCode() {
+    var inProgress = platform("In progress", "worda wordb", 1);
+    var highMatch = platform("High match", "wordc wordd", 2);
+    var lowConfidence = platform("Sparse discovery", "worde wordf wordg wordh wordi wordj", 3);
+
+    when(users.existsById(userId)).thenReturn(true);
+    when(readings.findAllPlatformReadings())
+        .thenReturn(List.of(lowConfidence, inProgress, highMatch));
+    when(vocabulary.findStatusesByNormalizedValues(
+            eq(userId), eq("en"), org.mockito.ArgumentMatchers.any()))
+        .thenReturn(
+            Map.of(
+                "worda", VocabularyStatus.KNOWN,
+                "wordb", VocabularyStatus.KNOWN,
+                "wordc", VocabularyStatus.KNOWN,
+                "wordd", VocabularyStatus.KNOWN,
+                "worde", VocabularyStatus.KNOWN));
+    when(progress.findByUserIdAndReadingIds(eq(userId), org.mockito.ArgumentMatchers.anySet()))
+        .thenReturn(
+            Map.of(
+                inProgress.id(),
+                ReadingProgress.inProgress(userId, inProgress.id(), LocalDateTime.now())));
+
+    var result = useCase.recommendPlatformReadings(new PageRequest(0, 10));
+
+    // El orden pedagógico estándar: lecturas no empezadas (priority 0) primero, luego IN_PROGRESS
+    // (priority 1)
+    assertThat(result.content())
+        .extracting(com.soap.soap.application.model.RecommendedPlatformReading::title)
+        .containsExactly("Sparse discovery", "High match", "In progress");
+
+    // reasonCodes correspondientes evaluados determinísticamente
+    assertThat(result.content().get(0).reasonCode()).isEqualTo(RecommendationReasonCode.DISCOVERY);
+    assertThat(result.content().get(1).reasonCode())
+        .isEqualTo(RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
+    assertThat(result.content().get(2).reasonCode())
+        .isEqualTo(RecommendationReasonCode.CONTINUE_READING);
+  }
+
+  @Test
+  void lowConfidenceSparseClassificationProducesDiscoveryDespiteModerateFit() {
+    // 100 palabras únicas alfabéticas, 10 known, 90 unclassified
+    var words = new java.util.ArrayList<String>();
+    for (var i = 0; i < 100; i++) {
+      words.add("token" + letters(i));
+    }
+    var reading = platform("Moderate Fit Low Confidence", String.join(" ", words), 1);
+
+    when(users.existsById(userId)).thenReturn(true);
+    when(readings.findAllPlatformReadings()).thenReturn(List.of(reading));
+
+    var statusMap = new HashMap<String, VocabularyStatus>();
+    for (var i = 0; i < 10; i++) {
+      statusMap.put("token" + letters(i), VocabularyStatus.KNOWN);
+    }
+    when(vocabulary.findStatusesByNormalizedValues(
+            eq(userId), eq("en"), org.mockito.ArgumentMatchers.any()))
+        .thenReturn(statusMap);
+    when(progress.findByUserIdAndReadingIds(eq(userId), org.mockito.ArgumentMatchers.anySet()))
+        .thenReturn(Map.of());
+
+    var result = useCase.recommendPlatformReadings(new PageRequest(0, 10));
+
+    assertThat(result.content()).hasSize(1);
+    var item = result.content().getFirst();
+    // 100 - (0.7 * 90) = 37.00%
+    assertThat(item.vocabularyFitPercentage()).isEqualByComparingTo("37.00");
+    // 10 / 100 = 10.00%
+    assertThat(item.classificationConfidencePercentage()).isEqualByComparingTo("10.00");
+    // Regla 2: confidence < 20% -> DISCOVERY (evita falsa alta afinidad por fit aislado)
+    assertThat(item.reasonCode()).isEqualTo(RecommendationReasonCode.DISCOVERY);
   }
 
   private String letters(int value) {

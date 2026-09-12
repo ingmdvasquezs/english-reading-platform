@@ -44,7 +44,10 @@ class RecommendPlatformReadingsEndpointTest {
             1,
             1,
             new BigDecimal("56.00"),
-            new BigDecimal("80.00"));
+            new BigDecimal("80.00"),
+            null,
+            null,
+            com.soap.soap.domain.model.RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
     when(port.recommendPlatformReadings(new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
@@ -64,6 +67,10 @@ class RecommendPlatformReadingsEndpointTest {
               assertThat(item.getVocabularyFitPercentage()).isEqualByComparingTo("56.00");
               assertThat(item.getClassificationConfidencePercentage())
                   .isEqualByComparingTo("80.00");
+              assertThat(item.getReasonCode())
+                  .isEqualTo(
+                      com.soap.soap.infrastructure.soap.generated.RecommendationReasonCodeType
+                          .HIGH_VOCABULARY_MATCH);
             });
     verify(port).recommendPlatformReadings(new PageRequest(0, 10));
   }

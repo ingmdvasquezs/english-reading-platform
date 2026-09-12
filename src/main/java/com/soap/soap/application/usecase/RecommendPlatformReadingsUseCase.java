@@ -7,7 +7,6 @@ import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.PedagogicalRecommendationScore;
 import com.soap.soap.application.model.RecommendationShadowCandidate;
 import com.soap.soap.application.model.RecommendedPlatformReading;
-import com.soap.soap.application.model.VocabularyBreakdown;
 import com.soap.soap.application.port.in.RecommendPlatformReadingsPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
@@ -18,6 +17,7 @@ import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.service.PedagogicalRecommendationScorer;
 import com.soap.soap.application.service.PlatformReadingRecommendationCalculator;
 import com.soap.soap.application.service.RecommendationEvidenceV2Calculator;
+import com.soap.soap.application.service.RecommendationReasonEvaluator;
 import com.soap.soap.application.service.TextWordProcessor;
 import com.soap.soap.domain.model.VocabularyStatus;
 import java.util.Comparator;
@@ -63,6 +63,7 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
   private final CurrentUserPort currentUser;
   private final RecommendationEvidenceV2Calculator v2EvidenceCalculator;
   private final RecommendationShadowPort shadow;
+  private final RecommendationReasonEvaluator reasonEvaluator;
 
   @Autowired
   public RecommendPlatformReadingsUseCase(
@@ -75,7 +76,8 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
       PedagogicalRecommendationScorer scorer,
       CurrentUserPort currentUser,
       RecommendationEvidenceV2Calculator v2EvidenceCalculator,
-      RecommendationShadowPort shadow) {
+      RecommendationShadowPort shadow,
+      RecommendationReasonEvaluator reasonEvaluator) {
     this.users = users;
     this.readings = readings;
     this.progress = progress;
@@ -86,6 +88,32 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
     this.currentUser = currentUser;
     this.v2EvidenceCalculator = v2EvidenceCalculator;
     this.shadow = shadow;
+    this.reasonEvaluator = reasonEvaluator;
+  }
+
+  public RecommendPlatformReadingsUseCase(
+      UserRepositoryPort users,
+      ReadingRepositoryPort readings,
+      ReadingProgressRepositoryPort progress,
+      UserVocabularyRepositoryPort vocabulary,
+      TextWordProcessor wordProcessor,
+      PlatformReadingRecommendationCalculator calculator,
+      PedagogicalRecommendationScorer scorer,
+      CurrentUserPort currentUser,
+      RecommendationEvidenceV2Calculator v2EvidenceCalculator,
+      RecommendationShadowPort shadow) {
+    this(
+        users,
+        readings,
+        progress,
+        vocabulary,
+        wordProcessor,
+        calculator,
+        scorer,
+        currentUser,
+        v2EvidenceCalculator,
+        shadow,
+        new RecommendationReasonEvaluator());
   }
 
   public RecommendPlatformReadingsUseCase(
@@ -107,7 +135,8 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
         scorer,
         currentUser,
         new RecommendationEvidenceV2Calculator(),
-        ignored -> {});
+        ignored -> {},
+        new RecommendationReasonEvaluator());
   }
 
   @Override
@@ -170,22 +199,20 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
         calculated.stream()
             .map(
                 reading -> {
-                  var enriched =
-                      withProgress(
-                          reading,
-                          progressByReading.containsKey(reading.readingId())
-                              ? progressByReading.get(reading.readingId()).status()
-                              : null);
+                  var progressStatus =
+                      progressByReading.containsKey(reading.readingId())
+                          ? progressByReading.get(reading.readingId()).status()
+                          : null;
+                  var reasonCode =
+                      reasonEvaluator.evaluate(
+                          reading.vocabularyBreakdown(),
+                          reading.classificationConfidencePercentage(),
+                          progressStatus);
+                  var enriched = withProgress(reading, progressStatus, reasonCode);
                   return new ScoredReading(
                       enriched,
                       scorer.score(
-                          new VocabularyBreakdown(
-                              enriched.uniqueWords(),
-                              enriched.knownWords(),
-                              enriched.learningWords(),
-                              enriched.explicitNewWords(),
-                              enriched.ignoredWords(),
-                              enriched.unclassifiedWords()),
+                          reading.vocabularyBreakdown(),
                           enriched.classificationConfidencePercentage(),
                           enriched.editorialLevel()));
                 })
@@ -219,7 +246,8 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
 
   private static RecommendedPlatformReading withProgress(
       RecommendedPlatformReading reading,
-      com.soap.soap.domain.model.ReadingProgressStatus progressStatus) {
+      com.soap.soap.domain.model.ReadingProgressStatus progressStatus,
+      com.soap.soap.domain.model.RecommendationReasonCode reasonCode) {
     return new RecommendedPlatformReading(
         reading.readingId(),
         reading.title(),
@@ -236,7 +264,8 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
         reading.vocabularyFitPercentage(),
         reading.classificationConfidencePercentage(),
         progressStatus,
-        reading.coverKey());
+        reading.coverKey(),
+        reasonCode);
   }
 
   private static int progressPriority(com.soap.soap.domain.model.ReadingProgressStatus status) {

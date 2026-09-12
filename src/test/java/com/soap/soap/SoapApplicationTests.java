@@ -1979,7 +1979,10 @@ class SoapApplicationTests {
                   .evaluatesTo("0.00"))
           .andExpect(
               xpath("//*[local-name()='readings'][1]/*[local-name()='explicitNewWords']")
-                  .evaluatesTo("0"));
+                  .evaluatesTo("0"))
+          .andExpect(
+              xpath("//*[local-name()='readings'][1]/*[local-name()='reasonCode']")
+                  .evaluatesTo("DISCOVERY"));
 
       client
           .sendRequest(
