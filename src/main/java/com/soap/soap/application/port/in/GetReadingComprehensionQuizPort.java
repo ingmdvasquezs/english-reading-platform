@@ -4,5 +4,9 @@ import com.soap.soap.application.model.ComprehensionQuizView;
 import java.util.UUID;
 
 public interface GetReadingComprehensionQuizPort {
-  ComprehensionQuizView getQuiz(UUID readingId);
+  default ComprehensionQuizView getQuiz(UUID readingId) {
+    return getQuiz(readingId, null);
+  }
+
+  ComprehensionQuizView getQuiz(UUID readingId, UUID submissionId);
 }

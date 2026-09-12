@@ -11,8 +11,10 @@ import com.soap.soap.application.port.out.ComprehensionQuizRepositoryPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
+import com.soap.soap.domain.model.ComprehensionQuestion;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.ReadingProgressStatus;
+import com.soap.soap.domain.service.ComprehensionQuizSelectionPolicy;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -27,10 +29,11 @@ public class GetReadingComprehensionQuizUseCase implements GetReadingComprehensi
   private final ReadingRepositoryPort readings;
   private final ReadingProgressRepositoryPort progress;
   private final ComprehensionQuizRepositoryPort quizRepository;
+  private final ComprehensionQuizSelectionPolicy selectionPolicy;
 
   @Override
   @Transactional(readOnly = true)
-  public ComprehensionQuizView getQuiz(UUID readingId) {
+  public ComprehensionQuizView getQuiz(UUID readingId, UUID submissionId) {
     if (readingId == null) {
       throw new InvalidApplicationArgumentException("Reading id must not be null");
     }
@@ -55,13 +58,30 @@ public class GetReadingComprehensionQuizUseCase implements GetReadingComprehensi
 
     var quizOpt = quizRepository.findByReadingId(readingId);
     if (quizOpt.isEmpty() || !quizOpt.get().isAvailable()) {
-      return new ComprehensionQuizView(readingId, false, List.of());
+      return new ComprehensionQuizView(readingId, false, List.of(), null);
     }
 
     var quiz = quizOpt.get();
+
+    List<ComprehensionQuestion> selectedQuestions;
+    Integer selectionVersion = null;
+
+    if (submissionId == null) {
+      // Legacy path (submissionId omitted): return canonical V1 questions up to ordinal 3
+      selectedQuestions =
+          quiz.questions().stream()
+              .filter(q -> q.ordinal() <= 3)
+              .sorted(Comparator.comparingInt(ComprehensionQuestion::ordinal))
+              .toList();
+    } else {
+      // Versioned selection path
+      selectionVersion = ComprehensionQuizSelectionPolicy.CURRENT_SELECTION_VERSION;
+      selectedQuestions =
+          selectionPolicy.select(quiz, userId, readingId, submissionId, selectionVersion);
+    }
+
     var questionsView =
-        quiz.questions().stream()
-            .sorted(Comparator.comparingInt(q -> q.ordinal()))
+        selectedQuestions.stream()
             .map(
                 q ->
                     new ComprehensionQuizQuestionView(
@@ -78,6 +98,6 @@ public class GetReadingComprehensionQuizUseCase implements GetReadingComprehensi
                             .toList()))
             .toList();
 
-    return new ComprehensionQuizView(readingId, true, questionsView);
+    return new ComprehensionQuizView(readingId, true, questionsView, selectionVersion);
   }
 }

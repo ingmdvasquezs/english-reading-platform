@@ -1,10 +1,12 @@
 package com.soap.soap.infrastructure.soap.endpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.soap.soap.application.command.AnswerSubmission;
 import com.soap.soap.application.command.SubmitComprehensionAttemptCommand;
+import com.soap.soap.application.exception.InvalidComprehensionSubmissionException;
 import com.soap.soap.application.model.ComprehensionAttemptResult;
 import com.soap.soap.application.model.ComprehensionOptionResult;
 import com.soap.soap.application.model.ComprehensionQuestionResult;
@@ -16,10 +18,12 @@ import com.soap.soap.application.port.in.GetLatestComprehensionResultPort;
 import com.soap.soap.application.port.in.GetReadingComprehensionQuizPort;
 import com.soap.soap.application.port.in.SubmitComprehensionAttemptPort;
 import com.soap.soap.domain.model.QuestionType;
+import com.soap.soap.infrastructure.soap.exception.InvalidSoapRequestException;
 import com.soap.soap.infrastructure.soap.generated.GetLatestComprehensionResultRequest;
 import com.soap.soap.infrastructure.soap.generated.GetReadingComprehensionQuizRequest;
 import com.soap.soap.infrastructure.soap.generated.SubmitComprehensionAttemptRequest;
 import com.soap.soap.infrastructure.soap.mapper.ComprehensionSoapMapper;
+import com.soap.soap.infrastructure.soap.resolver.SoapFaultClassifier;
 import jakarta.xml.bind.JAXBContext;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -53,7 +57,7 @@ class ComprehensionSoapContractTest {
   }
 
   @Test
-  void quizResponseDoesNotContainIsCorrectOrExplanationInRawXml() throws Exception {
+  void legacyQuizResponseDoesNotContainIsCorrectOrExplanationInRawXml() throws Exception {
     UUID readingId = UUID.randomUUID();
     UUID questionId = UUID.randomUUID();
     UUID optionId = UUID.randomUUID();
@@ -68,9 +72,10 @@ class ComprehensionSoapContractTest {
                     1,
                     QuestionType.FACTUAL,
                     "What color was the scarf?",
-                    List.of(new ComprehensionQuizOptionView(optionId, 1, "Blue")))));
+                    List.of(new ComprehensionQuizOptionView(optionId, 1, "Blue")))),
+            null);
 
-    when(getQuizPort.getQuiz(readingId)).thenReturn(quizView);
+    when(getQuizPort.getQuiz(readingId, null)).thenReturn(quizView);
 
     var request = new GetReadingComprehensionQuizRequest();
     request.setReadingId(readingId.toString());
@@ -91,10 +96,50 @@ class ComprehensionSoapContractTest {
     assertThat(rawXml).contains("What color was the scarf?");
     assertThat(rawXml).contains("Blue");
     assertThat(rawXml).contains("<available>true</available>");
+    assertThat(response.getSelectionVersion()).isNull();
+    assertThat(rawXml).doesNotContain("<selectionVersion>");
   }
 
   @Test
-  void submitResponseIncludesScoreAndFeedback() {
+  void versionedQuizResponseIncludesSelectionVersionInRawXml() throws Exception {
+    UUID readingId = UUID.randomUUID();
+    UUID submissionId = UUID.randomUUID();
+    UUID questionId = UUID.randomUUID();
+    UUID optionId = UUID.randomUUID();
+
+    var quizView =
+        new ComprehensionQuizView(
+            readingId,
+            true,
+            List.of(
+                new ComprehensionQuizQuestionView(
+                    questionId,
+                    1,
+                    QuestionType.FACTUAL,
+                    "What color was the scarf?",
+                    List.of(new ComprehensionQuizOptionView(optionId, 1, "Blue")))),
+            1);
+
+    when(getQuizPort.getQuiz(readingId, submissionId)).thenReturn(quizView);
+
+    var request = new GetReadingComprehensionQuizRequest();
+    request.setReadingId(readingId.toString());
+    request.setSubmissionId(submissionId.toString());
+
+    var response = getQuizEndpoint.getQuiz(request);
+
+    var jaxbContext = JAXBContext.newInstance(response.getClass());
+    var marshaller = jaxbContext.createMarshaller();
+    var writer = new StringWriter();
+    marshaller.marshal(response, writer);
+    String rawXml = writer.toString();
+
+    assertThat(response.getSelectionVersion()).isEqualTo(1);
+    assertThat(rawXml).contains("<selectionVersion>1</selectionVersion>");
+  }
+
+  @Test
+  void submitResponseIncludesScoreAndFeedbackWithLegacyRequest() {
     UUID readingId = UUID.randomUUID();
     UUID submissionId = UUID.randomUUID();
     UUID attemptId = UUID.randomUUID();
@@ -127,7 +172,8 @@ class ComprehensionSoapContractTest {
             new SubmitComprehensionAttemptCommand(
                 readingId,
                 submissionId,
-                List.of(new AnswerSubmission(questionId, selectedOptionId)))))
+                List.of(new AnswerSubmission(questionId, selectedOptionId)),
+                null)))
         .thenReturn(attemptResult);
 
     var request = new SubmitComprehensionAttemptRequest();
@@ -152,6 +198,49 @@ class ComprehensionSoapContractTest {
   }
 
   @Test
+  void submitWithExplicitSelectionVersionMapsCorrectly() {
+    UUID readingId = UUID.randomUUID();
+    UUID submissionId = UUID.randomUUID();
+    UUID attemptId = UUID.randomUUID();
+    UUID questionId = UUID.randomUUID();
+    UUID selectedOptionId = UUID.randomUUID();
+
+    var attemptResult =
+        new ComprehensionAttemptResult(
+            attemptId,
+            readingId,
+            submissionId,
+            new BigDecimal("100.00"),
+            1,
+            1,
+            LocalDateTime.now(),
+            List.of());
+
+    when(submitAttemptPort.submitAttempt(
+            new SubmitComprehensionAttemptCommand(
+                readingId,
+                submissionId,
+                List.of(new AnswerSubmission(questionId, selectedOptionId)),
+                1)))
+        .thenReturn(attemptResult);
+
+    var request = new SubmitComprehensionAttemptRequest();
+    request.setReadingId(readingId.toString());
+    request.setSubmissionId(submissionId.toString());
+    request.setSelectionVersion(1);
+    var answerInput =
+        new com.soap.soap.infrastructure.soap.generated.ComprehensionAnswerInputType();
+    answerInput.setQuestionId(questionId.toString());
+    answerInput.setSelectedOptionId(selectedOptionId.toString());
+    request.getAnswers().add(answerInput);
+
+    var response = submitAttemptEndpoint.submitAttempt(request);
+
+    assertThat(response.getAttempt()).isNotNull();
+    assertThat(response.getAttempt().getAttemptId()).isEqualTo(attemptId.toString());
+  }
+
+  @Test
   void latestResultResponseMapsAttemptCorrectly() {
     UUID readingId = UUID.randomUUID();
     when(latestResultPort.getLatestResult(readingId))
@@ -165,5 +254,40 @@ class ComprehensionSoapContractTest {
     assertThat(response.getReadingId()).isEqualTo(readingId.toString());
     assertThat(response.isHasAttempt()).isFalse();
     assertThat(response.getAttempt()).isNull();
+  }
+
+  @Test
+  void getQuizWithMalformedSubmissionIdThrowsInvalidSoapRequestException() {
+    var request = new GetReadingComprehensionQuizRequest();
+    request.setReadingId(UUID.randomUUID().toString());
+    request.setSubmissionId("not-a-uuid");
+
+    assertThatThrownBy(() -> getQuizEndpoint.getQuiz(request))
+        .isInstanceOf(InvalidSoapRequestException.class)
+        .hasMessageContaining("Invalid submissionId format");
+
+    var ex =
+        new InvalidSoapRequestException(
+            "Invalid submissionId format", new IllegalArgumentException());
+    assertThat(SoapFaultClassifier.isClientFault(ex)).isTrue();
+    assertThat(SoapFaultClassifier.category(ex)).isEqualTo("validation");
+  }
+
+  @Test
+  void submitWithUnsupportedSelectionVersionClassifiedAsClientFault() {
+    var ex =
+        new InvalidComprehensionSubmissionException(
+            "Invalid quiz selection: Unsupported selectionVersion: 999");
+    assertThat(SoapFaultClassifier.isClientFault(ex)).isTrue();
+    assertThat(SoapFaultClassifier.category(ex)).isEqualTo("validation");
+  }
+
+  @Test
+  void misconfiguredBankClassifiedAsServerFault() {
+    var ex =
+        new IllegalStateException(
+            "No candidate questions found for type MAIN_IDEA in selectionVersion 1");
+    assertThat(SoapFaultClassifier.isClientFault(ex)).isFalse();
+    assertThat(SoapFaultClassifier.category(ex)).isEqualTo("internal");
   }
 }

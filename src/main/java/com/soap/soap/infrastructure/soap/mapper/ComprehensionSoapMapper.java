@@ -29,10 +29,20 @@ public class ComprehensionSoapMapper extends SoapMapperSupport {
     return parseUuid(request.getReadingId(), "readingId");
   }
 
+  public UUID toSubmissionId(GetReadingComprehensionQuizRequest request) {
+    if (request.getSubmissionId() == null || request.getSubmissionId().isBlank()) {
+      return null;
+    }
+    return parseUuid(request.getSubmissionId(), "submissionId");
+  }
+
   public GetReadingComprehensionQuizResponse toQuizResponse(ComprehensionQuizView view) {
     var response = new GetReadingComprehensionQuizResponse();
     response.setReadingId(view.readingId().toString());
     response.setAvailable(view.available());
+    if (view.selectionVersion() != null) {
+      response.setSelectionVersion(view.selectionVersion());
+    }
     for (var q : view.questions()) {
       var qType = new ComprehensionQuizQuestionType();
       qType.setQuestionId(q.questionId().toString());
@@ -63,7 +73,8 @@ public class ComprehensionSoapMapper extends SoapMapperSupport {
                 parseUuid(ans.getSelectedOptionId(), "selectedOptionId")));
       }
     }
-    return new SubmitComprehensionAttemptCommand(readingId, submissionId, answers);
+    return new SubmitComprehensionAttemptCommand(
+        readingId, submissionId, answers, request.getSelectionVersion());
   }
 
   public SubmitComprehensionAttemptResponse toSubmitResponse(ComprehensionAttemptResult result) {

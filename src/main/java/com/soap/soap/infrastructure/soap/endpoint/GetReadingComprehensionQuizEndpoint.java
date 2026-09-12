@@ -22,6 +22,7 @@ public class GetReadingComprehensionQuizEndpoint {
   @ResponsePayload
   public GetReadingComprehensionQuizResponse getQuiz(
       @RequestPayload GetReadingComprehensionQuizRequest request) {
-    return mapper.toQuizResponse(port.getQuiz(mapper.toReadingId(request)));
+    return mapper.toQuizResponse(
+        port.getQuiz(mapper.toReadingId(request), mapper.toSubmissionId(request)));
   }
 }

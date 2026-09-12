@@ -18,10 +18,12 @@ import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.domain.model.ComprehensionOption;
 import com.soap.soap.domain.model.ComprehensionQuestion;
 import com.soap.soap.domain.model.ComprehensionQuiz;
+import com.soap.soap.domain.model.QuestionType;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.ReadingProgressStatus;
 import com.soap.soap.domain.model.UserComprehensionAnswer;
 import com.soap.soap.domain.model.UserComprehensionAttempt;
+import com.soap.soap.domain.service.ComprehensionQuizSelectionPolicy;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
@@ -30,6 +32,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,6 +49,7 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
   private final ReadingProgressRepositoryPort progress;
   private final ComprehensionQuizRepositoryPort quizRepository;
   private final ComprehensionAttemptRepositoryPort attemptRepository;
+  private final ComprehensionQuizSelectionPolicy selectionPolicy;
   private final Clock clock;
 
   @Override
@@ -76,6 +81,11 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
       return toResult(existingOpt.get(), quiz);
     }
 
+    int requestedVersion =
+        (command.selectionVersion() != null)
+            ? command.selectionVersion()
+            : ComprehensionQuizSelectionPolicy.CURRENT_SELECTION_VERSION;
+
     var reading =
         readings
             .findById(command.readingId())
@@ -103,19 +113,35 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
                     new ComprehensionNotAvailableException(
                         "Comprehension quiz is not available for this reading"));
 
+    List<ComprehensionQuestion> assignedQuestions;
+    try {
+      assignedQuestions =
+          selectionPolicy.select(
+              quiz, userId, command.readingId(), command.submissionId(), requestedVersion);
+    } catch (IllegalArgumentException ex) {
+      throw new InvalidComprehensionSubmissionException(
+          "Invalid quiz selection: " + ex.getMessage());
+    }
+
     var distinctQuestions =
         command.answers().stream().map(AnswerSubmission::questionId).collect(Collectors.toSet());
     if (distinctQuestions.size() != command.answers().size()) {
       throw new InvalidComprehensionSubmissionException(
           "Duplicate answers submitted for the same question");
     }
-    if (command.answers().size() != quiz.questions().size()) {
-      throw new InvalidComprehensionSubmissionException(
-          "Answers count does not match total quiz questions");
+    if (command.answers().size() != 3) {
+      throw new InvalidComprehensionSubmissionException("Answers count must be exactly 3");
     }
 
-    Map<UUID, ComprehensionQuestion> questionMap =
-        quiz.questions().stream()
+    Set<UUID> assignedQuestionIds =
+        assignedQuestions.stream().map(ComprehensionQuestion::id).collect(Collectors.toSet());
+    if (!distinctQuestions.equals(assignedQuestionIds)) {
+      throw new InvalidComprehensionSubmissionException(
+          "Submitted questions do not match the assigned quiz set");
+    }
+
+    Map<UUID, ComprehensionQuestion> assignedMap =
+        assignedQuestions.stream()
             .collect(Collectors.toMap(ComprehensionQuestion::id, Function.identity()));
 
     UUID attemptId = UUID.randomUUID();
@@ -127,7 +153,7 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
         throw new InvalidComprehensionSubmissionException(
             "Question id and selected option id must not be null");
       }
-      var question = questionMap.get(answer.questionId());
+      var question = assignedMap.get(answer.questionId());
       if (question == null) {
         throw new InvalidComprehensionSubmissionException(
             "Question does not belong to this reading quiz");
@@ -150,7 +176,7 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
               UUID.randomUUID(), attemptId, question.id(), selectedOption.id(), isCorrect));
     }
 
-    int totalCount = quiz.questions().size();
+    int totalCount = 3;
     BigDecimal scorePercentage =
         BigDecimal.valueOf(correctCount)
             .multiply(BigDecimal.valueOf(100))
@@ -178,39 +204,50 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
         attempt.answers().stream()
             .collect(Collectors.toMap(UserComprehensionAnswer::questionId, Function.identity()));
 
-    var questionResults =
+    Map<UUID, ComprehensionQuestion> questionsById =
         quiz.questions().stream()
-            .sorted(Comparator.comparingInt(ComprehensionQuestion::ordinal))
-            .map(
-                q -> {
-                  var ans = answerMap.get(q.id());
-                  UUID selectedOptionId = ans != null ? ans.selectedOptionId() : null;
-                  boolean isCorrect = ans != null && ans.isCorrect();
-                  UUID correctOptionId =
-                      q.options().stream()
-                          .filter(ComprehensionOption::isCorrect)
-                          .map(ComprehensionOption::id)
-                          .findFirst()
-                          .orElse(null);
+            .collect(Collectors.toMap(ComprehensionQuestion::id, Function.identity()));
 
-                  var options =
-                      q.options().stream()
-                          .sorted(Comparator.comparingInt(ComprehensionOption::ordinal))
-                          .map(o -> new ComprehensionOptionResult(o.id(), o.ordinal(), o.content()))
-                          .toList();
-
-                  return new ComprehensionQuestionResult(
-                      q.id(),
-                      q.ordinal(),
-                      q.questionType(),
-                      q.prompt(),
-                      selectedOptionId,
-                      correctOptionId,
-                      isCorrect,
-                      q.explanation(),
-                      options);
-                })
+    List<ComprehensionQuestion> answeredQuestions =
+        attempt.answers().stream()
+            .map(UserComprehensionAnswer::questionId)
+            .map(questionsById::get)
+            .filter(Objects::nonNull)
+            .sorted(Comparator.comparingInt(q -> displayOrderForType(q.questionType())))
             .toList();
+
+    List<ComprehensionQuestionResult> questionResults = new ArrayList<>();
+    int displayOrdinal = 1;
+
+    for (var q : answeredQuestions) {
+      var ans = answerMap.get(q.id());
+      UUID selectedOptionId = ans != null ? ans.selectedOptionId() : null;
+      boolean isCorrect = ans != null && ans.isCorrect();
+      UUID correctOptionId =
+          q.options().stream()
+              .filter(ComprehensionOption::isCorrect)
+              .map(ComprehensionOption::id)
+              .findFirst()
+              .orElse(null);
+
+      var options =
+          q.options().stream()
+              .sorted(Comparator.comparingInt(ComprehensionOption::ordinal))
+              .map(o -> new ComprehensionOptionResult(o.id(), o.ordinal(), o.content()))
+              .toList();
+
+      questionResults.add(
+          new ComprehensionQuestionResult(
+              q.id(),
+              displayOrdinal++,
+              q.questionType(),
+              q.prompt(),
+              selectedOptionId,
+              correctOptionId,
+              isCorrect,
+              q.explanation(),
+              options));
+    }
 
     return new ComprehensionAttemptResult(
         attempt.id(),
@@ -221,5 +258,13 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
         attempt.totalQuestionsCount(),
         attempt.submittedAt(),
         questionResults);
+  }
+
+  private static int displayOrderForType(QuestionType type) {
+    return switch (type) {
+      case FACTUAL -> 1;
+      case INFERENCE -> 2;
+      case MAIN_IDEA -> 3;
+    };
   }
 }

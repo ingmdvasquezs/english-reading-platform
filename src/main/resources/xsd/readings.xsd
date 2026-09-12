@@ -668,6 +668,7 @@
         <xs:complexType>
             <xs:sequence>
                 <xs:element name="readingId" type="xs:string"/>
+                <xs:element name="submissionId" type="xs:string" minOccurs="0"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
@@ -677,6 +678,7 @@
                 <xs:element name="readingId" type="xs:string"/>
                 <xs:element name="available" type="xs:boolean"/>
                 <xs:element name="questions" type="tns:comprehensionQuizQuestionType" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element name="selectionVersion" type="xs:int" minOccurs="0"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
@@ -694,6 +696,7 @@
                 <xs:element name="readingId" type="xs:string"/>
                 <xs:element name="submissionId" type="xs:string"/>
                 <xs:element name="answers" type="tns:comprehensionAnswerInputType" minOccurs="1" maxOccurs="unbounded"/>
+                <xs:element name="selectionVersion" type="xs:int" minOccurs="0"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
