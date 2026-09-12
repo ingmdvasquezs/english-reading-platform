@@ -638,4 +638,124 @@
         </xs:sequence></xs:complexType>
     </xs:element>
 
+    <xs:simpleType name="questionTypeType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="FACTUAL"/>
+            <xs:enumeration value="INFERENCE"/>
+            <xs:enumeration value="MAIN_IDEA"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="comprehensionQuizOptionType">
+        <xs:sequence>
+            <xs:element name="optionId" type="xs:string"/>
+            <xs:element name="ordinal" type="xs:int"/>
+            <xs:element name="content" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="comprehensionQuizQuestionType">
+        <xs:sequence>
+            <xs:element name="questionId" type="xs:string"/>
+            <xs:element name="ordinal" type="xs:int"/>
+            <xs:element name="questionType" type="tns:questionTypeType"/>
+            <xs:element name="prompt" type="xs:string"/>
+            <xs:element name="options" type="tns:comprehensionQuizOptionType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="getReadingComprehensionQuizRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="readingId" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="getReadingComprehensionQuizResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="readingId" type="xs:string"/>
+                <xs:element name="available" type="xs:boolean"/>
+                <xs:element name="questions" type="tns:comprehensionQuizQuestionType" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="comprehensionAnswerInputType">
+        <xs:sequence>
+            <xs:element name="questionId" type="xs:string"/>
+            <xs:element name="selectedOptionId" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="submitComprehensionAttemptRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="readingId" type="xs:string"/>
+                <xs:element name="submissionId" type="xs:string"/>
+                <xs:element name="answers" type="tns:comprehensionAnswerInputType" minOccurs="1" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="comprehensionQuestionResultOptionType">
+        <xs:sequence>
+            <xs:element name="optionId" type="xs:string"/>
+            <xs:element name="ordinal" type="xs:int"/>
+            <xs:element name="content" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="comprehensionQuestionResultType">
+        <xs:sequence>
+            <xs:element name="questionId" type="xs:string"/>
+            <xs:element name="ordinal" type="xs:int"/>
+            <xs:element name="questionType" type="tns:questionTypeType"/>
+            <xs:element name="prompt" type="xs:string"/>
+            <xs:element name="selectedOptionId" type="xs:string"/>
+            <xs:element name="correctOptionId" type="xs:string"/>
+            <xs:element name="isCorrect" type="xs:boolean"/>
+            <xs:element name="explanation" type="xs:string"/>
+            <xs:element name="options" type="tns:comprehensionQuestionResultOptionType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="comprehensionAttemptResultType">
+        <xs:sequence>
+            <xs:element name="attemptId" type="xs:string"/>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="submissionId" type="xs:string"/>
+            <xs:element name="scorePercentage" type="xs:decimal"/>
+            <xs:element name="correctAnswersCount" type="xs:int"/>
+            <xs:element name="totalQuestionsCount" type="xs:int"/>
+            <xs:element name="submittedAt" type="xs:dateTime"/>
+            <xs:element name="questions" type="tns:comprehensionQuestionResultType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="submitComprehensionAttemptResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="attempt" type="tns:comprehensionAttemptResultType"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="getLatestComprehensionResultRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="readingId" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="getLatestComprehensionResultResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="readingId" type="xs:string"/>
+                <xs:element name="hasAttempt" type="xs:boolean"/>
+                <xs:element name="attempt" type="tns:comprehensionAttemptResultType" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
 </xs:schema>

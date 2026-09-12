@@ -3,6 +3,7 @@ package com.soap.soap.infrastructure.soap.resolver;
 import com.soap.soap.application.exception.AliasAlreadyInUseException;
 import com.soap.soap.application.exception.AuthenticationRequiredException;
 import com.soap.soap.application.exception.CollectionNotFoundException;
+import com.soap.soap.application.exception.ComprehensionNotAvailableException;
 import com.soap.soap.application.exception.ConcurrentVocabularyModificationException;
 import com.soap.soap.application.exception.DictionaryInvalidResponseException;
 import com.soap.soap.application.exception.DictionaryTimeoutException;
@@ -10,6 +11,7 @@ import com.soap.soap.application.exception.DictionaryUnavailableException;
 import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
+import com.soap.soap.application.exception.InvalidComprehensionSubmissionException;
 import com.soap.soap.application.exception.InvalidCredentialsException;
 import com.soap.soap.application.exception.OnboardingAlreadyCompletedException;
 import com.soap.soap.application.exception.ReadingAccessDeniedException;
@@ -40,7 +42,9 @@ public final class SoapFaultClassifier {
           WordAlreadyInVocabularyException.class,
           WordNotFoundException.class,
           InvalidVocabularyStateException.class,
-          InvalidSoapRequestException.class);
+          InvalidSoapRequestException.class,
+          ComprehensionNotAvailableException.class,
+          InvalidComprehensionSubmissionException.class);
 
   private SoapFaultClassifier() {}
 
@@ -78,6 +82,9 @@ public final class SoapFaultClassifier {
     }
     if (exception instanceof ReadingAccessDeniedException) {
       return "access_denied";
+    }
+    if (exception instanceof ComprehensionNotAvailableException) {
+      return "comprehension_not_available";
     }
     if (exception instanceof CollectionNotFoundException
         || exception instanceof ReadingNotFoundException
