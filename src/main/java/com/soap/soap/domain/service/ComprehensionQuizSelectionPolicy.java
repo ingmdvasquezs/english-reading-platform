@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ComprehensionQuizSelectionPolicy {
 
-  public static final int CURRENT_SELECTION_VERSION = 1;
+  public static final int CURRENT_SELECTION_VERSION = 2;
   public static final int SELECTION_VERSION_1 = 1;
   public static final int SELECTION_VERSION_2 = 2;
 

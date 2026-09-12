@@ -227,4 +227,72 @@ class ComprehensionQuizSelectionPolicyTest {
     assertThatThrownBy(() -> policy.select(quiz, userId, readingId, null, 1))
         .isInstanceOf(NullPointerException.class);
   }
+
+  @Test
+  void differentReadingIdProducesDifferentSelection() {
+    var quiz = createV26SixQuestionBank(readingId);
+    Set<String> distinctSelections = new HashSet<>();
+    for (int i = 0; i < 50; i++) {
+      UUID otherReadingId = UUID.randomUUID();
+      var selected = policy.select(quiz, userId, otherReadingId, submissionId, 2);
+      distinctSelections.add(
+          selected.get(0).id() + "|" + selected.get(1).id() + "|" + selected.get(2).id());
+    }
+    assertThat(distinctSelections.size()).isGreaterThan(1);
+  }
+
+  @Test
+  void differentUserIdProducesDifferentSelection() {
+    var quiz = createV26SixQuestionBank(readingId);
+    Set<String> distinctSelections = new HashSet<>();
+    for (int i = 0; i < 50; i++) {
+      UUID otherUserId = UUID.randomUUID();
+      var selected = policy.select(quiz, otherUserId, readingId, submissionId, 2);
+      distinctSelections.add(
+          selected.get(0).id() + "|" + selected.get(1).id() + "|" + selected.get(2).id());
+    }
+    assertThat(distinctSelections.size()).isGreaterThan(1);
+  }
+
+  @Test
+  void selectionVersionIsPartOfSeed() {
+    var q1 = createQuestion(readingId, 1, QuestionType.FACTUAL);
+    var q2 = createQuestion(readingId, 2, QuestionType.FACTUAL);
+    var q3 = createQuestion(readingId, 2, QuestionType.INFERENCE);
+    var q4 = createQuestion(readingId, 3, QuestionType.MAIN_IDEA);
+    var quiz = new ComprehensionQuiz(readingId, List.of(q1, q2, q3, q4));
+
+    boolean foundDifference = false;
+    for (int i = 0; i < 50; i++) {
+      UUID testSubId = UUID.randomUUID();
+      var selV1 = policy.select(quiz, userId, readingId, testSubId, 1);
+      var selV2 = policy.select(quiz, userId, readingId, testSubId, 2);
+      if (!selV1.get(0).id().equals(selV2.get(0).id())) {
+        foundDifference = true;
+        break;
+      }
+    }
+    assertThat(foundDifference)
+        .as("Selection must differ between V1 and V2 because selectionVersion is part of the seed")
+        .isTrue();
+  }
+
+  @Test
+  void candidateCountIsDynamicAndSupportsMoreThanTwoCandidates() {
+    var q1 = createQuestion(readingId, 1, QuestionType.FACTUAL);
+    var q2 = createQuestion(readingId, 2, QuestionType.FACTUAL);
+    var q3 = createQuestion(readingId, 4, QuestionType.FACTUAL);
+    var q4 = createQuestion(readingId, 3, QuestionType.INFERENCE);
+    var q5 = createQuestion(readingId, 5, QuestionType.MAIN_IDEA);
+    var quiz = new ComprehensionQuiz(readingId, List.of(q1, q2, q3, q4, q5));
+
+    Set<UUID> chosenFactuals = new HashSet<>();
+    for (int i = 0; i < 100; i++) {
+      UUID randomSubId = UUID.randomUUID();
+      var selected = policy.select(quiz, userId, readingId, randomSubId, 2);
+      chosenFactuals.add(selected.get(0).id());
+    }
+
+    assertThat(chosenFactuals).containsExactlyInAnyOrder(q1.id(), q2.id(), q3.id());
+  }
 }

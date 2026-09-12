@@ -84,7 +84,7 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
     int requestedVersion =
         (command.selectionVersion() != null)
             ? command.selectionVersion()
-            : ComprehensionQuizSelectionPolicy.CURRENT_SELECTION_VERSION;
+            : ComprehensionQuizSelectionPolicy.SELECTION_VERSION_1;
 
     var reading =
         readings

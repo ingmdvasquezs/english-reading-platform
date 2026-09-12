@@ -166,7 +166,7 @@ class GetReadingComprehensionQuizUseCaseTest {
 
     assertThat(result.available()).isTrue();
     assertThat(result.readingId()).isEqualTo(readingId);
-    assertThat(result.selectionVersion()).isEqualTo(1);
+    assertThat(result.selectionVersion()).isEqualTo(2);
     assertThat(result.questions()).hasSize(3);
     assertThat(result.questions().get(0).ordinal()).isEqualTo(1);
     assertThat(result.questions().get(1).ordinal()).isEqualTo(2);
