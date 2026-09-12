@@ -56,6 +56,25 @@ public record UserVocabulary(
     }
   }
 
+  public static UserVocabulary createInitial(
+      User user, Word word, VocabularyStatus status, Clock clock) {
+    Objects.requireNonNull(user, "User must not be null");
+    Objects.requireNonNull(word, "Word must not be null");
+    Objects.requireNonNull(status, "Vocabulary status must not be null");
+    Objects.requireNonNull(clock, "Clock must not be null");
+    var nowUtc = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+    int reviewStage = (status == VocabularyStatus.KNOWN) ? 3 : 0;
+    LocalDateTime nextReview =
+        switch (status) {
+          case LEARNING -> nowUtc;
+          case KNOWN -> nowUtc.plusDays(14);
+          case NEW, IGNORED -> null;
+        };
+    var learnedAt = status == VocabularyStatus.KNOWN ? nowUtc : null;
+    return new UserVocabulary(
+        null, user, word, status, nowUtc, learnedAt, null, reviewStage, null, nextReview);
+  }
+
   public UserVocabulary changeStatus(VocabularyStatus newStatus, Clock clock) {
     Objects.requireNonNull(newStatus, "Vocabulary status must not be null");
     Objects.requireNonNull(clock, "Clock must not be null");

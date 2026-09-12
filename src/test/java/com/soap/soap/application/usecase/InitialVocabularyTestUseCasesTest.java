@@ -29,6 +29,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,6 +37,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -99,6 +101,9 @@ class InitialVocabularyTestUseCasesTest {
     when(vocabulary.findByUserIdAndWordIds(eq(userId), any())).thenReturn(Map.of());
     when(users.markOnboardingCompleted(userId)).thenReturn(true);
 
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Collection<UserVocabulary>> captor = ArgumentCaptor.forClass(Collection.class);
+
     var result =
         useCase()
             .completeInitialVocabularyTest(
@@ -106,14 +111,97 @@ class InitialVocabularyTestUseCasesTest {
                 minimumClassifications(
                     classification("Hello", VocabularyStatus.NEW),
                     classification("bright", VocabularyStatus.LEARNING),
-                    classification("world", VocabularyStatus.KNOWN)));
+                    classification("world", VocabularyStatus.KNOWN),
+                    classification("alpha", VocabularyStatus.IGNORED)));
 
     assertThat(result.confirmedWordCount()).isEqualTo(10);
     assertThat(result.knownWords()).containsExactly("world");
-    verify(vocabulary).saveAll(any());
+    verify(vocabulary).saveAll(captor.capture());
+    Collection<UserVocabulary> saved = captor.getValue();
+    var byWord =
+        saved.stream()
+            .collect(
+                java.util.stream.Collectors.toMap(uv -> uv.word().normalizedValue(), uv -> uv));
+
+    var nowUtc = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+
+    // 1. KNOWN: stage 3, +14d, learnedAt = nowUtc, lastReviewedAt null
+    var knownEntry = byWord.get("world");
+    assertThat(knownEntry.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(knownEntry.reviewStage()).isEqualTo(3);
+    assertThat(knownEntry.learnedAt()).isEqualTo(nowUtc);
+    assertThat(knownEntry.lastReviewedAt()).isNull();
+    assertThat(knownEntry.nextReviewAt()).isEqualTo(nowUtc.plusDays(14));
+
+    // 2. LEARNING: stage 0, nowUtc (due immediately), learnedAt null, lastReviewedAt null
+    var learningEntry = byWord.get("bright");
+    assertThat(learningEntry.status()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(learningEntry.reviewStage()).isEqualTo(0);
+    assertThat(learningEntry.learnedAt()).isNull();
+    assertThat(learningEntry.lastReviewedAt()).isNull();
+    assertThat(learningEntry.nextReviewAt()).isEqualTo(nowUtc);
+
+    // 3. NEW: stage 0, nextReviewAt null, learnedAt null, lastReviewedAt null
+    var newEntry = byWord.get("hello");
+    assertThat(newEntry.status()).isEqualTo(VocabularyStatus.NEW);
+    assertThat(newEntry.reviewStage()).isEqualTo(0);
+    assertThat(newEntry.learnedAt()).isNull();
+    assertThat(newEntry.lastReviewedAt()).isNull();
+    assertThat(newEntry.nextReviewAt()).isNull();
+
+    // 4. IGNORED: stage 0, nextReviewAt null, learnedAt null, lastReviewedAt null
+    var ignoredEntry = byWord.get("alpha");
+    assertThat(ignoredEntry.status()).isEqualTo(VocabularyStatus.IGNORED);
+    assertThat(ignoredEntry.reviewStage()).isEqualTo(0);
+    assertThat(ignoredEntry.learnedAt()).isNull();
+    assertThat(ignoredEntry.lastReviewedAt()).isNull();
+    assertThat(ignoredEntry.nextReviewAt()).isNull();
+
     verify(vocabulary, never()).findByUserIdAndWordId(any(), any());
     verify(words).resolveAll(any(), eq("en"));
     verify(users).markOnboardingCompleted(userId);
+  }
+
+  @Test
+  void existingEntryUsesChangeStatusPreservingStageWhenTransitioningToKnown() {
+    var hello = new Word(UUID.randomUUID(), "hello", "en");
+    var existingStage4 =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            hello,
+            VocabularyStatus.LEARNING,
+            LocalDateTime.now(clock).minusDays(20),
+            null,
+            0L,
+            4,
+            LocalDateTime.now(clock).minusDays(2),
+            LocalDateTime.now(clock));
+    prepareCompletion();
+    stubResolvedWords(Map.of("hello", hello));
+    when(vocabulary.findByUserIdAndWordIds(eq(userId), any()))
+        .thenReturn(Map.of(hello.id(), existingStage4));
+    when(users.markOnboardingCompleted(userId)).thenReturn(true);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Collection<UserVocabulary>> captor = ArgumentCaptor.forClass(Collection.class);
+
+    useCase()
+        .completeInitialVocabularyTest(
+            "v1", minimumClassifications(classification("hello", VocabularyStatus.KNOWN)));
+
+    verify(vocabulary).saveAll(captor.capture());
+    Collection<UserVocabulary> saved = captor.getValue();
+    var helloEntry =
+        saved.stream()
+            .filter(uv -> uv.word().normalizedValue().equals("hello"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(helloEntry.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(helloEntry.reviewStage()).isEqualTo(4);
+    assertThat(helloEntry.nextReviewAt())
+        .isEqualTo(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC).plusDays(30));
+    assertThat(helloEntry.lastReviewedAt()).isEqualTo(LocalDateTime.now(clock).minusDays(2));
   }
 
   @Test

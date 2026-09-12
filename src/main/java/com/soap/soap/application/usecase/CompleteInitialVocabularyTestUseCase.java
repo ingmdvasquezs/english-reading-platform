@@ -16,7 +16,6 @@ import com.soap.soap.application.service.WordResolver;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
 import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.Collection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -92,7 +91,6 @@ public class CompleteInitialVocabularyTestUseCase implements CompleteInitialVoca
             userId, resolvedWords.values().stream().map(word -> word.id()).toList());
     var known = new java.util.ArrayList<String>();
     var changes = new java.util.ArrayList<UserVocabulary>();
-    var now = LocalDateTime.now(clock);
     for (var classificationEntry : normalizedClassifications.entrySet()) {
       var value = classificationEntry.getKey();
       var status = classificationEntry.getValue();
@@ -107,8 +105,7 @@ public class CompleteInitialVocabularyTestUseCase implements CompleteInitialVoca
       var vocabularyEntry =
           existing != null
               ? existing.changeStatus(status, clock)
-              : new UserVocabulary(
-                  null, user, word, status, now, status == VocabularyStatus.KNOWN ? now : null);
+              : UserVocabulary.createInitial(user, word, status, clock);
       changes.add(vocabularyEntry);
       if (status == VocabularyStatus.KNOWN) {
         known.add(value);

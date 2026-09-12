@@ -643,15 +643,8 @@ class SoapApplicationTests {
                 + "</testId>"
                 + classificationsXml(
                     List.of(
-                        "work",
-                        "daniel",
-                        "english",
-                        "obstacle",
-                        "morning",
-                        "always",
-                        "wanted",
-                        "speak",
-                        "well"),
+                        "work", "elena", "autumn", "market", "morning", "bread", "bakery", "train",
+                        "library"),
                     "NEW")
                 + "<classifications><word>not-in-the-test</word><status>NEW</status>"
                 + "</classifications>"
@@ -666,11 +659,11 @@ class SoapApplicationTests {
                 + initialVocabularyTestSource.load().testId()
                 + "</testId>"
                 + "<classifications><word>work</word><status>LEARNING</status></classifications>"
-                + "<classifications><word>Daniel</word><status>NEW</status></classifications>"
-                + "<classifications><word>English</word><status>KNOWN</status></classifications>"
-                + "<classifications><word>obstacle</word><status>IGNORED</status></classifications>"
+                + "<classifications><word>Elena</word><status>NEW</status></classifications>"
+                + "<classifications><word>autumn</word><status>KNOWN</status></classifications>"
+                + "<classifications><word>market</word><status>IGNORED</status></classifications>"
                 + classificationsXml(
-                    List.of("morning", "always", "wanted", "speak", "well", "reading"), "NEW")
+                    List.of("morning", "bread", "bakery", "train", "library", "learning"), "NEW")
                 + "</completeInitialVocabularyTestRequest>");
     assertThat(postSoap(completion, before.accessToken()).statusCode()).isEqualTo(200);
 
@@ -680,13 +673,13 @@ class SoapApplicationTests {
             vocabulary.findStatusesByNormalizedValues(
                 completedUser.id(),
                 "en",
-                java.util.Set.of("work", "daniel", "english", "obstacle", "morning")))
+                java.util.Set.of("work", "elena", "autumn", "market", "morning")))
         .containsExactlyInAnyOrderEntriesOf(
             java.util.Map.of(
                 "work", VocabularyStatus.LEARNING,
-                "daniel", VocabularyStatus.NEW,
-                "english", VocabularyStatus.KNOWN,
-                "obstacle", VocabularyStatus.IGNORED,
+                "elena", VocabularyStatus.NEW,
+                "autumn", VocabularyStatus.KNOWN,
+                "market", VocabularyStatus.IGNORED,
                 "morning", VocabularyStatus.NEW));
     assertThat(users.findById(other.id()).orElseThrow().onboardingCompleted()).isFalse();
     assertThat(postSoap(completion, before.accessToken()).statusCode()).isEqualTo(500);
@@ -695,11 +688,11 @@ class SoapApplicationTests {
   @Test
   void migrationSeedsTheActiveOnboardingReadingAndSoapReturnsItsPersistedContent() {
     var persistedTest = initialVocabularyTestSource.load();
-    assertThat(persistedTest.testId()).isEqualTo("onboarding-reading-1-v1");
+    assertThat(persistedTest.testId()).isEqualTo("onboarding-reading-3-v3");
     assertThat(persistedTest.text())
-        .startsWith("Daniel had always wanted to speak English well.")
-        .contains("\n\nAfter several months")
-        .endsWith("ideas that were increasingly challenging.");
+        .startsWith("Elena arrived in the quiet harbor town on a rainy morning in early autumn")
+        .contains("\n\nWithin a month")
+        .endsWith("another opportunity to learn, observe, and belong.");
 
     authenticateUser();
     try {
