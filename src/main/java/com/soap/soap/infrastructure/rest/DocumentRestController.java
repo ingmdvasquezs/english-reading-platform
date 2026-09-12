@@ -5,6 +5,7 @@ import com.soap.soap.application.model.DocumentProgressView;
 import com.soap.soap.application.model.DocumentStructureView;
 import com.soap.soap.application.model.DocumentUnitReaderData;
 import com.soap.soap.application.model.DocumentView;
+import com.soap.soap.application.model.DocumentVocabularyCompatibilityView;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.DocumentAssetStoragePort;
@@ -13,6 +14,7 @@ import com.soap.soap.application.usecase.AcceptDocumentImportUseCase;
 import com.soap.soap.application.usecase.DeleteDocumentUseCase;
 import com.soap.soap.application.usecase.DocumentProgressUseCase;
 import com.soap.soap.application.usecase.DocumentQueryUseCase;
+import com.soap.soap.application.usecase.GetDocumentVocabularyCompatibilityUseCase;
 import com.soap.soap.domain.model.DocumentFormat;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,6 +42,7 @@ public class DocumentRestController {
   private final DocumentQueryUseCase queries;
   private final DocumentProgressUseCase progress;
   private final DeleteDocumentUseCase deletions;
+  private final GetDocumentVocabularyCompatibilityUseCase compatibility;
   private final CurrentUserPort currentUser;
   private final ImportedDocumentRepositoryPort documents;
   private final DocumentAssetStoragePort storage;
@@ -49,6 +52,7 @@ public class DocumentRestController {
       DocumentQueryUseCase queries,
       DocumentProgressUseCase progress,
       DeleteDocumentUseCase deletions,
+      GetDocumentVocabularyCompatibilityUseCase compatibility,
       CurrentUserPort currentUser,
       ImportedDocumentRepositoryPort documents,
       DocumentAssetStoragePort storage) {
@@ -56,6 +60,7 @@ public class DocumentRestController {
     this.queries = queries;
     this.progress = progress;
     this.deletions = deletions;
+    this.compatibility = compatibility;
     this.currentUser = currentUser;
     this.documents = documents;
     this.storage = storage;
@@ -99,6 +104,11 @@ public class DocumentRestController {
   public ResponseEntity<Void> delete(@PathVariable UUID documentId) {
     deletions.delete(documentId);
     return ResponseEntity.noContent().build();
+  }
+
+  @GetMapping("/{documentId}/compatibility")
+  public DocumentVocabularyCompatibilityResponse compatibility(@PathVariable UUID documentId) {
+    return DocumentVocabularyCompatibilityResponse.from(compatibility.getCompatibility(documentId));
   }
 
   @GetMapping("/{documentId}/structure")
@@ -322,6 +332,30 @@ public class DocumentRestController {
     static <T> PageResponse<T> from(PageResult<?> page, java.util.List<T> content) {
       return new PageResponse<>(
           content, page.page(), page.size(), page.totalElements(), page.totalPages());
+    }
+  }
+
+  public record DocumentVocabularyCompatibilityResponse(
+      UUID documentId,
+      int uniqueWords,
+      int knownWords,
+      int learningWords,
+      int explicitNewWords,
+      int ignoredWords,
+      int unclassifiedWords,
+      java.math.BigDecimal vocabularyFitPercentage,
+      java.math.BigDecimal classificationConfidencePercentage) {
+    static DocumentVocabularyCompatibilityResponse from(DocumentVocabularyCompatibilityView value) {
+      return new DocumentVocabularyCompatibilityResponse(
+          value.documentId(),
+          value.uniqueWords(),
+          value.knownWords(),
+          value.learningWords(),
+          value.explicitNewWords(),
+          value.ignoredWords(),
+          value.unclassifiedWords(),
+          value.vocabularyFitPercentage(),
+          value.classificationConfidencePercentage());
     }
   }
 }

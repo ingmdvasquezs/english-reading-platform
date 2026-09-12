@@ -10,6 +10,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface JpaImportedDocumentRepository extends JpaRepository<ImportedDocumentEntity, UUID> {
+  Optional<ImportedDocumentEntity> findByIdAndOwnerId(UUID id, UUID ownerId);
+
   Page<ImportedDocumentEntity> findByOwnerIdAndImportStatusInOrderByCreatedAtDesc(
       UUID ownerId, Set<DocumentImportStatus> statuses, Pageable pageable);
 

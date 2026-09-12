@@ -212,6 +212,25 @@ class UserVocabularyPersistenceIntegrationTest {
     assertThat(summary.ignoredCount()).isEqualTo(0L);
   }
 
+  @Test
+  void findStatusesByUserAndLanguageReturnsStatusesAndPreservesPrecedence() {
+    var now = LocalDateTime.now();
+    createEntry(userA, "harbor", "en", VocabularyStatus.KNOWN, now);
+    createEntry(userA, "sunrise", "en", VocabularyStatus.LEARNING, now);
+    createEntry(userA, "castle", "es", VocabularyStatus.NEW, now); // different language
+    createEntry(userB, "secret", "en", VocabularyStatus.IGNORED, now); // different user
+
+    var statusesA = vocabulary.findStatusesByUserAndLanguage(userA.id(), "en");
+    assertThat(statusesA).containsEntry("harbor", VocabularyStatus.KNOWN);
+    assertThat(statusesA).containsEntry("sunrise", VocabularyStatus.LEARNING);
+    assertThat(statusesA).doesNotContainKey("castle"); // Spanish excluded
+    assertThat(statusesA).doesNotContainKey("secret"); // User B excluded
+
+    var statusesEs = vocabulary.findStatusesByUserAndLanguage(userA.id(), "es");
+    assertThat(statusesEs).containsEntry("castle", VocabularyStatus.NEW);
+    assertThat(statusesEs).doesNotContainKey("harbor");
+  }
+
   private void createEntry(
       User user, String wordValue, String language, VocabularyStatus status, LocalDateTime seenAt) {
     var word = words.resolve(wordValue, language);

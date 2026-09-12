@@ -98,6 +98,21 @@ public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositor
 
   @Override
   @Transactional(readOnly = true)
+  public Map<String, VocabularyStatus> findStatusesByUserAndLanguage(UUID userId, String language) {
+    var canonical = languages.normalize(language);
+    var result = new java.util.LinkedHashMap<String, VocabularyStatus>();
+    repository
+        .findStatusesByUserAndLanguages(userId, languages.equivalentLanguages(canonical))
+        .stream()
+        .sorted(
+            java.util.Comparator.comparingInt(
+                entry -> entry.getLanguage().equalsIgnoreCase(canonical) ? 0 : 1))
+        .forEach(entry -> result.putIfAbsent(entry.getNormalizedValue(), entry.getStatus()));
+    return Map.copyOf(result);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public Map<UUID, UserVocabulary> findByUserIdAndWordIds(UUID userId, Collection<UUID> wordIds) {
     if (wordIds.isEmpty()) {
       return Map.of();

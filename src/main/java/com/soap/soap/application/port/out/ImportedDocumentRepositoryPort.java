@@ -17,6 +17,8 @@ public interface ImportedDocumentRepositoryPort {
 
   Optional<ImportedDocument> findDocumentById(UUID documentId);
 
+  Optional<ImportedDocument> findDocumentByIdAndOwnerId(UUID documentId, UUID ownerId);
+
   Optional<ImportedDocument> findByOwnerAndSourceSha256AndStatusIn(
       UUID ownerId, String sourceSha256, Set<DocumentImportStatus> statuses);
 

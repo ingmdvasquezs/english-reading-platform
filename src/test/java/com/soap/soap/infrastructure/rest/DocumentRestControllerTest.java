@@ -20,6 +20,7 @@ import com.soap.soap.application.usecase.AcceptDocumentImportUseCase;
 import com.soap.soap.application.usecase.DeleteDocumentUseCase;
 import com.soap.soap.application.usecase.DocumentProgressUseCase;
 import com.soap.soap.application.usecase.DocumentQueryUseCase;
+import com.soap.soap.application.usecase.GetDocumentVocabularyCompatibilityUseCase;
 import com.soap.soap.domain.model.DocumentFormat;
 import com.soap.soap.domain.model.DocumentImportStatus;
 import com.soap.soap.domain.model.ImportedDocument;
@@ -42,6 +43,7 @@ class DocumentRestControllerTest {
   @Mock DocumentQueryUseCase queries;
   @Mock DocumentProgressUseCase progress;
   @Mock DeleteDocumentUseCase deletions;
+  @Mock GetDocumentVocabularyCompatibilityUseCase compatibility;
   @Mock CurrentUserPort currentUser;
   @Mock ImportedDocumentRepositoryPort documents;
   @Mock DocumentAssetStoragePort storage;
@@ -52,7 +54,14 @@ class DocumentRestControllerTest {
     mvc =
         MockMvcBuilders.standaloneSetup(
                 new DocumentRestController(
-                    imports, queries, progress, deletions, currentUser, documents, storage))
+                    imports,
+                    queries,
+                    progress,
+                    deletions,
+                    compatibility,
+                    currentUser,
+                    documents,
+                    storage))
             .setControllerAdvice(new RestExceptionHandler())
             .build();
   }
@@ -270,6 +279,57 @@ class DocumentRestControllerTest {
             jsonPath("$.tokens[0].vocabularyStatus").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.tokens[1].value").value("market"))
         .andExpect(jsonPath("$.tokens[1].vocabularyStatus").value("NEW"));
+  }
+
+  @Test
+  void compatibilityReturnsOkAndExpectedContract() throws Exception {
+    var documentId = UUID.randomUUID();
+    var view =
+        new com.soap.soap.application.model.DocumentVocabularyCompatibilityView(
+            documentId,
+            120,
+            80,
+            15,
+            5,
+            2,
+            20,
+            new java.math.BigDecimal("76.50"),
+            new java.math.BigDecimal("83.33"));
+    when(compatibility.getCompatibility(documentId)).thenReturn(view);
+
+    mvc.perform(get("/api/v1/documents/{id}/compatibility", documentId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.documentId").value(documentId.toString()))
+        .andExpect(jsonPath("$.uniqueWords").value(120))
+        .andExpect(jsonPath("$.knownWords").value(80))
+        .andExpect(jsonPath("$.learningWords").value(15))
+        .andExpect(jsonPath("$.explicitNewWords").value(5))
+        .andExpect(jsonPath("$.ignoredWords").value(2))
+        .andExpect(jsonPath("$.unclassifiedWords").value(20))
+        .andExpect(jsonPath("$.vocabularyFitPercentage").value(76.50))
+        .andExpect(jsonPath("$.classificationConfidencePercentage").value(83.33));
+  }
+
+  @Test
+  void compatibilityWhenNotFoundReturns404() throws Exception {
+    var documentId = UUID.randomUUID();
+    when(compatibility.getCompatibility(documentId))
+        .thenThrow(new DocumentNotFoundException(documentId));
+
+    mvc.perform(get("/api/v1/documents/{id}/compatibility", documentId))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
+  }
+
+  @Test
+  void compatibilityWhenNotReadyReturns409() throws Exception {
+    var documentId = UUID.randomUUID();
+    when(compatibility.getCompatibility(documentId))
+        .thenThrow(new com.soap.soap.application.exception.DocumentNotReadyException());
+
+    mvc.perform(get("/api/v1/documents/{id}/compatibility", documentId))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_READY"));
   }
 
   private ImportedDocument document(UUID id, UUID ownerId, String coverKey) {

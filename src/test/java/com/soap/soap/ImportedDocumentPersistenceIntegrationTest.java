@@ -92,6 +92,8 @@ class ImportedDocumentPersistenceIntegrationTest {
   @Test
   void savesLoadsAndNavigatesDocumentStructureInStableOrder() {
     assertThat(documents.findDocumentById(document.id())).contains(document);
+    assertThat(documents.findDocumentByIdAndOwnerId(document.id(), owner.id())).contains(document);
+    assertThat(documents.findDocumentByIdAndOwnerId(document.id(), UUID.randomUUID())).isEmpty();
     assertThat(documents.findSections(document.id()))
         .extracting(DocumentSection::ordinal)
         .containsExactly(1, 2);

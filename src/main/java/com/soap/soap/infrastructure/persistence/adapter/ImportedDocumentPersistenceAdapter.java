@@ -68,6 +68,12 @@ public class ImportedDocumentPersistenceAdapter implements ImportedDocumentRepos
 
   @Override
   @Transactional(readOnly = true)
+  public Optional<ImportedDocument> findDocumentByIdAndOwnerId(UUID documentId, UUID ownerId) {
+    return documents.findByIdAndOwnerId(documentId, ownerId).map(documentMapper::toDomain);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public Optional<ImportedDocument> findByOwnerAndSourceSha256AndStatusIn(
       UUID ownerId, String sourceSha256, java.util.Set<DocumentImportStatus> statuses) {
     return documents

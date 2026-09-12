@@ -24,6 +24,8 @@ public interface UserVocabularyRepositoryPort {
   Map<String, VocabularyStatus> findStatusesByNormalizedValues(
       UUID userId, String language, Collection<String> normalizedValues);
 
+  Map<String, VocabularyStatus> findStatusesByUserAndLanguage(UUID userId, String language);
+
   Map<UUID, UserVocabulary> findByUserIdAndWordIds(UUID userId, Collection<UUID> wordIds);
 
   UserVocabulary save(UserVocabulary vocabulary);
