@@ -80,6 +80,7 @@ class SubmitComprehensionAttemptUseCaseTest {
             quizRepository,
             attemptRepository,
             selectionPolicy,
+            new com.soap.soap.application.service.ReadingEditorialAccessPolicy(progress),
             clock);
 
     userId = UUID.randomUUID();
@@ -96,7 +97,8 @@ class SubmitComprehensionAttemptUseCaseTest {
             LocalDateTime.now(clock),
             ReadingOrigin.PLATFORM,
             EditorialLevel.B1,
-            "Education");
+            "Education",
+            com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
 
     q1Id = UUID.randomUUID();
     q1OptCorrect = UUID.randomUUID();

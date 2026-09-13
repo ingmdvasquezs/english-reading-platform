@@ -14,7 +14,37 @@ public record Reading(
     ReadingOrigin origin,
     EditorialLevel editorialLevel,
     String category,
-    String coverKey) {
+    String coverKey,
+    EditorialStatus editorialStatus) {
+
+  public Reading {
+    Objects.requireNonNull(origin, "Reading origin must not be null");
+    if (origin == ReadingOrigin.USER) {
+      if (user == null) {
+        throw new IllegalArgumentException("User reading must have an owner");
+      }
+      if (editorialLevel != null || category != null || editorialStatus != null) {
+        throw new IllegalArgumentException(
+            "User reading must not have platform metadata or editorial status");
+      }
+    }
+    if (origin == ReadingOrigin.PLATFORM) {
+      if (user != null) {
+        throw new IllegalArgumentException("Platform reading must not have an owner");
+      }
+      if (editorialLevel == null || category == null || category.isBlank()) {
+        throw new IllegalArgumentException("Platform reading must have editorial metadata");
+      }
+      if (editorialStatus == null) {
+        throw new IllegalArgumentException("Platform reading must have explicit editorial status");
+      }
+    }
+  }
+
+  public Reading(
+      UUID id, User user, String title, String content, String language, LocalDateTime createdAt) {
+    this(id, user, title, content, language, createdAt, ReadingOrigin.USER, null, null, null, null);
+  }
 
   public Reading(
       UUID id,
@@ -25,33 +55,23 @@ public record Reading(
       LocalDateTime createdAt,
       ReadingOrigin origin,
       EditorialLevel editorialLevel,
-      String category) {
-    this(id, user, title, content, language, createdAt, origin, editorialLevel, category, null);
-  }
-
-  public Reading(
-      UUID id, User user, String title, String content, String language, LocalDateTime createdAt) {
-    this(id, user, title, content, language, createdAt, ReadingOrigin.USER, null, null, null);
-  }
-
-  public Reading {
-    Objects.requireNonNull(origin, "Reading origin must not be null");
-    if (origin == ReadingOrigin.USER && user == null) {
-      throw new IllegalArgumentException("User reading must have an owner");
-    }
-    if (origin == ReadingOrigin.PLATFORM && user != null) {
-      throw new IllegalArgumentException("Platform reading must not have an owner");
-    }
-    if (origin == ReadingOrigin.PLATFORM
-        && (editorialLevel == null || category == null || category.isBlank())) {
-      throw new IllegalArgumentException("Platform reading must have editorial metadata");
-    }
-    if (origin == ReadingOrigin.USER && (editorialLevel != null || category != null)) {
-      throw new IllegalArgumentException("User reading must not have platform metadata");
-    }
+      String category,
+      EditorialStatus editorialStatus) {
+    this(
+        id,
+        user,
+        title,
+        content,
+        language,
+        createdAt,
+        origin,
+        editorialLevel,
+        category,
+        null,
+        editorialStatus);
   }
 
   public boolean isAccessibleBy(UUID userId) {
-    return origin == ReadingOrigin.PLATFORM || userId.equals(user.id());
+    return origin == ReadingOrigin.PLATFORM || (user != null && userId.equals(user.id()));
   }
 }

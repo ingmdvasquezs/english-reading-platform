@@ -20,6 +20,7 @@ public interface JpaReadingCollectionMembershipRepository
           join ReadingEntity r on r.id = membership.id.readingId
           where collection.key = :key and collection.active = true
             and r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
           order by membership.displayOrder, r.id
           """,
       countQuery =
@@ -30,6 +31,7 @@ public interface JpaReadingCollectionMembershipRepository
           join ReadingEntity r on r.id = membership.id.readingId
           where collection.key = :key and collection.active = true
             and r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
           """)
   Page<ReadingEntity> findReadingsByCollectionKey(@Param("key") String key, Pageable pageable);
 }

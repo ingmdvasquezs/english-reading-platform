@@ -26,9 +26,7 @@ public class ReadingCollectionPersistenceAdapter implements ReadingCollectionRep
   @Override
   @Transactional(readOnly = true)
   public List<ReadingCollection> findAllActive() {
-    return collections.findByActiveTrueOrderByDisplayOrderAscIdAsc().stream()
-        .map(mapper::toDomain)
-        .toList();
+    return collections.findActiveWithPublishedReadings().stream().map(mapper::toDomain).toList();
   }
 
   @Override

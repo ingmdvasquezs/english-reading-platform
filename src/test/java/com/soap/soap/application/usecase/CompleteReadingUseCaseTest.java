@@ -42,7 +42,13 @@ class CompleteReadingUseCaseTest {
   @BeforeEach
   void setUp() {
     userId = UUID.randomUUID();
-    useCase = new CompleteReadingUseCase(readings, progress, currentUser, CLOCK);
+    useCase =
+        new CompleteReadingUseCase(
+            readings,
+            progress,
+            new com.soap.soap.application.service.ReadingEditorialAccessPolicy(progress),
+            currentUser,
+            CLOCK);
   }
 
   @Test
@@ -72,7 +78,8 @@ class CompleteReadingUseCaseTest {
             null,
             ReadingOrigin.PLATFORM,
             EditorialLevel.A1,
-            "Test");
+            "Test",
+            com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
     when(currentUser.requireUserId()).thenReturn(userId);
     when(readings.findById(platform.id())).thenReturn(Optional.of(platform));
     when(progress.complete(userId, platform.id(), LocalDateTime.now(CLOCK)))

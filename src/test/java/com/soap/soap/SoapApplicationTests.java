@@ -283,7 +283,8 @@ class SoapApplicationTests {
                 now,
                 ReadingOrigin.PLATFORM,
                 com.soap.soap.domain.model.EditorialLevel.A2,
-                "Pedagogy"));
+                "Pedagogy",
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
     var tooEasy =
         readings.save(
             new Reading(
@@ -295,7 +296,8 @@ class SoapApplicationTests {
                 now.plusSeconds(1),
                 ReadingOrigin.PLATFORM,
                 com.soap.soap.domain.model.EditorialLevel.B1,
-                "Pedagogy"));
+                "Pedagogy",
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
     var tooDifficult =
         readings.save(
             new Reading(
@@ -307,7 +309,8 @@ class SoapApplicationTests {
                 now.plusSeconds(2),
                 ReadingOrigin.PLATFORM,
                 com.soap.soap.domain.model.EditorialLevel.B2,
-                "Pedagogy"));
+                "Pedagogy",
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
     entityManager.flush();
     lexicalIndexer.indexReading(ideal.id(), ideal.language(), ideal.content());
     lexicalIndexer.indexReading(tooEasy.id(), tooEasy.language(), tooEasy.content());
@@ -534,7 +537,8 @@ class SoapApplicationTests {
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.B1,
                 "Science",
-                "continue-cover"));
+                "continue-cover",
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
     var completed =
         readings.save(new Reading(null, user, "Completed", "Completed text", "en", now));
     readings.save(new Reading(null, user, "Not started", "Not started text", "en", now));

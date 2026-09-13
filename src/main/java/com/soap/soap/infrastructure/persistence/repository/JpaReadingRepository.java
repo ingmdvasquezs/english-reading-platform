@@ -60,12 +60,14 @@ public interface JpaReadingRepository extends JpaRepository<ReadingEntity, UUID>
                  r.createdAt as createdAt, r.coverKey as coverKey
           from ReadingEntity r
           where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
           order by r.createdAt desc, r.id
           """,
       countQuery =
           """
           select count(r) from ReadingEntity r
           where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
           """)
   Page<PlatformReadingSummaryView> findPlatformSummaries(Pageable pageable);
 
@@ -76,6 +78,7 @@ public interface JpaReadingRepository extends JpaRepository<ReadingEntity, UUID>
              r.createdAt as createdAt, r.coverKey as coverKey
       from ReadingEntity r
       where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+        and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
       order by r.createdAt desc, r.id
       """)
   List<PlatformReadingSummaryView> findAllPlatformSummaries();

@@ -147,6 +147,7 @@ class ReadingLexicalIndexerIntegrationTest {
         ReadingOrigin.PLATFORM,
         EditorialLevel.B1,
         "FICTION",
-        "cover-key");
+        "cover-key",
+        com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
   }
 }

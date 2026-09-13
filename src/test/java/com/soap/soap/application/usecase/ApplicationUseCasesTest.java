@@ -28,10 +28,12 @@ import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.port.out.WordRepositoryPort;
 import com.soap.soap.application.service.LanguageNormalizer;
 import com.soap.soap.application.service.ReadingAnalyzer;
+import com.soap.soap.application.service.ReadingEditorialAccessPolicy;
 import com.soap.soap.application.service.TextWordProcessor;
 import com.soap.soap.application.service.VocabularyCompatibilityCalculator;
 import com.soap.soap.application.service.WordResolver;
 import com.soap.soap.domain.model.EditorialLevel;
+import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.User;
@@ -67,11 +69,13 @@ class ApplicationUseCasesTest {
 
   private User user;
   private TextWordProcessor processor;
+  private ReadingEditorialAccessPolicy accessPolicy;
 
   @BeforeEach
   void setUp() {
     user = new User(UUID.randomUUID(), "Ada", "ada@example.com");
     processor = new TextWordProcessor();
+    accessPolicy = new ReadingEditorialAccessPolicy(progress);
     lenient().when(currentUser.requireUserId()).thenReturn(user.id());
   }
 
@@ -93,6 +97,7 @@ class ApplicationUseCasesTest {
     assertThat(result.user()).isEqualTo(user);
     assertThat(result.editorialLevel()).isNull();
     assertThat(result.category()).isNull();
+    assertThat(result.editorialStatus()).isNull();
   }
 
   @Test
@@ -202,7 +207,13 @@ class ApplicationUseCasesTest {
 
     var analysis =
         new AnalyzeReadingUseCase(
-                users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+                users,
+                readings,
+                vocabulary,
+                processor,
+                new ReadingAnalyzer(),
+                accessPolicy,
+                currentUser)
             .analyzeReading(reading.id());
 
     assertThat(analysis.totalTokens()).isEqualTo(3);
@@ -222,7 +233,13 @@ class ApplicationUseCasesTest {
     assertThatThrownBy(
             () ->
                 new AnalyzeReadingUseCase(
-                        users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+                        users,
+                        readings,
+                        vocabulary,
+                        processor,
+                        new ReadingAnalyzer(),
+                        accessPolicy,
+                        currentUser)
                     .analyzeReading(reading.id()))
         .isInstanceOf(ReadingNotFoundException.class);
     verify(vocabulary, never()).findStatusesByNormalizedValues(any(), any(), any());
@@ -240,7 +257,8 @@ class ApplicationUseCasesTest {
             LocalDateTime.now(),
             ReadingOrigin.PLATFORM,
             EditorialLevel.A2,
-            "Science");
+            "Science",
+            EditorialStatus.PUBLISHED);
     when(users.existsById(user.id())).thenReturn(true);
     when(readings.findById(reading.id())).thenReturn(Optional.of(reading));
     when(vocabulary.findStatusesByNormalizedValues(user.id(), "en", Set.of("hello", "world")))
@@ -248,7 +266,13 @@ class ApplicationUseCasesTest {
 
     var analysis =
         new AnalyzeReadingUseCase(
-                users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+                users,
+                readings,
+                vocabulary,
+                processor,
+                new ReadingAnalyzer(),
+                accessPolicy,
+                currentUser)
             .analyzeReading(reading.id());
 
     assertThat(analysis.knownWords()).isEqualTo(1);
@@ -297,7 +321,13 @@ class ApplicationUseCasesTest {
     assertThatThrownBy(
             () ->
                 new AnalyzeReadingUseCase(
-                        users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+                        users,
+                        readings,
+                        vocabulary,
+                        processor,
+                        new ReadingAnalyzer(),
+                        accessPolicy,
+                        currentUser)
                     .analyzeReading(UUID.randomUUID()))
         .isInstanceOf(UserNotFoundException.class);
     verify(users, never()).findById(any());
@@ -313,7 +343,13 @@ class ApplicationUseCasesTest {
 
     var analysis =
         new AnalyzeReadingUseCase(
-                users, readings, vocabulary, processor, new ReadingAnalyzer(), currentUser)
+                users,
+                readings,
+                vocabulary,
+                processor,
+                new ReadingAnalyzer(),
+                accessPolicy,
+                currentUser)
             .analyzeReading(reading.id());
 
     assertThat(analysis.words()).isEmpty();

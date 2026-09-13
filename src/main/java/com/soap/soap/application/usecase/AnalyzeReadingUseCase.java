@@ -9,6 +9,7 @@ import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.service.ReadingAnalyzer;
+import com.soap.soap.application.service.ReadingEditorialAccessPolicy;
 import com.soap.soap.application.service.TextWordProcessor;
 import com.soap.soap.domain.model.ReadingAnalysis;
 import java.util.Map;
@@ -25,6 +26,7 @@ public class AnalyzeReadingUseCase implements AnalyzeReadingPort {
   private final UserVocabularyRepositoryPort vocabulary;
   private final TextWordProcessor wordProcessor;
   private final ReadingAnalyzer analyzer;
+  private final ReadingEditorialAccessPolicy accessPolicy;
   private final CurrentUserPort currentUser;
 
   @Override
@@ -38,9 +40,7 @@ public class AnalyzeReadingUseCase implements AnalyzeReadingPort {
     }
     var reading =
         readings.findById(readingId).orElseThrow(() -> new ReadingNotFoundException(readingId));
-    if (!reading.isAccessibleBy(userId)) {
-      throw new ReadingNotFoundException(readingId);
-    }
+    accessPolicy.requireAccessible(reading, userId);
 
     var tokens = wordProcessor.tokenize(reading.content());
     var distinctValues =

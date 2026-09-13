@@ -5,6 +5,7 @@ import com.soap.soap.application.exception.ReadingNotFoundException;
 import com.soap.soap.application.port.in.GetReadingPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
+import com.soap.soap.application.service.ReadingEditorialAccessPolicy;
 import com.soap.soap.domain.model.Reading;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class GetReadingUseCase implements GetReadingPort {
   private final ReadingRepositoryPort readings;
+  private final ReadingEditorialAccessPolicy accessPolicy;
   private final CurrentUserPort currentUser;
 
   @Override
@@ -24,9 +26,9 @@ public class GetReadingUseCase implements GetReadingPort {
       throw new InvalidApplicationArgumentException("Reading id must not be null");
     }
     var userId = currentUser.requireUserId();
-    return readings
-        .findById(readingId)
-        .filter(reading -> reading.isAccessibleBy(userId))
-        .orElseThrow(() -> new ReadingNotFoundException(readingId));
+    var reading =
+        readings.findById(readingId).orElseThrow(() -> new ReadingNotFoundException(readingId));
+    accessPolicy.requireAccessible(reading, userId);
+    return reading;
   }
 }

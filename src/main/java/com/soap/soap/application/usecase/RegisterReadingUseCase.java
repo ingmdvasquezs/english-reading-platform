@@ -10,7 +10,6 @@ import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.service.LanguageNormalizer;
 import com.soap.soap.domain.model.Reading;
-import com.soap.soap.domain.model.ReadingOrigin;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -51,9 +50,6 @@ public class RegisterReadingUseCase implements RegisterReadingPort {
             command.title(),
             command.content(),
             languages.normalize(command.language()),
-            null,
-            ReadingOrigin.USER,
-            null,
             null));
   }
 }

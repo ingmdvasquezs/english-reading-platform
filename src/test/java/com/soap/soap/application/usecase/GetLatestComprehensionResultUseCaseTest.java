@@ -39,6 +39,7 @@ class GetLatestComprehensionResultUseCaseTest {
   @Mock private ReadingRepositoryPort readings;
   @Mock private ComprehensionQuizRepositoryPort quizRepository;
   @Mock private ComprehensionAttemptRepositoryPort attemptRepository;
+  @Mock private com.soap.soap.application.service.ReadingEditorialAccessPolicy accessPolicy;
 
   @InjectMocks private GetLatestComprehensionResultUseCase useCase;
 
@@ -60,7 +61,8 @@ class GetLatestComprehensionResultUseCaseTest {
             LocalDateTime.now(),
             ReadingOrigin.PLATFORM,
             EditorialLevel.B1,
-            "Education");
+            "Education",
+            com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
   }
 
   @Test

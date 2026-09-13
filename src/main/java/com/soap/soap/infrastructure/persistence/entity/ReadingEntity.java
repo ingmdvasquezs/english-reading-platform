@@ -1,6 +1,7 @@
 package com.soap.soap.infrastructure.persistence.entity;
 
 import com.soap.soap.domain.model.EditorialLevel;
+import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.ReadingOrigin;
 import jakarta.persistence.*;
 import java.util.UUID;
@@ -45,4 +46,8 @@ public class ReadingEntity extends CreatedAtEntity {
 
   @Column(name = "cover_key", length = 120)
   private String coverKey;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "editorial_status", length = 20)
+  private EditorialStatus editorialStatus;
 }

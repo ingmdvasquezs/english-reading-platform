@@ -60,7 +60,8 @@ class DeleteReadingUseCaseTest {
             null,
             ReadingOrigin.PLATFORM,
             EditorialLevel.A1,
-            "Test");
+            "Test",
+            com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
     when(readings.findById(foreign.id())).thenReturn(Optional.of(foreign));
     when(readings.findById(missing)).thenReturn(Optional.empty());
     when(readings.findById(platform.id())).thenReturn(Optional.of(platform));

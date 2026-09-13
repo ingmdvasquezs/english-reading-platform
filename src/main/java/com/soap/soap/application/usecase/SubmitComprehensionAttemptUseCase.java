@@ -15,6 +15,7 @@ import com.soap.soap.application.port.out.ComprehensionQuizRepositoryPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
+import com.soap.soap.application.service.ReadingEditorialAccessPolicy;
 import com.soap.soap.domain.model.ComprehensionOption;
 import com.soap.soap.domain.model.ComprehensionQuestion;
 import com.soap.soap.domain.model.ComprehensionQuiz;
@@ -50,6 +51,7 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
   private final ComprehensionQuizRepositoryPort quizRepository;
   private final ComprehensionAttemptRepositoryPort attemptRepository;
   private final ComprehensionQuizSelectionPolicy selectionPolicy;
+  private final ReadingEditorialAccessPolicy accessPolicy;
   private final Clock clock;
 
   @Override
@@ -89,15 +91,17 @@ public class SubmitComprehensionAttemptUseCase implements SubmitComprehensionAtt
     var reading =
         readings
             .findById(command.readingId())
-            .filter(candidate -> candidate.isAccessibleBy(userId))
             .orElseThrow(() -> new ReadingNotFoundException(command.readingId()));
 
     if (reading.origin() != ReadingOrigin.PLATFORM) {
+      accessPolicy.requireAccessible(reading, userId);
       throw new ComprehensionNotAvailableException(
           "Comprehension quiz is only available for platform readings");
     }
 
     var readingProgress = progress.findByUserIdAndReadingId(userId, command.readingId());
+    accessPolicy.requireAccessible(reading, userId, readingProgress.isPresent());
+
     if (readingProgress.isEmpty()
         || readingProgress.get().status() != ReadingProgressStatus.COMPLETED) {
       throw new ComprehensionNotAvailableException(

@@ -178,7 +178,8 @@ class CollectionUseCasesTest {
         LocalDateTime.parse("2026-09-01T08:00:00"),
         ReadingOrigin.PLATFORM,
         EditorialLevel.A1,
-        "Daily Life");
+        "Daily Life",
+        com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
   }
 
   private ReadingCollection collection(String key, int order, String coverKey) {

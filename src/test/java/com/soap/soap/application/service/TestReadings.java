@@ -1,6 +1,7 @@
 package com.soap.soap.application.service;
 
 import com.soap.soap.domain.model.EditorialLevel;
+import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingOrigin;
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ final class TestReadings {
         LocalDateTime.parse("2026-09-10T10:00:00"),
         ReadingOrigin.PLATFORM,
         EditorialLevel.A1,
-        "Test");
+        "Test",
+        EditorialStatus.PUBLISHED);
   }
 }

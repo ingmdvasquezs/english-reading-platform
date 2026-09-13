@@ -66,6 +66,7 @@ class GetReadingReaderDataUseCaseTest {
             readings,
             progress,
             new ReaderContentPreparer(new ReaderTextTokenizer(new TextWordProcessor()), vocabulary),
+            new com.soap.soap.application.service.ReadingEditorialAccessPolicy(progress),
             currentUser,
             CLOCK);
   }
@@ -168,7 +169,8 @@ class GetReadingReaderDataUseCaseTest {
             LocalDateTime.now(),
             ReadingOrigin.PLATFORM,
             EditorialLevel.B1,
-            "Science");
+            "Science",
+            com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
     when(currentUser.requireUserId()).thenReturn(userId);
     when(readings.findById(reading.id())).thenReturn(Optional.of(reading));
     when(vocabulary.findStatusesByNormalizedValues(userId, "en", Set.of("hello", "world")))
@@ -221,7 +223,8 @@ class GetReadingReaderDataUseCaseTest {
             LocalDateTime.now(),
             ReadingOrigin.PLATFORM,
             EditorialLevel.A2,
-            "Education");
+            "Education",
+            com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
     when(currentUser.requireUserId()).thenReturn(userId, otherUserId);
     when(readings.findById(reading.id())).thenReturn(Optional.of(reading));
     when(vocabulary.findStatusesByNormalizedValues(userId, "en", Set.of("learning")))

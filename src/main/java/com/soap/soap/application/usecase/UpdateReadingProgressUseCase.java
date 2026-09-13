@@ -7,6 +7,7 @@ import com.soap.soap.application.port.in.UpdateReadingProgressPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
+import com.soap.soap.application.service.ReadingEditorialAccessPolicy;
 import com.soap.soap.domain.model.ReadingProgress;
 import com.soap.soap.domain.model.ReadingProgressStatus;
 import java.time.Clock;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UpdateReadingProgressUseCase implements UpdateReadingProgressPort {
   private final ReadingRepositoryPort readings;
   private final ReadingProgressRepositoryPort progress;
+  private final ReadingEditorialAccessPolicy accessPolicy;
   private final CurrentUserPort currentUser;
   private final Clock clock;
 
@@ -28,10 +30,11 @@ public class UpdateReadingProgressUseCase implements UpdateReadingProgressPort {
   public ReadingProgress updateReadingProgress(UpdateReadingProgressCommand command) {
     validate(command);
     var userId = currentUser.requireUserId();
-    readings
-        .findById(command.readingId())
-        .filter(reading -> reading.isAccessibleBy(userId))
-        .orElseThrow(() -> new ReadingNotFoundException(command.readingId()));
+    var reading =
+        readings
+            .findById(command.readingId())
+            .orElseThrow(() -> new ReadingNotFoundException(command.readingId()));
+    accessPolicy.requireAccessible(reading, userId);
 
     var now = LocalDateTime.now(clock);
     var updated =

@@ -9,6 +9,7 @@ import com.soap.soap.application.port.out.ComprehensionAttemptRepositoryPort;
 import com.soap.soap.application.port.out.ComprehensionQuizRepositoryPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
+import com.soap.soap.application.service.ReadingEditorialAccessPolicy;
 import com.soap.soap.domain.model.ReadingOrigin;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class GetLatestComprehensionResultUseCase implements GetLatestComprehensi
   private final ReadingRepositoryPort readings;
   private final ComprehensionQuizRepositoryPort quizRepository;
   private final ComprehensionAttemptRepositoryPort attemptRepository;
+  private final ReadingEditorialAccessPolicy accessPolicy;
 
   @Override
   @Transactional(readOnly = true)
@@ -31,10 +33,8 @@ public class GetLatestComprehensionResultUseCase implements GetLatestComprehensi
     }
     var userId = currentUser.requireUserId();
     var reading =
-        readings
-            .findById(readingId)
-            .filter(candidate -> candidate.isAccessibleBy(userId))
-            .orElseThrow(() -> new ReadingNotFoundException(readingId));
+        readings.findById(readingId).orElseThrow(() -> new ReadingNotFoundException(readingId));
+    accessPolicy.requireAccessible(reading, userId);
 
     if (reading.origin() != ReadingOrigin.PLATFORM) {
       throw new ComprehensionNotAvailableException(

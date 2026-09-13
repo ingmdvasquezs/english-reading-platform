@@ -103,7 +103,8 @@ class ReadingWordFrequencyPersistenceAdapterIntegrationTest {
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A1,
                 "NATURE",
-                "cover-sky"));
+                "cover-sky",
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
 
     indexer.indexReading(reading.id(), "en", reading.content());
 
@@ -216,7 +217,8 @@ class ReadingWordFrequencyPersistenceAdapterIntegrationTest {
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A1,
                 "CULTURE",
-                "cover-tie"));
+                "cover-tie",
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
 
     indexer.indexReading(reading.id(), "en", reading.content());
 

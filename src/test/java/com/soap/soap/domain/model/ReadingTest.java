@@ -15,7 +15,17 @@ class ReadingTest {
     assertThatThrownBy(
             () ->
                 new Reading(
-                    null, null, "Title", "Content", "en", null, ReadingOrigin.USER, null, null))
+                    null,
+                    null,
+                    "Title",
+                    "Content",
+                    "en",
+                    null,
+                    ReadingOrigin.USER,
+                    null,
+                    null,
+                    null,
+                    null))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("owner");
     assertThatThrownBy(
@@ -29,13 +39,31 @@ class ReadingTest {
                     null,
                     ReadingOrigin.USER,
                     EditorialLevel.A1,
-                    "Daily Life"))
+                    "Daily Life",
+                    null,
+                    null))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("platform metadata");
+    assertThatThrownBy(
+            () ->
+                new Reading(
+                    null,
+                    owner,
+                    "Title",
+                    "Content",
+                    "en",
+                    null,
+                    ReadingOrigin.USER,
+                    null,
+                    null,
+                    null,
+                    EditorialStatus.PUBLISHED))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("editorial status");
   }
 
   @Test
-  void platformReadingRequiresMetadataAndRejectsAFakeOwner() {
+  void platformReadingRequiresMetadataAndExplicitEditorialStatus() {
     assertThatThrownBy(
             () ->
                 new Reading(
@@ -47,15 +75,42 @@ class ReadingTest {
                     null,
                     ReadingOrigin.PLATFORM,
                     EditorialLevel.A1,
-                    "Daily Life"))
+                    "Daily Life",
+                    EditorialStatus.PUBLISHED))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("must not have an owner");
     assertThatThrownBy(
             () ->
                 new Reading(
-                    null, null, "Title", "Content", "en", null, ReadingOrigin.PLATFORM, null, null))
+                    null,
+                    null,
+                    "Title",
+                    "Content",
+                    "en",
+                    null,
+                    ReadingOrigin.PLATFORM,
+                    null,
+                    null,
+                    null,
+                    EditorialStatus.PUBLISHED))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("editorial metadata");
+    assertThatThrownBy(
+            () ->
+                new Reading(
+                    null,
+                    null,
+                    "Title",
+                    "Content",
+                    "en",
+                    null,
+                    ReadingOrigin.PLATFORM,
+                    EditorialLevel.A1,
+                    "Daily Life",
+                    null,
+                    null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("explicit editorial status");
   }
 
   @Test
@@ -70,7 +125,8 @@ class ReadingTest {
             LocalDateTime.now(),
             ReadingOrigin.PLATFORM,
             EditorialLevel.B1,
-            "Science");
+            "Science",
+            EditorialStatus.PUBLISHED);
     var userReading = new Reading(null, owner, "User", "Content", "en", null);
 
     assertThat(platform.isAccessibleBy(UUID.randomUUID())).isTrue();
@@ -91,7 +147,8 @@ class ReadingTest {
             ReadingOrigin.PLATFORM,
             EditorialLevel.B1,
             "Science",
-            "platform-cover");
+            "platform-cover",
+            EditorialStatus.PUBLISHED);
     var userReading = new Reading(null, owner, "User", "Content", "en", null);
 
     assertThat(platform.coverKey()).isEqualTo("platform-cover");

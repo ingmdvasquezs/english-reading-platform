@@ -35,7 +35,11 @@ public interface JpaReadingProgressRepository extends JpaRepository<ReadingProgr
           from ReadingProgressEntity p
           where p.user.id = :userId
             and p.status = com.soap.soap.domain.model.ReadingProgressStatus.IN_PROGRESS
-            and (p.reading.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and ((p.reading.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+                  and p.reading.editorialStatus in (
+                      com.soap.soap.domain.model.EditorialStatus.PUBLISHED,
+                      com.soap.soap.domain.model.EditorialStatus.ARCHIVED
+                  ))
                  or p.reading.user.id = :userId)
           order by p.startedAt desc, p.reading.id asc
           """,
@@ -45,7 +49,11 @@ public interface JpaReadingProgressRepository extends JpaRepository<ReadingProgr
           from ReadingProgressEntity p
           where p.user.id = :userId
             and p.status = com.soap.soap.domain.model.ReadingProgressStatus.IN_PROGRESS
-            and (p.reading.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and ((p.reading.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+                  and p.reading.editorialStatus in (
+                      com.soap.soap.domain.model.EditorialStatus.PUBLISHED,
+                      com.soap.soap.domain.model.EditorialStatus.ARCHIVED
+                  ))
                  or p.reading.user.id = :userId)
           """)
   Page<ContinueReadingView> findInProgressReadings(@Param("userId") UUID userId, Pageable pageable);

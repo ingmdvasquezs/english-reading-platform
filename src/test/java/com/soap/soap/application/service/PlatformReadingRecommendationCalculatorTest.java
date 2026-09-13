@@ -3,6 +3,7 @@ package com.soap.soap.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.soap.soap.domain.model.EditorialLevel;
+import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.VocabularyStatus;
@@ -87,6 +88,7 @@ class PlatformReadingRecommendationCalculatorTest {
         LocalDateTime.parse("2026-08-29T12:00:00"),
         ReadingOrigin.PLATFORM,
         EditorialLevel.A1,
-        "Test");
+        "Test",
+        EditorialStatus.PUBLISHED);
   }
 }

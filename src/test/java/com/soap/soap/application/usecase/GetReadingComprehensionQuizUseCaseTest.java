@@ -40,6 +40,7 @@ class GetReadingComprehensionQuizUseCaseTest {
   @Mock private ReadingRepositoryPort readings;
   @Mock private ReadingProgressRepositoryPort progress;
   @Mock private ComprehensionQuizRepositoryPort quizRepository;
+  @Mock private com.soap.soap.application.service.ReadingEditorialAccessPolicy accessPolicy;
 
   @org.mockito.Spy
   private ComprehensionQuizSelectionPolicy selectionPolicy = new ComprehensionQuizSelectionPolicy();
@@ -64,7 +65,8 @@ class GetReadingComprehensionQuizUseCaseTest {
             LocalDateTime.now(),
             ReadingOrigin.PLATFORM,
             EditorialLevel.B1,
-            "Education");
+            "Education",
+            com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
   }
 
   private List<ComprehensionOption> createOptions(UUID qId) {

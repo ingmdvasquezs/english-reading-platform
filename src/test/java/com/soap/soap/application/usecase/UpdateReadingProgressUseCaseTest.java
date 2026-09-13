@@ -50,7 +50,13 @@ class UpdateReadingProgressUseCaseTest {
             "Text",
             "en",
             null);
-    useCase = new UpdateReadingProgressUseCase(readings, progress, currentUser, CLOCK);
+    useCase =
+        new UpdateReadingProgressUseCase(
+            readings,
+            progress,
+            new com.soap.soap.application.service.ReadingEditorialAccessPolicy(progress),
+            currentUser,
+            CLOCK);
   }
 
   @Test
