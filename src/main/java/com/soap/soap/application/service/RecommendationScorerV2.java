@@ -1,5 +1,6 @@
 package com.soap.soap.application.service;
 
+import com.soap.soap.application.model.ReadingLexicalEvidence;
 import com.soap.soap.application.model.RecommendationEvidenceV2;
 import com.soap.soap.application.model.RecommendationScoreV2;
 import com.soap.soap.domain.model.EditorialLevel;
@@ -9,76 +10,176 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class RecommendationScorerV2 {
-  static final BigDecimal KNOWN_TOKEN_WEIGHT = new BigDecimal("0.50");
-  static final BigDecimal LEARNING_REINFORCEMENT_WEIGHT = new BigDecimal("0.30");
-  static final BigDecimal LEXICAL_ACCESSIBILITY_WEIGHT = new BigDecimal("0.20");
-  static final BigDecimal TARGET_LEARNING_PERCENTAGE = new BigDecimal("15");
-  static final BigDecimal EXPLICIT_NEW_RISK_WEIGHT = BigDecimal.ONE;
-  private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+  public static final BigDecimal MIN_COMFORT_TARGET = new BigDecimal("95");
+  public static final BigDecimal TARGET_LEARNING_PERCENTAGE = new BigDecimal("15");
+  public static final BigDecimal SOFT_CHALLENGE_LIMIT = new BigDecimal("30");
+  public static final BigDecimal EXCESS_PENALTY_MULTIPLIER = new BigDecimal("1.50");
+  public static final BigDecimal COMFORT_WEIGHT = new BigDecimal("0.70");
+  public static final BigDecimal REINFORCEMENT_WEIGHT = new BigDecimal("0.30");
+  public static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+
+  public RecommendationScoreV2 score(
+      ReadingLexicalEvidence evidence, EditorialLevel editorialLevel, boolean isGlobalColdStart) {
+    if (evidence == null) {
+      return insufficientEvidenceScore(editorialLevel, 0, 0);
+    }
+    return calculateScore(
+        evidence.totalTokens(),
+        evidence.knownTokens(),
+        evidence.learningTokens(),
+        evidence.ignoredTokens(),
+        evidence.totalUnique(),
+        evidence.knownUnique(),
+        evidence.learningUnique(),
+        evidence.explicitNewUnique(),
+        evidence.ignoredUnique(),
+        evidence.unclassifiedUnique(),
+        editorialLevel,
+        isGlobalColdStart);
+  }
+
+  public RecommendationScoreV2 score(
+      ReadingLexicalEvidence evidence, EditorialLevel editorialLevel) {
+    return score(evidence, editorialLevel, false);
+  }
+
+  public RecommendationScoreV2 score(
+      RecommendationEvidenceV2 evidence, EditorialLevel editorialLevel, boolean isGlobalColdStart) {
+    if (evidence == null) {
+      return insufficientEvidenceScore(editorialLevel, 0, 0);
+    }
+    return calculateScore(
+        evidence.totalTokens(),
+        evidence.knownTokens(),
+        evidence.learningTokens(),
+        evidence.ignoredTokens(),
+        evidence.uniqueWords(),
+        evidence.knownUniqueWords(),
+        evidence.learningUniqueWords(),
+        evidence.explicitNewUniqueWords(),
+        evidence.ignoredUniqueWords(),
+        evidence.unclassifiedUniqueWords(),
+        editorialLevel,
+        isGlobalColdStart);
+  }
 
   public RecommendationScoreV2 score(
       RecommendationEvidenceV2 evidence, EditorialLevel editorialLevel) {
-    var relevantTokens = evidence.totalTokens() - evidence.ignoredTokens();
-    var relevantUnique = evidence.uniqueWords() - evidence.ignoredUniqueWords();
-    if (relevantTokens <= 0 || relevantUnique <= 0) {
-      return zeroScore();
+    return score(evidence, editorialLevel, false);
+  }
+
+  private RecommendationScoreV2 calculateScore(
+      int totalTokens,
+      int knownTokens,
+      int learningTokens,
+      int ignoredTokens,
+      int totalUnique,
+      int knownUnique,
+      int learningUnique,
+      int explicitNewUnique,
+      int ignoredUnique,
+      int unclassifiedUnique,
+      EditorialLevel editorialLevel,
+      boolean isGlobalColdStart) {
+    var relevantTokens = totalTokens - ignoredTokens;
+    var relevantUnique = totalUnique - ignoredUnique;
+    var classifiedUnique = knownUnique + learningUnique + explicitNewUnique + ignoredUnique;
+    var unclassifiedUniqueCalc = totalUnique - classifiedUnique;
+    if (totalUnique <= 0 || relevantUnique <= 0 || relevantTokens <= 0) {
+      return insufficientEvidenceScore(editorialLevel, totalUnique, classifiedUnique);
     }
 
-    var knownTokenCoverage = percentage(evidence.knownTokens(), relevantTokens);
-    var learningUniquePercentage = percentage(evidence.learningUniqueWords(), relevantUnique);
+    var editorialPrior = editorialPrior(editorialLevel);
+
+    // 1. knownTokenCoverage = knownTokens / relevantTokens * 100
+    var knownTokenCoverage = percentage(knownTokens, relevantTokens);
+
+    // 2. KnownComfort = min(100, knownTokenCoverage / 95 * 100)
+    var knownComfort =
+        knownTokenCoverage
+            .multiply(ONE_HUNDRED)
+            .divide(MIN_COMFORT_TARGET, 8, RoundingMode.HALF_UP)
+            .min(ONE_HUNDRED);
+
+    // 3. learningUniqueRatio = learningUnique / relevantUnique * 100
+    var learningUniqueRatio = percentage(learningUnique, relevantUnique);
+
+    // 4. LearningReinforcement = min(100, learningUniqueRatio / 15 * 100)
     var learningReinforcement =
-        learningUniquePercentage
+        learningUniqueRatio
             .multiply(ONE_HUNDRED)
             .divide(TARGET_LEARNING_PERCENTAGE, 8, RoundingMode.HALF_UP)
             .min(ONE_HUNDRED);
-    var lexicalChallenge =
-        percentage(
-            evidence.explicitNewUniqueWords() + evidence.unclassifiedUniqueWords(), relevantUnique);
-    var lexicalAccessibility = ONE_HUNDRED.subtract(lexicalChallenge);
-    var confidence =
-        percentage(
-            evidence.uniqueWords() - evidence.unclassifiedUniqueWords(), evidence.uniqueWords());
-    var confidenceRatio = confidence.divide(ONE_HUNDRED, 8, RoundingMode.HALF_UP);
-    var editorialPrior = editorialPrior(editorialLevel);
 
+    // 5. localConfidence = classifiedUnique / totalUnique * 100
+    // where:
+    // classifiedUnique = knownUnique + learningUnique + explicitNewUnique + ignoredUnique
+    // and unclassifiedUnique = totalUnique - classifiedUnique
+    var localConfidence = percentage(classifiedUnique, totalUnique);
+    var localConfidenceRatio = localConfidence.divide(ONE_HUNDRED, 8, RoundingMode.HALF_UP);
+
+    // 6. challengeUnique = explicitNewUnique + (unclassifiedUnique * localConfidenceRatio)
+    //    UniqueChallenge = challengeUnique / relevantUnique * 100
+    var unclassifiedWeighted =
+        BigDecimal.valueOf(unclassifiedUniqueCalc).multiply(localConfidenceRatio);
+    var challengeUnique = BigDecimal.valueOf(explicitNewUnique).add(unclassifiedWeighted);
+    var uniqueChallenge =
+        challengeUnique
+            .multiply(ONE_HUNDRED)
+            .divide(BigDecimal.valueOf(relevantUnique), 8, RoundingMode.HALF_UP);
+
+    // 7. ExcessChallengePenalty = max(0, (UniqueChallenge - 30) * 1.50)
+    var excessChallengePenalty =
+        uniqueChallenge.compareTo(SOFT_CHALLENGE_LIMIT) > 0
+            ? uniqueChallenge.subtract(SOFT_CHALLENGE_LIMIT).multiply(EXCESS_PENALTY_MULTIPLIER)
+            : BigDecimal.ZERO;
+
+    // 8. ScorePersonalized = clamp(KnownComfort * 0.70 + LearningReinforcement * 0.30 -
+    // ExcessChallengePenalty, 0, 100)
     var rawPersonalized =
-        knownTokenCoverage
-            .multiply(KNOWN_TOKEN_WEIGHT)
-            .add(learningReinforcement.multiply(LEARNING_REINFORCEMENT_WEIGHT))
-            .add(lexicalAccessibility.multiply(LEXICAL_ACCESSIBILITY_WEIGHT));
-    // Keeping the personalized branch at least at the prior makes positive evidence monotonic:
-    // learning more about KNOWN/LEARNING vocabulary cannot lower the blended score.
-    var personalized = rawPersonalized.max(editorialPrior);
-    var explicitNewRisk =
-        percentage(evidence.explicitNewUniqueWords(), relevantUnique)
-            .multiply(EXPLICIT_NEW_RISK_WEIGHT);
-    var finalScore =
-        confidenceRatio
-            .multiply(personalized)
-            .add(BigDecimal.ONE.subtract(confidenceRatio).multiply(editorialPrior))
-            .subtract(explicitNewRisk)
-            .max(BigDecimal.ZERO)
-            .min(ONE_HUNDRED);
+        knownComfort
+            .multiply(COMFORT_WEIGHT)
+            .add(learningReinforcement.multiply(REINFORCEMENT_WEIGHT))
+            .subtract(excessChallengePenalty);
+    var scorePersonalized = clamp(rawPersonalized, BigDecimal.ZERO, ONE_HUNDRED);
+
+    // 9. FinalScore
+    BigDecimal finalScore;
+    if (isGlobalColdStart) {
+      finalScore = editorialPrior;
+    } else {
+      var blended =
+          localConfidenceRatio
+              .multiply(scorePersonalized)
+              .add(BigDecimal.ONE.subtract(localConfidenceRatio).multiply(editorialPrior));
+      finalScore = clamp(blended, BigDecimal.ZERO, ONE_HUNDRED);
+    }
 
     return new RecommendationScoreV2(
-        scale(finalScore),
-        scale(personalized),
-        scale(editorialPrior),
-        scale(knownTokenCoverage),
-        scale(learningReinforcement),
-        scale(lexicalChallenge),
-        scale(confidence),
-        scale(explicitNewRisk));
+        scale4(finalScore),
+        scale4(scorePersonalized),
+        scale4(editorialPrior),
+        scale2(knownComfort),
+        scale2(learningReinforcement),
+        scale2(uniqueChallenge),
+        scale2(excessChallengePenalty),
+        scale2(localConfidence),
+        scale2(knownTokenCoverage),
+        scale2(learningUniqueRatio),
+        false);
   }
 
-  private BigDecimal editorialPrior(EditorialLevel level) {
+  public BigDecimal editorialPrior(EditorialLevel level) {
+    if (level == null) {
+      return new BigDecimal("50.0000");
+    }
     return switch (level) {
-      case A1 -> new BigDecimal("70");
-      case A2 -> new BigDecimal("66");
-      case B1 -> new BigDecimal("62");
-      case B2 -> new BigDecimal("58");
-      case C1 -> new BigDecimal("54");
-      case C2 -> new BigDecimal("50");
+      case A1 -> new BigDecimal("70.0000");
+      case A2 -> new BigDecimal("66.0000");
+      case B1 -> new BigDecimal("62.0000");
+      case B2 -> new BigDecimal("58.0000");
+      case C1 -> new BigDecimal("54.0000");
+      case C2 -> new BigDecimal("50.0000");
     };
   }
 
@@ -88,12 +189,44 @@ public class RecommendationScorerV2 {
         .divide(BigDecimal.valueOf(total), 8, RoundingMode.HALF_UP);
   }
 
-  private BigDecimal scale(BigDecimal value) {
+  private BigDecimal clamp(BigDecimal value, BigDecimal min, BigDecimal max) {
+    if (value.compareTo(min) < 0) {
+      return min;
+    }
+    if (value.compareTo(max) > 0) {
+      return max;
+    }
+    return value;
+  }
+
+  private BigDecimal scale4(BigDecimal value) {
     return value.setScale(4, RoundingMode.HALF_UP);
   }
 
-  private RecommendationScoreV2 zeroScore() {
-    var zero = BigDecimal.ZERO.setScale(4);
-    return new RecommendationScoreV2(zero, zero, zero, zero, zero, zero, zero, zero);
+  private BigDecimal scale2(BigDecimal value) {
+    return value.setScale(2, RoundingMode.HALF_UP);
+  }
+
+  private RecommendationScoreV2 insufficientEvidenceScore(
+      EditorialLevel editorialLevel, int totalUnique, int classifiedUnique) {
+    var prior = editorialPrior(editorialLevel);
+    var zero2 = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    var zero4 = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+    var confidence =
+        totalUnique > 0
+            ? percentage(classifiedUnique, totalUnique).setScale(2, RoundingMode.HALF_UP)
+            : zero2;
+    return new RecommendationScoreV2(
+        scale4(prior),
+        zero4,
+        scale4(prior),
+        zero2,
+        zero2,
+        zero2,
+        zero2,
+        confidence,
+        zero2,
+        zero2,
+        true);
   }
 }

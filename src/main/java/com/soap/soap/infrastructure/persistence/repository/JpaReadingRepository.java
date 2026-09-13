@@ -71,6 +71,17 @@ public interface JpaReadingRepository extends JpaRepository<ReadingEntity, UUID>
 
   @Query(
       """
+      select r.id as id, r.title as title, r.language as language,
+             r.editorialLevel as editorialLevel, r.category as category,
+             r.createdAt as createdAt, r.coverKey as coverKey
+      from ReadingEntity r
+      where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+      order by r.createdAt desc, r.id
+      """)
+  List<PlatformReadingSummaryView> findAllPlatformSummaries();
+
+  @Query(
+      """
       select r from ReadingEntity r
       where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
       order by r.createdAt desc, r.id

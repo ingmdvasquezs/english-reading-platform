@@ -90,6 +90,24 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
 
   @Override
   @Transactional(readOnly = true)
+  public List<PlatformReadingSummary> findAllPlatformReadingSummaries() {
+    return repository.findAllPlatformSummaries().stream()
+        .map(
+            summary ->
+                new PlatformReadingSummary(
+                    summary.getId(),
+                    summary.getTitle(),
+                    summary.getLanguage(),
+                    summary.getEditorialLevel(),
+                    summary.getCategory(),
+                    summary.getCreatedAt(),
+                    null,
+                    summary.getCoverKey()))
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public List<Reading> findAllPlatformReadings() {
     return repository.findAllPlatformReadings().stream().map(mapper::toDomain).toList();
   }

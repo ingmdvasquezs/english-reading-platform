@@ -87,7 +87,7 @@ translation:
 
 recommendation:
   v2:
-    shadow-enabled: ${RECOMMENDATION_V2_SHADOW_ENABLED:true}
+    min-global-classified-words: ${RECOMMENDATION_V2_MIN_GLOBAL_CLASSIFIED_WORDS:30}
 
 # Security hardening defaults. Override with environment-specific configuration when necessary.
 app:

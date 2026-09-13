@@ -30,7 +30,7 @@ class RecommendationReasonEvaluatorTest {
   @Test
   @DisplayName("COMPLETED nunca activa CONTINUE_READING solo por progreso")
   void completedNeverProducesContinueReading() {
-    var breakdown = new VocabularyBreakdown(100, 70, 10, 5, 0, 15);
+    var breakdown = new VocabularyBreakdown(100, 90, 5, 0, 0, 5);
     var code =
         evaluator.evaluate(breakdown, new BigDecimal("85.00"), ReadingProgressStatus.COMPLETED);
 
@@ -97,23 +97,25 @@ class RecommendationReasonEvaluatorTest {
     assertThat(evaluator.evaluate(balancedBreakdown2, new BigDecimal("40.00"), null))
         .isEqualTo(RecommendationReasonCode.BALANCED_CHALLENGE);
 
-    // confidence = 50.00 + known >= 65% -> HIGH_VOCABULARY_MATCH
-    assertThat(evaluator.evaluate(breakdown, new BigDecimal("50.00"), null))
+    // confidence = 50.00 + known >= 90% y challenge <= 15% -> HIGH_VOCABULARY_MATCH
+    var highMatch = new VocabularyBreakdown(100, 90, 5, 0, 0, 5);
+    assertThat(evaluator.evaluate(highMatch, new BigDecimal("50.00"), null))
         .isEqualTo(RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
   }
 
   @Test
-  @DisplayName("Regla 3: HIGH_VOCABULARY_MATCH con confidence >= 50% y known >= 65%")
+  @DisplayName(
+      "Regla 4: HIGH_VOCABULARY_MATCH con confidence >= 40%, known >= 90% y challenge <= 15%")
   void highVocabularyMatchRequiresConfidenceAndKnownThresholds() {
-    var highKnown = new VocabularyBreakdown(100, 65, 5, 10, 0, 20);
+    var highKnown = new VocabularyBreakdown(100, 90, 5, 0, 0, 5);
     assertThat(evaluator.evaluate(highKnown, new BigDecimal("50.00"), null))
         .isEqualTo(RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
 
-    var belowKnownThreshold = new VocabularyBreakdown(100, 64, 5, 15, 0, 16);
-    // known = 64% (< 65%), learning = 5% (< 10%), challenge = 31% (> 30%), conf = 50% ->
-    // MORE_CHALLENGING
+    var belowKnownThreshold = new VocabularyBreakdown(100, 89, 5, 0, 0, 6);
+    // known = 89% (< 90%), learning = 5% (< 10%), challenge = 6% (< 15%), conf = 50% ->
+    // falls to DISCOVERY
     assertThat(evaluator.evaluate(belowKnownThreshold, new BigDecimal("50.00"), null))
-        .isEqualTo(RecommendationReasonCode.MORE_CHALLENGING);
+        .isEqualTo(RecommendationReasonCode.DISCOVERY);
   }
 
   @Test
@@ -151,8 +153,8 @@ class RecommendationReasonEvaluatorTest {
   @Test
   @DisplayName("Precedencia: HIGH_VOCABULARY_MATCH sobre PRACTICE_VOCABULARY y BALANCED_CHALLENGE")
   void precedenceHighVocabularyMatchOverLearningAndChallenge() {
-    // known = 70%, learning = 12%, challenge = 18%, confidence = 80%
-    var breakdown = new VocabularyBreakdown(100, 70, 12, 8, 0, 10);
+    // known = 90%, learning = 10%, challenge = 0%, confidence = 80%
+    var breakdown = new VocabularyBreakdown(100, 90, 10, 0, 0, 0);
     var code = evaluator.evaluate(breakdown, new BigDecimal("80.00"), null);
 
     assertThat(code).isEqualTo(RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
@@ -176,8 +178,8 @@ class RecommendationReasonEvaluatorTest {
   @DisplayName("Ignored words se excluyen del denominador de palabras relevantes")
   void ignoredWordsExcludedFromRelevantDenominator() {
     // total 120 palabras, 20 ignored -> 100 relevant words
-    // 65 known sobre 100 relevant = 65%
-    var breakdown = new VocabularyBreakdown(120, 65, 5, 10, 20, 20);
+    // 90 known sobre 100 relevant = 90%
+    var breakdown = new VocabularyBreakdown(120, 90, 5, 5, 20, 0);
     var code = evaluator.evaluate(breakdown, new BigDecimal("50.00"), null);
 
     assertThat(code).isEqualTo(RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
@@ -192,5 +194,96 @@ class RecommendationReasonEvaluatorTest {
     var code = evaluator.evaluate(breakdown, new BigDecimal("9.20"), null);
 
     assertThat(code).isEqualTo(RecommendationReasonCode.DISCOVERY);
+  }
+
+  @Test
+  @DisplayName("V2: Precedencia estricta de 8 niveles en RecommendationReasonEvaluator")
+  void v2EightLevelStrictPrecedence() {
+    var b100 = new BigDecimal("100.00");
+    var b95 = new BigDecimal("95.00");
+    var b90 = new BigDecimal("90.00");
+    var b50 = new BigDecimal("50.00");
+    var b40 = new BigDecimal("40.00");
+    var b80 = new BigDecimal("80.00");
+    var b70 = new BigDecimal("70.00");
+    var b35 = new BigDecimal("35.00");
+    var b31 = new BigDecimal("31.00");
+    var b25 = new BigDecimal("25.00");
+    var b24 = new BigDecimal("24.99");
+    var b20 = new BigDecimal("20.00");
+    var b15 = new BigDecimal("15.00");
+    var b10 = new BigDecimal("10.00");
+    var b5 = new BigDecimal("5.00");
+
+    // 1. CONTINUE_READING has absolute highest precedence (even in cold start or 0 confidence)
+    assertThat(
+            evaluator.evaluate(
+                ReadingProgressStatus.IN_PROGRESS,
+                true,
+                true,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO))
+        .isEqualTo(RecommendationReasonCode.CONTINUE_READING);
+
+    // 2. DISCOVERY when global cold start is true
+    assertThat(evaluator.evaluate(null, true, false, b100, b95, b15, b5))
+        .isEqualTo(RecommendationReasonCode.DISCOVERY);
+
+    // 3. DISCOVERY when insufficient local evidence or local confidence < 25%
+    assertThat(evaluator.evaluate(null, false, true, b100, b95, b15, b5))
+        .isEqualTo(RecommendationReasonCode.DISCOVERY);
+    assertThat(evaluator.evaluate(null, false, false, b24, b95, b15, b5))
+        .isEqualTo(RecommendationReasonCode.DISCOVERY);
+
+    // 4. HIGH_VOCABULARY_MATCH: localConfidence >= 40, knownTokenCoverage >= 90, uniqueChallenge <=
+    // 15
+    // Takes precedence over PRACTICE_VOCABULARY (learning >= 10)
+    assertThat(
+            evaluator.evaluate(
+                null, false, false, b50, b90,
+                b15, // learning >= 10, but high match takes precedence!
+                b10))
+        .isEqualTo(RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
+
+    // 5. PRACTICE_VOCABULARY: localConfidence >= 40, learningUniqueRatio >= 10
+    // Takes precedence over BALANCED_CHALLENGE (challenge between 15 and 30)
+    assertThat(
+            evaluator.evaluate(
+                null, false, false, b50, b70, // known < 90
+                b10, // learning >= 10
+                b20)) // challenge in 15..30
+        .isEqualTo(RecommendationReasonCode.PRACTICE_VOCABULARY);
+
+    // 6. BALANCED_CHALLENGE: localConfidence >= 40, 15 <= uniqueChallenge <= 30
+    assertThat(
+            evaluator.evaluate(
+                null, false, false, b40, b70, b5, // learning < 10
+                b20)) // challenge in 15..30
+        .isEqualTo(RecommendationReasonCode.BALANCED_CHALLENGE);
+
+    // 7. MORE_CHALLENGING: localConfidence >= 40, uniqueChallenge > 30
+    assertThat(
+            evaluator.evaluate(
+                null, false, false, b40, b50, b5, // learning < 10
+                b31)) // challenge > 30
+        .isEqualTo(RecommendationReasonCode.MORE_CHALLENGING);
+
+    // 8. DISCOVERY fallback: 25 <= localConfidence < 40
+    assertThat(
+            evaluator.evaluate(
+                null, false, false, b35, // 25 <= conf < 40
+                b95, b20, b5))
+        .isEqualTo(RecommendationReasonCode.DISCOVERY);
+
+    // Fallback when localConfidence >= 40 but no condition matched (e.g. known < 90, learning < 10,
+    // challenge < 15)
+    assertThat(
+            evaluator.evaluate(
+                null, false, false, b50, b80, // known < 90
+                b5, // learning < 10
+                b10)) // challenge < 15
+        .isEqualTo(RecommendationReasonCode.DISCOVERY);
   }
 }

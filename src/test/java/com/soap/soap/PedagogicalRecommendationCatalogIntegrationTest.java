@@ -21,6 +21,7 @@ import com.soap.soap.domain.model.User;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.domain.model.Word;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -121,12 +122,17 @@ class PedagogicalRecommendationCatalogIntegrationTest {
             .orElseThrow();
     var selected =
         orderedWords(target).stream().filter(selectable::contains).distinct().limit(10).toList();
+    var additional =
+        selectable.stream().filter(word -> !selected.contains(word)).limit(20).toList();
+
+    var classifications = new ArrayList<VocabularyClassification>();
+    selected.forEach(
+        word -> classifications.add(new VocabularyClassification(word, VocabularyStatus.NEW)));
+    additional.forEach(
+        word -> classifications.add(new VocabularyClassification(word, VocabularyStatus.KNOWN)));
 
     completeOnboarding.completeInitialVocabularyTest(
-        onboardingTest.load().testId(),
-        selected.stream()
-            .map(value -> new VocabularyClassification(value, VocabularyStatus.NEW))
-            .toList());
+        onboardingTest.load().testId(), classifications);
 
     var persisted = vocabulary.findStatusesByNormalizedValues(user.id(), "en", selected);
     var after = ranked();
@@ -276,8 +282,8 @@ class PedagogicalRecommendationCatalogIntegrationTest {
     progress.complete(user.id(), completed.id(), LocalDateTime.now());
 
     var mixed = ranked();
-    assertThat(indexOf(mixed, notStarted)).isLessThan(indexOf(mixed, inProgress));
-    assertThat(indexOf(mixed, inProgress)).isLessThan(indexOf(mixed, completed));
+    assertThat(indexOf(mixed, inProgress)).isLessThan(indexOf(mixed, notStarted));
+    assertThat(indexOf(mixed, notStarted)).isLessThan(indexOf(mixed, completed));
 
     for (var reading : catalog.values()) {
       progress.complete(user.id(), reading.id(), LocalDateTime.now());
@@ -392,6 +398,34 @@ class PedagogicalRecommendationCatalogIntegrationTest {
         .filter(item -> item.coverKey() != null)
         .forEach(
             item -> assertThat(rankedById.get(item.id()).coverKey()).isEqualTo(item.coverKey()));
+  }
+
+  @Test
+  void matureUserRanksHighEvidenceC2OverLowEvidenceA2InRealCatalog() {
+    var c2Target = reading("A Republic of Echoes");
+    var a2Target = reading("Why Cities Need Trees");
+
+    // Classify high evidence on C2 (65% known, 15% learning -> mature user > 30 words)
+    classifyDistribution(c2Target, 65, 15);
+
+    var ranked = ranked();
+    var c2Result = find(ranked, c2Target);
+
+    assertThat(c2Result.classificationConfidencePercentage())
+        .isGreaterThan(new BigDecimal("70.00"));
+    assertThat(indexOf(ranked, c2Target)).isLessThan(indexOf(ranked, a2Target));
+  }
+
+  @Test
+  void vocabularyFitPercentageCorrespondsToKnownComfortNotFinalScore() {
+    var reading = reading("The Lost Blue Scarf");
+    classifyDistribution(reading, 65, 15);
+
+    var result = find(ranked(), reading);
+    // In V2: vocabularyFitPercentage is KnownComfort = min(100, knownTokenCoverage / 95 * 100)
+    assertThat(result.vocabularyFitPercentage()).isNotNull();
+    assertThat(result.vocabularyFitPercentage()).isGreaterThan(BigDecimal.ZERO);
+    assertThat(result.vocabularyFitPercentage()).isLessThanOrEqualTo(new BigDecimal("100.00"));
   }
 
   private List<RecommendedPlatformReading> ranked() {

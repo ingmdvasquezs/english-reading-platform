@@ -99,6 +99,8 @@ class SoapApplicationTests {
   @Autowired private ApplicationContext applicationContext;
   @Autowired private SoapExceptionResolver soapExceptionResolver;
   @Autowired private MeterRegistry meterRegistry;
+  @Autowired private com.soap.soap.application.service.ReadingLexicalIndexer lexicalIndexer;
+  @Autowired private jakarta.persistence.EntityManager entityManager;
   @LocalServerPort private int serverPort;
   @MockitoBean private DictionaryPort dictionaryPort;
   @MockitoBean private TranslationPort translationPort;
@@ -265,6 +267,10 @@ class SoapApplicationTests {
     }
     var explicitNew = words.save(new Word(null, "novel", "ped"));
     vocabulary.save(new UserVocabulary(null, user, explicitNew, VocabularyStatus.NEW, now, null));
+    for (int i = 1; i <= 20; i++) {
+      var word = words.save(new Word(null, "filler" + i, "ped"));
+      vocabulary.save(new UserVocabulary(null, user, word, VocabularyStatus.KNOWN, now, now));
+    }
 
     var ideal =
         readings.save(
@@ -278,28 +284,34 @@ class SoapApplicationTests {
                 ReadingOrigin.PLATFORM,
                 com.soap.soap.domain.model.EditorialLevel.A2,
                 "Pedagogy"));
-    readings.save(
-        new Reading(
-            null,
-            null,
-            "Too easy",
-            "alpha beta gamma delta epsilon zeta eta theta iota uncertain",
-            "ped",
-            now.plusSeconds(1),
-            ReadingOrigin.PLATFORM,
-            com.soap.soap.domain.model.EditorialLevel.B1,
-            "Pedagogy"));
-    readings.save(
-        new Reading(
-            null,
-            null,
-            "Too difficult",
-            "alpha beta gamma delta learnone unknownone unknowntwo unknownthree unknownfour unknownfive",
-            "ped",
-            now.plusSeconds(2),
-            ReadingOrigin.PLATFORM,
-            com.soap.soap.domain.model.EditorialLevel.B2,
-            "Pedagogy"));
+    var tooEasy =
+        readings.save(
+            new Reading(
+                null,
+                null,
+                "Too easy",
+                "alpha beta gamma delta epsilon zeta eta theta iota uncertain",
+                "ped",
+                now.plusSeconds(1),
+                ReadingOrigin.PLATFORM,
+                com.soap.soap.domain.model.EditorialLevel.B1,
+                "Pedagogy"));
+    var tooDifficult =
+        readings.save(
+            new Reading(
+                null,
+                null,
+                "Too difficult",
+                "alpha beta gamma delta learnone unknownone unknowntwo unknownthree unknownfour unknownfive",
+                "ped",
+                now.plusSeconds(2),
+                ReadingOrigin.PLATFORM,
+                com.soap.soap.domain.model.EditorialLevel.B2,
+                "Pedagogy"));
+    entityManager.flush();
+    lexicalIndexer.indexReading(ideal.id(), ideal.language(), ideal.content());
+    lexicalIndexer.indexReading(tooEasy.id(), tooEasy.language(), tooEasy.content());
+    lexicalIndexer.indexReading(tooDifficult.id(), tooDifficult.language(), tooDifficult.content());
     authenticateUser();
     try {
       var result = recommendPlatformReadings.recommendPlatformReadings(new PageRequest(0, 3));
@@ -1972,7 +1984,7 @@ class SoapApplicationTests {
           .andExpect(xpath("count(//*[local-name()='readings'])").evaluatesTo("2"))
           .andExpect(
               xpath("//*[local-name()='readings'][1]/*[local-name()='vocabularyFitPercentage']")
-                  .evaluatesTo("30.00"))
+                  .evaluatesTo("0.00"))
           .andExpect(
               xpath(
                       "//*[local-name()='readings'][1]/*[local-name()='classificationConfidencePercentage']")
