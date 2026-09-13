@@ -24,7 +24,6 @@ import com.soap.soap.application.service.RecommendationReasonEvaluator;
 import com.soap.soap.application.service.RecommendationScorerV2;
 import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.ReadingProgress;
-import com.soap.soap.domain.model.ReadingProgressStatus;
 import com.soap.soap.domain.model.RecommendationReasonCode;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -71,8 +70,8 @@ class RecommendPlatformReadingsUseCaseTest {
   }
 
   @Test
-  @DisplayName("Prioriza IN_PROGRESS sobre NOT_STARTED y COMPLETED, y mapea breakdown exacto")
-  void ranksPedagogicallyPrioritizesProgressAndMapsBreakdown() {
+  @DisplayName("Excluye IN_PROGRESS y COMPLETED y recomienda únicamente lecturas NOT_STARTED")
+  void excludesInProgressAndCompletedAndRecommendsOnlyNotStarted() {
     var inProgressSummary = summary("In Progress Book", EditorialLevel.B2, 1);
     var notStartedSummary = summary("Not Started Book", EditorialLevel.A1, 2);
     var completedSummary = summary("Completed Book", EditorialLevel.A1, 3);
@@ -82,13 +81,11 @@ class RecommendPlatformReadingsUseCaseTest {
         .thenReturn(List.of(completedSummary, notStartedSummary, inProgressSummary));
     when(vocabulary.countClassifiedWordsByUserAndLanguage(userId, "en")).thenReturn(50L);
 
-    var inProgressEvidence = evidence(inProgressSummary.id(), 100, 75, 10, 0, 40, 25, 5, 5, 0, 5);
     var notStartedEvidence = evidence(notStartedSummary.id(), 100, 95, 5, 0, 50, 45, 5, 0, 0, 0);
-    var completedEvidence = evidence(completedSummary.id(), 100, 95, 5, 0, 50, 45, 5, 0, 0, 0);
 
     when(frequencyRepository.findLexicalEvidenceByUserAndLanguage(
-            eq(userId), eq("en"), org.mockito.ArgumentMatchers.anyCollection()))
-        .thenReturn(List.of(inProgressEvidence, notStartedEvidence, completedEvidence));
+            eq(userId), eq("en"), eq(List.of(notStartedSummary.id()))))
+        .thenReturn(List.of(notStartedEvidence));
 
     when(progress.findByUserIdAndReadingIds(
             eq(userId),
@@ -103,23 +100,48 @@ class RecommendPlatformReadingsUseCaseTest {
 
     var result = useCase.recommendPlatformReadings(new PageRequest(0, 10));
 
-    // IN_PROGRESS (priority 0) MUST win even though its finalScore is lower than A1
+    // Excludes IN_PROGRESS and COMPLETED: only Not Started Book is recommended
     assertThat(result.content())
         .extracting(RecommendedPlatformReading::title)
-        .containsExactly("In Progress Book", "Not Started Book", "Completed Book");
+        .containsExactly("Not Started Book");
+    assertThat(result.totalElements()).isEqualTo(1);
 
     var first = result.content().get(0);
-    assertThat(first.progressStatus()).isEqualTo(ReadingProgressStatus.IN_PROGRESS);
-    assertThat(first.reasonCode()).isEqualTo(RecommendationReasonCode.CONTINUE_READING);
+    assertThat(first.progressStatus()).isNull();
+    assertThat(first.vocabularyFitPercentage()).isEqualByComparingTo("100.00");
+    assertThat(first.classificationConfidencePercentage()).isEqualByComparingTo("100.00");
+    assertThat(first.reasonCode()).isEqualTo(RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
 
-    var second = result.content().get(1);
-    assertThat(second.progressStatus()).isNull();
-    assertThat(second.vocabularyFitPercentage()).isEqualByComparingTo("100.00");
-    assertThat(second.classificationConfidencePercentage()).isEqualByComparingTo("100.00");
-    assertThat(second.reasonCode()).isEqualTo(RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
+    // Evidencia léxica solo se consulta para candidateIds NOT_STARTED
+    verify(frequencyRepository)
+        .findLexicalEvidenceByUserAndLanguage(userId, "en", List.of(notStartedSummary.id()));
+  }
 
-    var third = result.content().get(2);
-    assertThat(third.progressStatus()).isEqualTo(ReadingProgressStatus.COMPLETED);
+  @Test
+  @DisplayName("Usuario con todo el catálogo iniciado o completado recibe resultado vacío")
+  void whenAllCandidatesAreStartedOrCompletedReturnsEmptyResult() {
+    var inProgressSummary = summary("In Progress Book", EditorialLevel.B2, 1);
+    var completedSummary = summary("Completed Book", EditorialLevel.A1, 2);
+
+    when(users.existsById(userId)).thenReturn(true);
+    when(readings.findAllPlatformReadingSummaries())
+        .thenReturn(List.of(inProgressSummary, completedSummary));
+
+    when(progress.findByUserIdAndReadingIds(
+            eq(userId), eq(Set.of(inProgressSummary.id(), completedSummary.id()))))
+        .thenReturn(
+            Map.of(
+                inProgressSummary.id(),
+                ReadingProgress.inProgress(userId, inProgressSummary.id(), LocalDateTime.now()),
+                completedSummary.id(),
+                ReadingProgress.completed(
+                    userId, completedSummary.id(), LocalDateTime.now(), LocalDateTime.now())));
+
+    var result = useCase.recommendPlatformReadings(new PageRequest(0, 10));
+
+    assertThat(result.content()).isEmpty();
+    assertThat(result.totalElements()).isEqualTo(0);
+    verify(frequencyRepository, never()).findLexicalEvidenceByUserAndLanguage(any(), any(), any());
   }
 
   @Test

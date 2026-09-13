@@ -40,9 +40,8 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
       LoggerFactory.getLogger(RecommendPlatformReadingsUseCase.class);
 
   private static final Comparator<ScoredReading> COLD_START_RANKING =
-      Comparator.comparingInt(
-              (ScoredReading scored) -> progressPriority(scored.reading().progressStatus()))
-          .thenComparing(scored -> scored.score().finalScore(), Comparator.reverseOrder())
+      Comparator.comparing(
+              (ScoredReading scored) -> scored.score().finalScore(), Comparator.reverseOrder())
           .thenComparingInt(scored -> scored.reading().editorialLevel().ordinal())
           .thenComparing(
               scored -> scored.reading().createdAt(),
@@ -51,9 +50,8 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
           .thenComparing(scored -> scored.reading().readingId());
 
   private static final Comparator<ScoredReading> MATURE_RANKING =
-      Comparator.comparingInt(
-              (ScoredReading scored) -> progressPriority(scored.reading().progressStatus()))
-          .thenComparing(scored -> scored.score().finalScore(), Comparator.reverseOrder())
+      Comparator.comparing(
+              (ScoredReading scored) -> scored.score().finalScore(), Comparator.reverseOrder())
           .thenComparing(
               scored -> scored.score().classificationConfidence(), Comparator.reverseOrder())
           .thenComparing(scored -> scored.score().uniqueChallenge())
@@ -128,15 +126,28 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
       throw new UserNotFoundException(userId);
     }
 
-    // 1. Load candidate summaries without content TEXT
+    // 1. Load candidate platform summaries without content TEXT
     List<PlatformReadingSummary> candidates = readings.findAllPlatformReadingSummaries();
     if (candidates.isEmpty()) {
       return new PageResult<>(List.of(), pageRequest.page(), pageRequest.size(), 0);
     }
 
-    // 2 & 3. Group candidates by language to batch query lexical evidence and cold-start state
-    Map<String, List<UUID>> candidatesByLanguage =
-        candidates.stream()
+    // 2. Batch query reading progress for candidate platform readings
+    List<UUID> candidateIds = candidates.stream().map(PlatformReadingSummary::id).toList();
+    var progressByReading = progress.findByUserIdAndReadingIds(userId, new HashSet<>(candidateIds));
+
+    // 3. Exclude any candidate that has a ReadingProgress (only keep NOT_STARTED)
+    List<PlatformReadingSummary> unstartedCandidates =
+        candidates.stream().filter(c -> !progressByReading.containsKey(c.id())).toList();
+
+    if (unstartedCandidates.isEmpty()) {
+      return new PageResult<>(List.of(), pageRequest.page(), pageRequest.size(), 0);
+    }
+
+    // 4. Group NOT_STARTED candidates by language to batch query lexical evidence and cold-start
+    // state
+    Map<String, List<UUID>> unstartedByLanguage =
+        unstartedCandidates.stream()
             .collect(
                 Collectors.groupingBy(
                     PlatformReadingSummary::language,
@@ -146,7 +157,7 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
     Map<UUID, ReadingLexicalEvidence> evidenceByReadingId = new HashMap<>();
     Map<String, Boolean> coldStartByLanguage = new HashMap<>();
 
-    for (var entry : candidatesByLanguage.entrySet()) {
+    for (var entry : unstartedByLanguage.entrySet()) {
       String language = entry.getKey();
       List<UUID> ids = entry.getValue();
 
@@ -160,22 +171,17 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
       }
     }
 
-    // 4. Batch query reading progress for candidates
-    List<UUID> candidateIds = candidates.stream().map(PlatformReadingSummary::id).toList();
-    var progressByReading = progress.findByUserIdAndReadingIds(userId, new HashSet<>(candidateIds));
-
-    // 5. Score and filter candidates
+    // 5. Score and filter unstarted candidates
     boolean hasAnyColdStart = coldStartByLanguage.values().stream().anyMatch(Boolean::booleanValue);
-    List<ScoredReading> scored = new ArrayList<>(candidates.size());
-    for (PlatformReadingSummary candidate : candidates) {
+    List<ScoredReading> scored = new ArrayList<>(unstartedCandidates.size());
+    for (PlatformReadingSummary candidate : unstartedCandidates) {
       ReadingLexicalEvidence evidence = evidenceByReadingId.get(candidate.id());
       if (evidence == null) {
         LOGGER.warn("recommendation.missing_lexical_profile readingId={}", candidate.id());
         continue;
       }
 
-      var progressRecord = progressByReading.get(candidate.id());
-      var progressStatus = progressRecord != null ? progressRecord.status() : null;
+      ReadingProgressStatus progressStatus = null;
 
       boolean candidateColdStart = coldStartByLanguage.getOrDefault(candidate.language(), true);
       RecommendationScoreV2 score =
@@ -224,16 +230,6 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
     var selected =
         ranked.subList((int) from, (int) to).stream().map(ScoredReading::reading).toList();
     return new PageResult<>(selected, pageRequest.page(), pageRequest.size(), ranked.size());
-  }
-
-  private static int progressPriority(ReadingProgressStatus status) {
-    if (status == ReadingProgressStatus.IN_PROGRESS) {
-      return 0;
-    }
-    if (status == null) {
-      return 1;
-    }
-    return 2; // COMPLETED
   }
 
   private record ScoredReading(RecommendedPlatformReading reading, RecommendationScoreV2 score) {}

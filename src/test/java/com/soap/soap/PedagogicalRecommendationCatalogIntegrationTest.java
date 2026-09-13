@@ -16,7 +16,6 @@ import com.soap.soap.application.port.out.WordRepositoryPort;
 import com.soap.soap.application.service.TextWordProcessor;
 import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.Reading;
-import com.soap.soap.domain.model.ReadingProgressStatus;
 import com.soap.soap.domain.model.User;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
@@ -55,6 +54,7 @@ class PedagogicalRecommendationCatalogIntegrationTest {
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
   @Autowired private RecommendPlatformReadingsPort recommendations;
+  @Autowired private com.soap.soap.application.port.in.ListContinueReadingPort continueReading;
   @Autowired private CompleteInitialVocabularyTestPort completeOnboarding;
   @Autowired private InitialVocabularyTestSourcePort onboardingTest;
   @Autowired private ReadingRepositoryPort readings;
@@ -273,25 +273,50 @@ class PedagogicalRecommendationCatalogIntegrationTest {
   }
 
   @Test
-  void realCatalogProgressHierarchyNeverProducesArtificiallyEmptyPages() {
-    var ordered = ranked();
-    var notStarted = reading(ordered.get(0).title());
-    var inProgress = reading(ordered.get(1).title());
-    var completed = reading(ordered.get(2).title());
+  void separatesContinueReadingFromRecommendationsAndExcludesStartedReadings() {
+    var initialCatalog = ranked();
+    assertThat(initialCatalog).hasSize(74);
+
+    var notStarted = reading(initialCatalog.get(0).title());
+    var inProgress = reading(initialCatalog.get(1).title());
+    var completed = reading(initialCatalog.get(2).title());
+
     progress.startIfAbsent(user.id(), inProgress.id(), LocalDateTime.now());
     progress.complete(user.id(), completed.id(), LocalDateTime.now());
 
-    var mixed = ranked();
-    assertThat(indexOf(mixed, inProgress)).isLessThan(indexOf(mixed, notStarted));
-    assertThat(indexOf(mixed, notStarted)).isLessThan(indexOf(mixed, completed));
+    // Criteria D: IN_PROGRESS appears in listContinueReading
+    var continueReadingResult = continueReading.listContinueReading(new PageRequest(0, 10));
+    assertThat(continueReadingResult.content())
+        .extracting(com.soap.soap.application.model.ContinueReadingItem::readingId)
+        .contains(inProgress.id())
+        .doesNotContain(completed.id(), notStarted.id());
 
+    // Criteria A & B: IN_PROGRESS and COMPLETED do NOT appear in recommendPlatformReadings
+    var recommended = ranked();
+    assertThat(ids(recommended))
+        .doesNotContain(inProgress.id())
+        .doesNotContain(completed.id())
+        .contains(notStarted.id());
+
+    // Criteria E: No reading appears simultaneously in both responses
+    var continueReadingIds =
+        continueReadingResult.content().stream()
+            .map(com.soap.soap.application.model.ContinueReadingItem::readingId)
+            .collect(Collectors.toSet());
+    assertThat(ids(recommended)).noneMatch(continueReadingIds::contains);
+
+    // Criteria F: totalElements excludes IN_PROGRESS and COMPLETED (74 - 2 = 72)
+    var pagedRecs = recommendations.recommendPlatformReadings(new PageRequest(0, 10));
+    assertThat(pagedRecs.totalElements()).isEqualTo(72);
+    assertThat(recommended).hasSize(72);
+
+    // Criteria I: When all catalog readings are completed or in progress, recommendations is empty
     for (var reading : catalog.values()) {
       progress.complete(user.id(), reading.id(), LocalDateTime.now());
     }
-    var allCompleted = recommendations.recommendPlatformReadings(new PageRequest(5, 4));
-    assertThat(allCompleted.content())
-        .hasSize(4)
-        .allMatch(item -> item.progressStatus() == ReadingProgressStatus.COMPLETED);
+    var allCompleted = recommendations.recommendPlatformReadings(new PageRequest(0, 10));
+    assertThat(allCompleted.totalElements()).isEqualTo(0);
+    assertThat(allCompleted.content()).isEmpty();
   }
 
   @Test
