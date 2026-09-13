@@ -38,4 +38,6 @@ public interface UserVocabularyRepositoryPort {
   long countDueWords(UUID userId, java.time.LocalDateTime now);
 
   long countTotalReviewableWords(UUID userId, java.time.LocalDateTime now);
+
+  long countClassifiedWordsByUserAndLanguage(UUID userId, String language);
 }

@@ -175,6 +175,14 @@ public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositor
     return repository.countTotalReviewableWords(userId, now);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public long countClassifiedWordsByUserAndLanguage(UUID userId, String language) {
+    var canonical = languages.normalize(language);
+    return repository.countClassifiedWordsByUserAndLanguages(
+        userId, languages.equivalentLanguages(canonical));
+  }
+
   private boolean hasConstraint(Throwable exception, String constraint) {
     for (var cause = exception; cause != null; cause = cause.getCause()) {
       if (cause instanceof ConstraintViolationException violation
