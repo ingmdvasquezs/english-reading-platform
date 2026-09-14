@@ -76,6 +76,63 @@ public interface JpaReadingProgressRepository extends JpaRepository<ReadingProgr
     LocalDateTime getStartedAt();
   }
 
+  @Query(
+      value =
+          """
+          select p.reading.id as readingId,
+                 p.reading.title as title,
+                 p.reading.editorialLevel as editorialLevel,
+                 p.reading.category as category,
+                 p.reading.coverKey as coverKey,
+                 p.status as progressStatus
+          from ReadingProgressEntity p
+          where p.user.id = :userId
+            and p.reading.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and p.reading.editorialStatus in (
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED,
+                com.soap.soap.domain.model.EditorialStatus.ARCHIVED
+            )
+            and p.status in (
+                com.soap.soap.domain.model.ReadingProgressStatus.IN_PROGRESS,
+                com.soap.soap.domain.model.ReadingProgressStatus.COMPLETED
+            )
+          order by
+            case when p.status = com.soap.soap.domain.model.ReadingProgressStatus.IN_PROGRESS then 0 else 1 end asc,
+            case when p.status = com.soap.soap.domain.model.ReadingProgressStatus.IN_PROGRESS then p.startedAt else p.completedAt end desc nulls last,
+            p.reading.id asc
+          """,
+      countQuery =
+          """
+          select count(p)
+          from ReadingProgressEntity p
+          where p.user.id = :userId
+            and p.reading.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and p.reading.editorialStatus in (
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED,
+                com.soap.soap.domain.model.EditorialStatus.ARCHIVED
+            )
+            and p.status in (
+                com.soap.soap.domain.model.ReadingProgressStatus.IN_PROGRESS,
+                com.soap.soap.domain.model.ReadingProgressStatus.COMPLETED
+            )
+          """)
+  Page<PlatformReadingHistoryView> findPlatformReadingHistory(
+      @Param("userId") UUID userId, Pageable pageable);
+
+  interface PlatformReadingHistoryView {
+    UUID getReadingId();
+
+    String getTitle();
+
+    EditorialLevel getEditorialLevel();
+
+    String getCategory();
+
+    String getCoverKey();
+
+    ReadingProgressStatus getProgressStatus();
+  }
+
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
       value =

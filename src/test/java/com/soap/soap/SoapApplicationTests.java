@@ -621,6 +621,76 @@ class SoapApplicationTests {
   }
 
   @Test
+  @Transactional
+  void listPlatformReadingHistoryRequiresAuthenticationAndReturnsPlatformReadings() {
+    var platform =
+        readings.save(
+            new Reading(
+                null,
+                null,
+                "History Platform Reading " + java.util.UUID.randomUUID(),
+                "History platform reading content.",
+                "en",
+                LocalDateTime.parse("2026-09-04T12:00:00"),
+                ReadingOrigin.PLATFORM,
+                EditorialLevel.B1,
+                "Science",
+                "history-cover",
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
+    readingProgress.startIfAbsent(
+        user.id(), platform.id(), LocalDateTime.parse("2026-09-04T12:00:00"));
+
+    var client = MockWebServiceClient.createClient(applicationContext);
+    client
+        .sendRequest(
+            withPayload(
+                source(
+                    """
+                    <listPlatformReadingHistoryRequest xmlns="http://soap.com/english-reading/readings">
+                      <page>0</page><size>10</size>
+                    </listPlatformReadingHistoryRequest>
+                    """)))
+        .andExpect(clientOrSenderFault());
+
+    authenticateUser();
+    try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                      <listPlatformReadingHistoryRequest xmlns="http://soap.com/english-reading/readings">
+                        <page>0</page><size>10</size>
+                      </listPlatformReadingHistoryRequest>
+                      """)))
+          .andExpect(noFault())
+          .andExpect(xpath("//*[local-name()='page']").evaluatesTo("0"))
+          .andExpect(xpath("//*[local-name()='size']").evaluatesTo("10"))
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("1"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='readingId']")
+                  .evaluatesTo(platform.id().toString()))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='title']")
+                  .evaluatesTo(platform.title()))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='editorialLevel']")
+                  .evaluatesTo("B1"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='category']")
+                  .evaluatesTo("Science"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='coverKey']")
+                  .evaluatesTo("history-cover"))
+          .andExpect(
+              xpath("//*[local-name()='readings']/*[local-name()='progressStatus']")
+                  .evaluatesTo("IN_PROGRESS"));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  @Test
   void registerLoginCompleteAndLoginAgainPersistsOnboardingForOnlyTheAuthenticatedUser()
       throws Exception {
     var email = "onboarding-flow-" + java.util.UUID.randomUUID() + "@example.com";

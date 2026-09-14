@@ -3,6 +3,7 @@ package com.soap.soap.application.port.out;
 import com.soap.soap.application.model.ContinueReadingItem;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.PlatformReadingHistoryItem;
 import com.soap.soap.domain.model.ReadingProgress;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -16,6 +17,9 @@ public interface ReadingProgressRepositoryPort {
   Map<UUID, ReadingProgress> findByUserIdAndReadingIds(UUID userId, Set<UUID> readingIds);
 
   PageResult<ContinueReadingItem> findInProgressReadings(UUID userId, PageRequest pageRequest);
+
+  PageResult<PlatformReadingHistoryItem> findPlatformReadingHistory(
+      UUID userId, PageRequest pageRequest);
 
   ReadingProgress startIfAbsent(UUID userId, UUID readingId, LocalDateTime startedAt);
 

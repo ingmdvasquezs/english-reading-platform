@@ -3,6 +3,7 @@ package com.soap.soap.infrastructure.persistence.adapter;
 import com.soap.soap.application.model.ContinueReadingItem;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.PlatformReadingHistoryItem;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.domain.model.ReadingProgress;
 import com.soap.soap.infrastructure.persistence.entity.ReadingProgressEntity;
@@ -61,6 +62,31 @@ public class ReadingProgressPersistenceAdapter implements ReadingProgressReposit
                         item.getEditorialLevel(),
                         item.getCategory(),
                         item.getStartedAt()))
+            .toList(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PageResult<PlatformReadingHistoryItem> findPlatformReadingHistory(
+      UUID userId, PageRequest pageRequest) {
+    var page =
+        repository.findPlatformReadingHistory(
+            userId,
+            org.springframework.data.domain.PageRequest.of(pageRequest.page(), pageRequest.size()));
+    return new PageResult<>(
+        page.getContent().stream()
+            .map(
+                item ->
+                    new PlatformReadingHistoryItem(
+                        item.getReadingId(),
+                        item.getTitle(),
+                        item.getEditorialLevel(),
+                        item.getCategory(),
+                        item.getCoverKey(),
+                        item.getProgressStatus()))
             .toList(),
         page.getNumber(),
         page.getSize(),

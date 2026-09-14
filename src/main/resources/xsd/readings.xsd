@@ -255,6 +255,18 @@
         </xs:sequence>
     </xs:complexType>
 
+    <xs:complexType name="platformReadingHistoryItemType">
+        <xs:sequence>
+            <xs:element name="readingId" type="xs:string"/>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="editorialLevel" type="tns:editorialLevelType"/>
+            <xs:element name="category" type="xs:string"/>
+            <xs:element name="coverKey" type="xs:string" minOccurs="0"/>
+            <xs:element name="progressStatus" type="tns:readingProgressStatusType"/>
+        </xs:sequence>
+    </xs:complexType>
+
+
     <xs:complexType name="collectionType">
         <xs:sequence>
             <xs:element name="key" type="xs:string"/>
@@ -415,6 +427,18 @@
     <xs:element name="listPlatformReadingsResponse">
         <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
             <xs:element name="readings" type="tns:platformReadingSummaryType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
+    </xs:element>
+
+    <xs:element name="listPlatformReadingHistoryRequest">
+        <xs:complexType><xs:sequence>
+            <xs:element name="page" type="xs:int"/>
+            <xs:element name="size" type="xs:int"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="listPlatformReadingHistoryResponse">
+        <xs:complexType><xs:complexContent><xs:extension base="tns:pageType"><xs:sequence>
+            <xs:element name="readings" type="tns:platformReadingHistoryItemType" minOccurs="0" maxOccurs="unbounded"/>
         </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
     </xs:element>
 
