@@ -1,7 +1,11 @@
 package com.soap.soap.infrastructure.editorial;
 
+import com.soap.soap.application.command.UpdatePlatformReadingProvenanceCommand;
 import com.soap.soap.application.port.in.IngestEditorialReadingPort;
+import com.soap.soap.application.port.in.PublishPlatformReadingPort;
+import com.soap.soap.application.port.in.UpdatePlatformReadingProvenancePort;
 import java.nio.file.Path;
+import java.util.UUID;
 import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -16,15 +20,21 @@ public class EditorialImportCliRunner implements ApplicationRunner {
 
   private final EditorialManifestParser parser;
   private final IngestEditorialReadingPort ingestion;
+  private final UpdatePlatformReadingProvenancePort provenanceUpdate;
+  private final PublishPlatformReadingPort publishReadingPort;
   private final ConfigurableApplicationContext context;
   private Consumer<Integer> exitStrategy;
 
   public EditorialImportCliRunner(
       EditorialManifestParser parser,
       IngestEditorialReadingPort ingestion,
+      UpdatePlatformReadingProvenancePort provenanceUpdate,
+      PublishPlatformReadingPort publishReadingPort,
       ConfigurableApplicationContext context) {
     this.parser = parser;
     this.ingestion = ingestion;
+    this.provenanceUpdate = provenanceUpdate;
+    this.publishReadingPort = publishReadingPort;
     this.context = context;
     this.exitStrategy =
         code -> {
@@ -40,9 +50,34 @@ public class EditorialImportCliRunner implements ApplicationRunner {
 
   @Override
   public void run(ApplicationArguments args) {
-    if (!args.containsOption("editorial-import")) {
+    boolean hasImport = args.containsOption("editorial-import");
+    boolean hasProvenance = args.containsOption("editorial-provenance-update");
+    boolean hasPublish = args.containsOption("editorial-publish");
+
+    int operationsCount = (hasImport ? 1 : 0) + (hasProvenance ? 1 : 0) + (hasPublish ? 1 : 0);
+
+    if (operationsCount == 0) {
       return;
     }
+
+    if (operationsCount > 1) {
+      log.error("Multiple editorial operations supplied");
+      System.err.println(
+          "EDITORIAL_OPERATION_FAILED: Exactly one editorial operation may be supplied");
+      exitStrategy.accept(1);
+      return;
+    }
+
+    if (hasImport) {
+      handleImport(args);
+    } else if (hasProvenance) {
+      handleProvenanceUpdate(args);
+    } else {
+      handlePublish(args);
+    }
+  }
+
+  private void handleImport(ApplicationArguments args) {
 
     int exitCode = 0;
     try {
@@ -73,6 +108,92 @@ public class EditorialImportCliRunner implements ApplicationRunner {
     } catch (Exception e) {
       log.error("Editorial import failed: {}", e.getMessage());
       System.err.println("EDITORIAL_IMPORT_FAILED: " + e.getMessage());
+      exitCode = 1;
+    } finally {
+      exitStrategy.accept(exitCode);
+    }
+  }
+
+  private void handleProvenanceUpdate(ApplicationArguments args) {
+    int exitCode = 0;
+    try {
+      var values = args.getOptionValues("editorial-provenance-update");
+      if (values == null || values.isEmpty() || values.getFirst().isBlank()) {
+        throw new IllegalArgumentException(
+            "Option --editorial-provenance-update requires a valid file path");
+      }
+      var path = Path.of(values.getFirst());
+      log.info("Starting editorial provenance update from: {}", path);
+
+      var parsed = parser.parse(path);
+      var command =
+          new UpdatePlatformReadingProvenanceCommand(
+              parsed.adaptationGroupKey(),
+              parsed.language(),
+              parsed.editorialLevel(),
+              parsed.sourceTitle(),
+              parsed.sourceAuthor(),
+              parsed.sourceUrl(),
+              parsed.sourceNotes());
+
+      var result = provenanceUpdate.updateProvenance(command);
+
+      log.info(
+          "Editorial provenance update completed successfully: readingId={}, status={}, title={}",
+          result.id(),
+          result.editorialStatus(),
+          result.title());
+      System.out.println(
+          "EDITORIAL_PROVENANCE_UPDATE_SUCCESS: readingId="
+              + result.id()
+              + ", status="
+              + result.editorialStatus()
+              + ", title="
+              + result.title());
+      exitCode = 0;
+    } catch (Exception e) {
+      log.error("Editorial provenance update failed: {}", e.getMessage());
+      System.err.println("EDITORIAL_PROVENANCE_UPDATE_FAILED: " + e.getMessage());
+      exitCode = 1;
+    } finally {
+      exitStrategy.accept(exitCode);
+    }
+  }
+
+  private void handlePublish(ApplicationArguments args) {
+    int exitCode = 0;
+    try {
+      var values = args.getOptionValues("editorial-publish");
+      if (values == null || values.isEmpty() || values.getFirst().isBlank()) {
+        throw new IllegalArgumentException("Option --editorial-publish requires a valid readingId");
+      }
+      UUID readingId;
+      try {
+        readingId = UUID.fromString(values.getFirst().trim());
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException(
+            "Invalid UUID format for --editorial-publish: " + values.getFirst());
+      }
+
+      log.info("Starting editorial publication for readingId: {}", readingId);
+      var result = publishReadingPort.publish(readingId);
+
+      log.info(
+          "Editorial publish completed successfully: readingId={}, status={}, title={}",
+          result.id(),
+          result.editorialStatus(),
+          result.title());
+      System.out.println(
+          "EDITORIAL_PUBLISH_SUCCESS: readingId="
+              + result.id()
+              + ", status="
+              + result.editorialStatus()
+              + ", title="
+              + result.title());
+      exitCode = 0;
+    } catch (Exception e) {
+      log.error("Editorial publish failed: {}", e.getMessage());
+      System.err.println("EDITORIAL_PUBLISH_FAILED: " + e.getMessage());
       exitCode = 1;
     } finally {
       exitStrategy.accept(exitCode);
