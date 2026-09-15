@@ -102,7 +102,6 @@ app:
     max-cover-pixels: ${DOCUMENT_MAX_COVER_PIXELS:25000000}
     max-pdf-pages: ${DOCUMENT_MAX_PDF_PAGES:1000}
     max-extracted-characters: ${DOCUMENT_MAX_EXTRACTED_CHARACTERS:5000000}
-    supported-languages: ${DOCUMENT_SUPPORTED_LANGUAGES:en}
     executor-core-size: ${DOCUMENT_EXECUTOR_CORE_SIZE:2}
     executor-max-size: ${DOCUMENT_EXECUTOR_MAX_SIZE:4}
     executor-queue-capacity: ${DOCUMENT_EXECUTOR_QUEUE_CAPACITY:20}

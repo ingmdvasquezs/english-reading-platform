@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.soap.soap.application.exception.DocumentAlreadyImportedException;
 import com.soap.soap.application.exception.DocumentImportException;
 import com.soap.soap.application.exception.DuplicateActiveDocumentSourceException;
+import com.soap.soap.application.policy.LanguageAvailabilityPolicy;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.DocumentAssetStoragePort;
 import com.soap.soap.application.port.out.ImportedDocumentRepositoryPort;
@@ -221,13 +222,14 @@ class AcceptDocumentImportUseCaseTest {
   }
 
   private AcceptDocumentImportUseCase useCase(Executor executor) {
+    var availability = new LanguageAvailabilityPolicy(Set.of("en"), Set.of("en"));
     return new AcceptDocumentImportUseCase(
         currentUser,
         users,
         documents,
         storage,
         processor,
-        new DocumentLanguagePolicy(Set.of("en")),
+        new DocumentLanguagePolicy(availability),
         executor,
         meters,
         Clock.systemUTC());

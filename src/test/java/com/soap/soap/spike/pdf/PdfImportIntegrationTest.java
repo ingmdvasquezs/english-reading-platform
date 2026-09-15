@@ -7,6 +7,7 @@ import com.soap.soap.application.command.UpdateDocumentProgressCommand;
 import com.soap.soap.application.exception.DocumentAlreadyImportedException;
 import com.soap.soap.application.exception.DocumentNotReadyException;
 import com.soap.soap.application.model.DocumentImportLimits;
+import com.soap.soap.application.policy.LanguageAvailabilityPolicy;
 import com.soap.soap.application.port.out.DocumentProgressRepositoryPort;
 import com.soap.soap.application.port.out.ImportedDocumentRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -93,7 +94,7 @@ class PdfImportIntegrationTest {
             documents,
             storage,
             processor,
-            new DocumentLanguagePolicy(Set.of("en")),
+            new DocumentLanguagePolicy(new LanguageAvailabilityPolicy(Set.of("en"), Set.of("en"))),
             Runnable::run,
             new SimpleMeterRegistry(),
             Clock.systemUTC());
