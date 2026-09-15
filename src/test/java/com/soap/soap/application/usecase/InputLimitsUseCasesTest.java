@@ -8,6 +8,7 @@ import com.soap.soap.application.command.RegisterReadingCommand;
 import com.soap.soap.application.command.RegisterUserCommand;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.model.InputLimits;
+import com.soap.soap.application.policy.LanguageAvailabilityPolicy;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.DictionaryPort;
 import com.soap.soap.application.port.out.PasswordEncoderPort;
@@ -18,6 +19,7 @@ import com.soap.soap.application.service.LanguageNormalizer;
 import com.soap.soap.application.service.TextWordProcessor;
 import com.soap.soap.domain.model.User;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -54,7 +56,8 @@ class InputLimitsUseCasesTest {
             mock(ReadingRepositoryPort.class),
             new LanguageNormalizer(),
             currentUser,
-            limits);
+            limits,
+            new LanguageAvailabilityPolicy(Set.of("en"), Set.of("en")));
 
     assertInvalid(
         () -> useCase.registerReading(new RegisterReadingCommand("t".repeat(201), "x", "en")));

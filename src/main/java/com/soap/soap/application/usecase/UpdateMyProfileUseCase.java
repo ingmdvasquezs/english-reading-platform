@@ -6,6 +6,7 @@ import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.model.InputLimits;
 import com.soap.soap.application.model.UserProfile;
+import com.soap.soap.application.policy.LanguageAvailabilityPolicy;
 import com.soap.soap.application.port.in.UpdateMyProfilePort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -24,6 +25,7 @@ public class UpdateMyProfileUseCase implements UpdateMyProfilePort {
   private final CurrentUserPort currentUser;
   private final UserRepositoryPort users;
   private final InputLimits limits;
+  private final LanguageAvailabilityPolicy languageAvailabilityPolicy;
 
   @Override
   @Transactional
@@ -35,8 +37,9 @@ public class UpdateMyProfileUseCase implements UpdateMyProfilePort {
     var user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
     var name = requiredText(command.name(), "Name", limits.maxNameCharacters());
     var alias = optionalText(command.alias(), "Alias", MAX_ALIAS_CHARACTERS);
-    var nativeLanguage = optionalLanguage(command.nativeLanguage(), "Native language");
-    var learningLanguage = requiredLanguage(command.learningLanguage(), "Learning language");
+    var nativeLanguage = optionalLanguageSyntaxOnly(command.nativeLanguage(), "Native language");
+    var learningLanguage =
+        requiredLearningLanguage(command.learningLanguage(), "Learning language");
     if (command.age() != null && (command.age() < MIN_AGE || command.age() > MAX_AGE)) {
       throw new InvalidApplicationArgumentException("Age must be between 5 and 120");
     }
@@ -65,12 +68,10 @@ public class UpdateMyProfileUseCase implements UpdateMyProfilePort {
     return requiredText(value, field, maximum);
   }
 
-  private static String optionalLanguage(String value, String field) {
-    return value == null ? null : requiredLanguage(value, field);
-  }
-
-  private static String requiredLanguage(String value, String field) {
-    if (value == null || value.isBlank()) {
+  /** Validates BCP-47 syntax only — no availability check (e.g. nativeLanguage). */
+  private static String optionalLanguageSyntaxOnly(String value, String field) {
+    if (value == null) return null;
+    if (value.isBlank()) {
       throw new InvalidApplicationArgumentException(field + " must not be blank");
     }
     try {
@@ -78,5 +79,20 @@ public class UpdateMyProfileUseCase implements UpdateMyProfilePort {
     } catch (IllegalArgumentException e) {
       throw new InvalidApplicationArgumentException(field + " is invalid", e);
     }
+  }
+
+  /** Validates BCP-47 syntax AND product availability (learningLanguage). */
+  private String requiredLearningLanguage(String value, String field) {
+    if (value == null || value.isBlank()) {
+      throw new InvalidApplicationArgumentException(field + " must not be blank");
+    }
+    LanguageTag tag;
+    try {
+      tag = LanguageTag.of(value);
+    } catch (IllegalArgumentException e) {
+      throw new InvalidApplicationArgumentException(field + " is invalid", e);
+    }
+    languageAvailabilityPolicy.requireLearningLanguageEnabled(tag);
+    return tag.value();
   }
 }

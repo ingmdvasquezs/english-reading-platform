@@ -108,6 +108,9 @@ app:
     executor-queue-capacity: ${DOCUMENT_EXECUTOR_QUEUE_CAPACITY:20}
     orphan-minimum-age: ${DOCUMENT_ORPHAN_MINIMUM_AGE:24h}
     reconciliation-delay: ${DOCUMENT_RECONCILIATION_DELAY:24h}
+  languages:
+    enabled-learning: ${LANGUAGES_ENABLED_LEARNING:en}
+    enabled-content: ${LANGUAGES_ENABLED_CONTENT:en}
   correlation-id:
     header: X-Correlation-ID
     maximum-length: 64

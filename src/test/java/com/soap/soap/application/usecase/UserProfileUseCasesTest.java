@@ -12,11 +12,13 @@ import com.soap.soap.application.exception.AliasAlreadyInUseException;
 import com.soap.soap.application.exception.AuthenticationRequiredException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.model.InputLimits;
+import com.soap.soap.application.policy.LanguageAvailabilityPolicy;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.domain.model.User;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,7 @@ class UserProfileUseCasesTest {
   private UUID userId;
   private User user;
   private UpdateMyProfileUseCase update;
+  private LanguageAvailabilityPolicy englishOnlyPolicy;
 
   @BeforeEach
   void setUp() {
@@ -49,7 +52,9 @@ class UserProfileUseCasesTest {
             null,
             null,
             "en");
-    update = new UpdateMyProfileUseCase(currentUser, users, InputLimits.defaults());
+    englishOnlyPolicy = new LanguageAvailabilityPolicy(Set.of("en"), Set.of("en"));
+    update =
+        new UpdateMyProfileUseCase(currentUser, users, InputLimits.defaults(), englishOnlyPolicy);
   }
 
   @Test
@@ -138,6 +143,33 @@ class UserProfileUseCasesTest {
                 update.updateMyProfile(
                     new UpdateMyProfileCommand("Ada", null, null, null, "invalid language!")))
         .isInstanceOf(InvalidApplicationArgumentException.class);
+  }
+
+  /**
+   * Availability test: 'fr' is syntactically valid BCP-47 but not enabled in the current product.
+   */
+  @Test
+  void rejectsLearningLanguageNotEnabledInCurrentProduct() {
+    arrangeUser();
+
+    assertThatThrownBy(
+            () -> update.updateMyProfile(new UpdateMyProfileCommand("Ada", null, null, null, "fr")))
+        .isInstanceOf(InvalidApplicationArgumentException.class)
+        .hasMessageContaining("fr")
+        .hasMessageContaining("not currently supported");
+    verify(users, never()).save(any());
+  }
+
+  /** nativeLanguage is editorial metadata — availability policy does NOT apply. */
+  @Test
+  void acceptsNativeLanguageNotEnabledForLearning() {
+    arrangeUser();
+    when(users.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+    // es is not in the enabled-learning set, but nativeLanguage is syntax-only validated
+    var result = update.updateMyProfile(new UpdateMyProfileCommand("Ada", null, null, "es", "en"));
+
+    assertThat(result.nativeLanguage()).isEqualTo("es");
   }
 
   private void arrangeUser() {

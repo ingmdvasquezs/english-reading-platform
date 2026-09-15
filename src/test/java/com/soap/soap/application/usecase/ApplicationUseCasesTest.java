@@ -20,6 +20,7 @@ import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.PlatformReadingSummary;
 import com.soap.soap.application.model.ReadingSummary;
+import com.soap.soap.application.policy.LanguageAvailabilityPolicy;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
@@ -85,7 +86,12 @@ class ApplicationUseCasesTest {
     when(readings.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     var useCase =
         new RegisterReadingUseCase(
-            users, readings, new LanguageNormalizer(), currentUser, InputLimits.defaults());
+            users,
+            readings,
+            new LanguageNormalizer(),
+            currentUser,
+            InputLimits.defaults(),
+            new LanguageAvailabilityPolicy(Set.of("en"), Set.of("en")));
 
     var result =
         useCase.registerReading(new RegisterReadingCommand("  Title  ", "  Content  ", " EN "));
@@ -113,7 +119,8 @@ class ApplicationUseCasesTest {
                         readings,
                         new LanguageNormalizer(),
                         currentUser,
-                        InputLimits.defaults())
+                        InputLimits.defaults(),
+                        new LanguageAvailabilityPolicy(Set.of("en"), Set.of("en")))
                     .registerReading(new RegisterReadingCommand("Title", "Content", "en")))
         .isInstanceOf(UserNotFoundException.class);
     verify(readings, never()).save(any());

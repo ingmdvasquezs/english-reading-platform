@@ -48,7 +48,12 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(properties = "security.jwt.secret=test-only-secret-with-at-least-32-bytes")
+@SpringBootTest(
+    properties = {
+      "security.jwt.secret=test-only-secret-with-at-least-32-bytes",
+      "app.languages.enabled-learning=en,fr,pt-BR,de,ja",
+      "app.languages.enabled-content=en,fr,pt-BR,de,ja"
+    })
 @Testcontainers
 @ActiveProfiles("local")
 class MultiLanguageOcpAcceptanceTest {

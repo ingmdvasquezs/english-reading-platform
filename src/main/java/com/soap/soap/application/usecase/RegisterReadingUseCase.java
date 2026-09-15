@@ -4,11 +4,13 @@ import com.soap.soap.application.command.RegisterReadingCommand;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.model.InputLimits;
+import com.soap.soap.application.policy.LanguageAvailabilityPolicy;
 import com.soap.soap.application.port.in.RegisterReadingPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.service.LanguageNormalizer;
+import com.soap.soap.domain.model.LanguageTag;
 import com.soap.soap.domain.model.Reading;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class RegisterReadingUseCase implements RegisterReadingPort {
   private final LanguageNormalizer languages;
   private final CurrentUserPort currentUser;
   private final InputLimits limits;
+  private final LanguageAvailabilityPolicy languageAvailabilityPolicy;
 
   @Override
   @Transactional
@@ -42,14 +45,10 @@ public class RegisterReadingUseCase implements RegisterReadingPort {
           "Reading content exceeds the maximum UTF-8 size");
     }
     var user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+    var normalizedLanguage = languages.normalize(command.language());
+    languageAvailabilityPolicy.requireContentLanguageEnabled(LanguageTag.of(normalizedLanguage));
 
     return readings.save(
-        new Reading(
-            null,
-            user,
-            command.title(),
-            command.content(),
-            languages.normalize(command.language()),
-            null));
+        new Reading(null, user, command.title(), command.content(), normalizedLanguage, null));
   }
 }
