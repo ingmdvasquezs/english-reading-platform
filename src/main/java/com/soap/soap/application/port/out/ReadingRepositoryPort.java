@@ -26,7 +26,14 @@ public interface ReadingRepositoryPort {
 
   List<Reading> findAllPlatformReadings();
 
+  Optional<Reading> findPlatformReadingByAdaptationKey(
+      String adaptationGroupKey,
+      String language,
+      com.soap.soap.domain.model.EditorialLevel editorialLevel);
+
   Reading save(Reading reading);
+
+  Reading saveAndFlush(Reading reading);
 
   void deleteById(UUID id);
 }

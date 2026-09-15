@@ -14,6 +14,8 @@ public interface ReadingWordFrequencyRepositoryPort {
 
   Map<String, Integer> findFrequenciesByReadingId(UUID readingId);
 
+  boolean existsByReadingId(UUID readingId);
+
   List<ReadingLexicalEvidence> findLexicalEvidenceByUserAndLanguage(
       UUID userId, String language, Collection<UUID> readingIds);
 }

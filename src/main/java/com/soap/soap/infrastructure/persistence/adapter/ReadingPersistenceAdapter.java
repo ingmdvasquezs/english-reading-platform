@@ -155,9 +155,30 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public Optional<Reading> findPlatformReadingByAdaptationKey(
+      String adaptationGroupKey,
+      String language,
+      com.soap.soap.domain.model.EditorialLevel editorialLevel) {
+    return repository
+        .findByAdaptationGroupKeyAndLanguageAndEditorialLevelAndOrigin(
+            adaptationGroupKey,
+            language,
+            editorialLevel,
+            com.soap.soap.domain.model.ReadingOrigin.PLATFORM)
+        .map(mapper::toDomain);
+  }
+
+  @Override
   @Transactional
   public Reading save(Reading reading) {
     return mapper.toDomain(repository.save(mapper.toEntity(reading)));
+  }
+
+  @Override
+  @Transactional
+  public Reading saveAndFlush(Reading reading) {
+    return mapper.toDomain(repository.saveAndFlush(mapper.toEntity(reading)));
   }
 
   @Override

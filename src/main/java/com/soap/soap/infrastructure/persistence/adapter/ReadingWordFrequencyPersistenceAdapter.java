@@ -90,6 +90,20 @@ public class ReadingWordFrequencyPersistenceAdapter implements ReadingWordFreque
     return Map.copyOf(result);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public boolean existsByReadingId(UUID readingId) {
+    if (readingId == null) {
+      throw new IllegalArgumentException("Reading ID must not be null");
+    }
+    var count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM reading_word_frequencies WHERE reading_id = :readingId",
+            new MapSqlParameterSource("readingId", readingId),
+            Integer.class);
+    return count != null && count > 0;
+  }
+
   /**
    * Finds lexical evidence for a user across a set of readings.
    *

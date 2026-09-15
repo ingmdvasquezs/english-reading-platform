@@ -18,6 +18,12 @@ public interface JpaReadingRepository extends JpaRepository<ReadingEntity, UUID>
   @EntityGraph(attributePaths = "user")
   Optional<ReadingEntity> findById(UUID id);
 
+  Optional<ReadingEntity> findByAdaptationGroupKeyAndLanguageAndEditorialLevelAndOrigin(
+      String adaptationGroupKey,
+      String language,
+      com.soap.soap.domain.model.EditorialLevel editorialLevel,
+      com.soap.soap.domain.model.ReadingOrigin origin);
+
   @Query(
       value =
           """
