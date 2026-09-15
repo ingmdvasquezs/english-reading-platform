@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,9 +26,11 @@ import com.soap.soap.application.service.RecommendationScorerV2;
 import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.ReadingProgress;
 import com.soap.soap.domain.model.RecommendationReasonCode;
+import com.soap.soap.domain.model.User;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +59,9 @@ class RecommendPlatformReadingsUseCaseTest {
   void setUp() {
     userId = UUID.randomUUID();
     when(currentUser.requireUserId()).thenReturn(userId);
+    lenient()
+        .when(users.findById(userId))
+        .thenReturn(Optional.of(new User(userId, "Test User", "test@example.com")));
     useCase =
         new RecommendPlatformReadingsUseCase(
             users,
@@ -339,6 +345,104 @@ class RecommendPlatformReadingsUseCaseTest {
     when(vocabulary.countClassifiedWordsByUserAndLanguage(userId, "en")).thenReturn(31L);
     var matureResult2 = useCase.recommendPlatformReadings(new PageRequest(0, 10));
     assertThat(matureResult2.content().getFirst().title()).isEqualTo("B1 Well-Known");
+  }
+
+  @Test
+  @DisplayName(
+      "Recomienda únicamente lecturas que coincidan con learningLanguage sin fallback silencioso a en")
+  void filtersCandidatesStrictlyByLearningLanguageWithoutFallbackToEn() {
+    var userFr =
+        new User(
+            userId,
+            "French Learner",
+            "fr@example.com",
+            "hash",
+            LocalDateTime.now(),
+            true,
+            "frUser",
+            20,
+            "es",
+            "fr");
+    when(users.existsById(userId)).thenReturn(true);
+    when(users.findById(userId)).thenReturn(Optional.of(userFr));
+
+    var enSummary =
+        new PlatformReadingSummary(
+            UUID.randomUUID(),
+            "English Book",
+            "en",
+            EditorialLevel.A1,
+            "Daily Life & Relationships",
+            LocalDateTime.now(),
+            null,
+            "en-cover");
+    var frSummary =
+        new PlatformReadingSummary(
+            UUID.randomUUID(),
+            "Livre Français",
+            "fr",
+            EditorialLevel.A1,
+            "Daily Life & Relationships",
+            LocalDateTime.now(),
+            null,
+            "fr-cover");
+
+    when(readings.findAllPlatformReadingSummaries()).thenReturn(List.of(enSummary, frSummary));
+    when(vocabulary.countClassifiedWordsByUserAndLanguage(userId, "fr")).thenReturn(50L);
+    var frEvidence = evidence(frSummary.id(), 100, 95, 5, 0, 50, 45, 5, 0, 0, 0);
+    when(frequencyRepository.findLexicalEvidenceByUserAndLanguage(
+            eq(userId), eq("fr"), eq(List.of(frSummary.id()))))
+        .thenReturn(List.of(frEvidence));
+    when(progress.findByUserIdAndReadingIds(eq(userId), eq(Set.of(frSummary.id()))))
+        .thenReturn(Map.of());
+
+    var result = useCase.recommendPlatformReadings(new PageRequest(0, 10));
+
+    // Exclusively fr candidate is recommended, en is strictly omitted
+    assertThat(result.content())
+        .extracting(RecommendedPlatformReading::title)
+        .containsExactly("Livre Français");
+
+    // When user has a language without candidates, empty result returned - NO fallback to en
+    var userJa =
+        new User(
+            userId,
+            "Japanese Learner",
+            "ja@example.com",
+            "hash",
+            LocalDateTime.now(),
+            true,
+            "jaUser",
+            20,
+            "es",
+            "ja");
+    when(users.findById(userId)).thenReturn(Optional.of(userJa));
+    var resultJa = useCase.recommendPlatformReadings(new PageRequest(0, 10));
+    assertThat(resultJa.content()).isEmpty();
+    assertThat(resultJa.totalElements()).isEqualTo(0);
+  }
+
+  @Test
+  @DisplayName("Lanza IllegalStateException si el usuario no tiene learningLanguage configurado")
+  void throwsWhenUserHasNoConfiguredLearningLanguage() {
+    var unconfiguredUser =
+        new User(
+            userId,
+            "No Lang User",
+            "nolang@example.com",
+            "hash",
+            LocalDateTime.now(),
+            true,
+            "nolang",
+            20,
+            "es",
+            null);
+    when(users.existsById(userId)).thenReturn(true);
+    when(users.findById(userId)).thenReturn(Optional.of(unconfiguredUser));
+
+    assertThatThrownBy(() -> useCase.recommendPlatformReadings(new PageRequest(0, 10)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("active learning language");
   }
 
   private PlatformReadingSummary summary(String title, EditorialLevel level, int daysAgo) {

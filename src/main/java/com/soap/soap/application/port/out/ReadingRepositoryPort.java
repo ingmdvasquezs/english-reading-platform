@@ -19,6 +19,9 @@ public interface ReadingRepositoryPort {
 
   PageResult<PlatformReadingSummary> findPlatformSummaries(PageRequest pageRequest);
 
+  PageResult<PlatformReadingSummary> findPlatformSummaries(
+      String language, PageRequest pageRequest);
+
   List<PlatformReadingSummary> findAllPlatformReadingSummaries();
 
   List<Reading> findAllPlatformReadings();

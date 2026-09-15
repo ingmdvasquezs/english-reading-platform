@@ -146,7 +146,7 @@ class ReadingLexicalIndexerIntegrationTest {
         null,
         ReadingOrigin.PLATFORM,
         EditorialLevel.B1,
-        "FICTION",
+        "Culture, Arts & Fiction",
         "cover-key",
         com.soap.soap.domain.model.EditorialStatus.PUBLISHED);
   }

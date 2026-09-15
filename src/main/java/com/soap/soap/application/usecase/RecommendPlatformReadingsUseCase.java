@@ -17,6 +17,7 @@ import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.service.RecommendationReasonEvaluator;
 import com.soap.soap.application.service.RecommendationScorerV2;
+import com.soap.soap.domain.model.LanguageTag;
 import com.soap.soap.domain.model.ReadingProgressStatus;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -125,9 +126,24 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
     if (!users.existsById(userId)) {
       throw new UserNotFoundException(userId);
     }
+    var user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+    if (user.learningLanguage() == null || user.learningLanguage().isBlank()) {
+      throw new IllegalStateException(
+          "User " + userId + " does not have an active learning language configured");
+    }
+    String learningLanguage = LanguageTag.of(user.learningLanguage()).value();
 
     // 1. Load candidate platform summaries without content TEXT
-    List<PlatformReadingSummary> candidates = readings.findAllPlatformReadingSummaries();
+    List<PlatformReadingSummary> allCandidates = readings.findAllPlatformReadingSummaries();
+    if (allCandidates.isEmpty()) {
+      return new PageResult<>(List.of(), pageRequest.page(), pageRequest.size(), 0);
+    }
+
+    List<PlatformReadingSummary> candidates =
+        allCandidates.stream()
+            .filter(c -> learningLanguage.equalsIgnoreCase(c.language()))
+            .toList();
+
     if (candidates.isEmpty()) {
       return new PageResult<>(List.of(), pageRequest.page(), pageRequest.size(), 0);
     }

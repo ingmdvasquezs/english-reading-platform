@@ -9,7 +9,7 @@ import com.soap.soap.application.model.UserProfile;
 import com.soap.soap.application.port.in.UpdateMyProfilePort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
-import java.util.Locale;
+import com.soap.soap.domain.model.LanguageTag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,9 +37,6 @@ public class UpdateMyProfileUseCase implements UpdateMyProfilePort {
     var alias = optionalText(command.alias(), "Alias", MAX_ALIAS_CHARACTERS);
     var nativeLanguage = optionalLanguage(command.nativeLanguage(), "Native language");
     var learningLanguage = requiredLanguage(command.learningLanguage(), "Learning language");
-    if (!"en".equals(learningLanguage)) {
-      throw new InvalidApplicationArgumentException("Learning language must be en");
-    }
     if (command.age() != null && (command.age() < MIN_AGE || command.age() > MAX_AGE)) {
       throw new InvalidApplicationArgumentException("Age must be between 5 and 120");
     }
@@ -73,13 +70,13 @@ public class UpdateMyProfileUseCase implements UpdateMyProfilePort {
   }
 
   private static String requiredLanguage(String value, String field) {
-    var normalized = requiredText(value, field, 10);
-    var parts = normalized.split("-", -1);
-    var language = parts[0].toLowerCase(Locale.ROOT);
-    var result = parts.length == 1 ? language : language + "-" + parts[1].toUpperCase(Locale.ROOT);
-    if (parts.length > 2 || !result.matches("[a-z]{2,3}(-[A-Z]{2,3})?")) {
-      throw new InvalidApplicationArgumentException(field + " is invalid");
+    if (value == null || value.isBlank()) {
+      throw new InvalidApplicationArgumentException(field + " must not be blank");
     }
-    return result;
+    try {
+      return LanguageTag.of(value).value();
+    } catch (IllegalArgumentException e) {
+      throw new InvalidApplicationArgumentException(field + " is invalid", e);
+    }
   }
 }

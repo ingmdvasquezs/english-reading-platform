@@ -92,7 +92,7 @@ class ApplicationUseCasesTest {
 
     assertThat(result.title()).isEqualTo("Title");
     assertThat(result.content()).isEqualTo("Content");
-    assertThat(result.language()).isEqualTo("en");
+    assertThat(result.language().value()).isEqualTo("en");
     assertThat(result.origin()).isEqualTo(ReadingOrigin.USER);
     assertThat(result.user()).isEqualTo(user);
     assertThat(result.editorialLevel()).isNull();
@@ -305,13 +305,14 @@ class ApplicationUseCasesTest {
     var request = new PageRequest(0, 10);
     var expected = new PageResult<PlatformReadingSummary>(List.of(), 0, 10, 4);
     when(users.existsById(user.id())).thenReturn(true);
-    when(readings.findPlatformSummaries(request)).thenReturn(expected);
+    when(users.findById(user.id())).thenReturn(Optional.of(user));
+    when(readings.findPlatformSummaries("en", request)).thenReturn(expected);
 
     assertThat(
             new ListPlatformReadingsUseCase(users, readings, progress, currentUser)
                 .listPlatformReadings(request))
         .isEqualTo(expected);
-    verify(readings).findPlatformSummaries(request);
+    verify(readings).findPlatformSummaries("en", request);
   }
 
   @Test

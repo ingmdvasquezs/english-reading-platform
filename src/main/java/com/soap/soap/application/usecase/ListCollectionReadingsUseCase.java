@@ -14,6 +14,7 @@ import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.service.PlatformReadingRecommendationCalculator;
 import com.soap.soap.application.service.TextWordProcessor;
+import com.soap.soap.domain.model.LanguageTag;
 import com.soap.soap.domain.model.VocabularyStatus;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -51,10 +52,21 @@ public class ListCollectionReadingsUseCase implements ListCollectionReadingsPort
     if (!users.existsById(userId)) {
       throw new UserNotFoundException(userId);
     }
+    // Verify collection exists
     collections
         .findActiveByKey(collectionKey)
         .orElseThrow(() -> new CollectionNotFoundException(collectionKey));
-    var page = collections.findReadings(collectionKey, pageRequest);
+
+    // Load user and determine learning language
+    var user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+    if (user.learningLanguage() == null || user.learningLanguage().isBlank()) {
+      throw new IllegalStateException(
+          "User " + userId + " does not have an active learning language configured");
+    }
+    String learningLanguage = LanguageTag.of(user.learningLanguage()).value();
+
+    // Fetch readings scoped to user language
+    var page = collections.findReadings(collectionKey, learningLanguage, pageRequest);
     var wordsByReading = new LinkedHashMap<UUID, Set<String>>();
     var wordsByLanguage = new HashMap<String, Set<String>>();
     for (var reading : page.content()) {
@@ -63,9 +75,8 @@ public class ListCollectionReadingsUseCase implements ListCollectionReadingsPort
               .map(TextWordProcessor.Token::normalizedValue)
               .collect(Collectors.toUnmodifiableSet());
       wordsByReading.put(reading.id(), uniqueWords);
-      wordsByLanguage
-          .computeIfAbsent(reading.language(), ignored -> new HashSet<>())
-          .addAll(uniqueWords);
+      String readingLang = reading.language() == null ? null : reading.language().value();
+      wordsByLanguage.computeIfAbsent(readingLang, ignored -> new HashSet<>()).addAll(uniqueWords);
     }
     var statusesByLanguage = new HashMap<String, Map<String, VocabularyStatus>>();
     wordsByLanguage.forEach(
@@ -83,11 +94,13 @@ public class ListCollectionReadingsUseCase implements ListCollectionReadingsPort
         page.content().stream()
             .map(
                 reading -> {
+                  String readingLang =
+                      reading.language() == null ? null : reading.language().value();
                   var calculated =
                       calculator.calculate(
                           reading,
                           wordsByReading.get(reading.id()),
-                          statusesByLanguage.getOrDefault(reading.language(), Map.of()));
+                          statusesByLanguage.getOrDefault(readingLang, Map.of()));
                   return withProgress(
                       calculated,
                       progressByReading.containsKey(reading.id())

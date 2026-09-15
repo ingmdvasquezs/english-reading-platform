@@ -31,7 +31,7 @@ public class RegisterReadingSoapMapper {
 
     response.setReadingId(reading.id().toString());
     response.setTitle(reading.title());
-    response.setLanguage(reading.language());
+    response.setLanguage(reading.language() == null ? null : reading.language().value());
 
     if (reading.createdAt() != null) {
       response.setCreatedAt(

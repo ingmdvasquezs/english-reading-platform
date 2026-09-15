@@ -186,7 +186,7 @@ class SoapEndpointsTest {
         new ReadingSummary(
             reading.id(),
             reading.title(),
-            reading.language(),
+            reading.language().value(),
             reading.createdAt(),
             5,
             1,

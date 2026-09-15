@@ -2,6 +2,7 @@ package com.soap.soap.application.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +23,7 @@ import com.soap.soap.domain.model.ReadingCollection;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.ReadingProgress;
 import com.soap.soap.domain.model.ReadingProgressStatus;
+import com.soap.soap.domain.model.User;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +72,8 @@ class CollectionUseCasesTest {
 
     assertThatThrownBy(() -> useCase.listCollectionReadings("missing", new PageRequest(0, 10)))
         .isInstanceOf(CollectionNotFoundException.class);
-    verify(collections, never()).findReadings("missing", new PageRequest(0, 10));
+    verify(collections, never()).findReadings(any(), any(), any());
+    verify(collections, never()).findReadings(any(), any());
   }
 
   @Test
@@ -81,9 +84,11 @@ class CollectionUseCasesTest {
     var secondReading = reading(secondReadingId, "Second", "known");
     var request = new PageRequest(1, 2);
     when(users.existsById(userId)).thenReturn(true);
+    when(users.findById(userId))
+        .thenReturn(Optional.of(new User(userId, "Alice", "alice@example.com")));
     when(collections.findActiveByKey("everyday"))
         .thenReturn(Optional.of(collection("everyday", 1, null)));
-    when(collections.findReadings("everyday", request))
+    when(collections.findReadings("everyday", "en", request))
         .thenReturn(new PageResult<>(List.of(reading, secondReading), 1, 2, 11));
     when(vocabulary.findStatusesByNormalizedValues(
             userId, "en", Set.of("known", "learning", "new", "ignored", "unknown")))
@@ -134,9 +139,13 @@ class CollectionUseCasesTest {
     when(currentUser.requireUserId()).thenReturn(userId, secondUserId);
     when(users.existsById(userId)).thenReturn(true);
     when(users.existsById(secondUserId)).thenReturn(true);
+    when(users.findById(userId))
+        .thenReturn(Optional.of(new User(userId, "User1", "u1@example.com")));
+    when(users.findById(secondUserId))
+        .thenReturn(Optional.of(new User(secondUserId, "User2", "u2@example.com")));
     when(collections.findActiveByKey("shared"))
         .thenReturn(Optional.of(collection("shared", 1, null)));
-    when(collections.findReadings("shared", request))
+    when(collections.findReadings("shared", "en", request))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
     when(vocabulary.findStatusesByNormalizedValues(userId, "en", Set.of("alpha", "beta")))
         .thenReturn(Map.of("alpha", com.soap.soap.domain.model.VocabularyStatus.KNOWN));

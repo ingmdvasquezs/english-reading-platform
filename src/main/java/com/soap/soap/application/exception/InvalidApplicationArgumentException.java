@@ -5,4 +5,8 @@ public class InvalidApplicationArgumentException extends IllegalArgumentExceptio
   public InvalidApplicationArgumentException(String message) {
     super(message);
   }
+
+  public InvalidApplicationArgumentException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

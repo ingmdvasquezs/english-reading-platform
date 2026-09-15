@@ -84,8 +84,10 @@ class ComprehensionFlowIntegrationTest {
   private static void insertQuizFixture(JdbcTemplate jdbc, UUID readingId, String title) {
     jdbc.update(
         """
-        INSERT INTO readings (id, user_id, title, content, language, created_at, origin, editorial_level, category, editorial_status)
-        VALUES (?, NULL, ?, 'Sample reading content for comprehension quiz flow testing.', 'en', CURRENT_TIMESTAMP, 'PLATFORM', 'B1', 'Work & Society', 'PUBLISHED')
+        INSERT INTO readings (id, user_id, title, content, language, created_at, origin, editorial_level, category, editorial_status,
+                              short_description, content_type, region, source_kind, rights_status, adaptation_kind, access_tier)
+        VALUES (?, NULL, ?, 'Sample reading content for comprehension quiz flow testing.', 'en', CURRENT_TIMESTAMP, 'PLATFORM', 'B1', 'Work & Society', 'PUBLISHED',
+                'Sample short description', 'FICTION', 'GLOBAL', 'ORIGINAL_EDITORIAL', 'ORIGINAL', 'ORIGINAL', 'FREE')
         """,
         readingId,
         title);

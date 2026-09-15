@@ -1,29 +1,28 @@
 package com.soap.soap.application.service;
 
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
+import com.soap.soap.domain.model.LanguageTag;
 import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 @Component
 public class LanguageNormalizer {
-  private static final Pattern SUPPORTED_LANGUAGE =
-      Pattern.compile("[A-Za-z]{2,3}(?:[-_][A-Za-z]{2,3})?");
 
   public String normalize(String language) {
     if (language == null || language.isBlank()) {
       throw new InvalidApplicationArgumentException("Language must not be blank");
     }
-    var trimmed = language.trim();
-    if (!SUPPORTED_LANGUAGE.matcher(trimmed).matches()) {
-      throw new InvalidApplicationArgumentException("Language format is invalid");
+    try {
+      var tag = LanguageTag.of(language.trim().replace('_', '-'));
+      var val = tag.value();
+      if (val.equalsIgnoreCase("en") || val.toLowerCase(Locale.ROOT).startsWith("en-")) {
+        return "en";
+      }
+      return val;
+    } catch (IllegalArgumentException e) {
+      throw new InvalidApplicationArgumentException("Language format is invalid", e);
     }
-    var normalized = trimmed.toLowerCase(Locale.ROOT);
-    if (normalized.equals("en") || normalized.startsWith("en-") || normalized.startsWith("en_")) {
-      return "en";
-    }
-    return normalized;
   }
 
   public Set<String> equivalentLanguages(String language) {

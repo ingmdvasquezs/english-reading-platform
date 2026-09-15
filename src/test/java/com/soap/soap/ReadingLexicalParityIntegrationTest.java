@@ -59,11 +59,11 @@ class ReadingLexicalParityIntegrationTest {
                 java.time.LocalDateTime.now(),
                 com.soap.soap.domain.model.ReadingOrigin.PLATFORM,
                 com.soap.soap.domain.model.EditorialLevel.A1,
-                "Daily Life",
+                "Daily Life & Relationships",
                 null,
                 com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
 
-    String canonicalLanguage = languageNormalizer.normalize(reading.language());
+    String canonicalLanguage = languageNormalizer.normalize(reading.language().value());
 
     // 3. In-memory processing via Java TextWordProcessor
     var tokens = wordProcessor.tokenize(reading.content());

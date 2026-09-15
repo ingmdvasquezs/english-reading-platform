@@ -154,4 +154,28 @@ class ReadingTest {
     assertThat(platform.coverKey()).isEqualTo("platform-cover");
     assertThat(userReading.coverKey()).isNull();
   }
+
+  @Test
+  void approvedEditorialContentTypesAreValidAndUnapprovedValuesAreRejected() {
+    assertThat(EditorialContentType.valueOf("LEGEND")).isEqualTo(EditorialContentType.LEGEND);
+    assertThat(EditorialContentType.valueOf("MYTH")).isEqualTo(EditorialContentType.MYTH);
+    assertThat(EditorialContentType.valueOf("HISTORICAL_ACCOUNT"))
+        .isEqualTo(EditorialContentType.HISTORICAL_ACCOUNT);
+    assertThat(EditorialContentType.valueOf("BIOGRAPHY")).isEqualTo(EditorialContentType.BIOGRAPHY);
+    assertThat(EditorialContentType.valueOf("REAL_STORY"))
+        .isEqualTo(EditorialContentType.REAL_STORY);
+    assertThat(EditorialContentType.valueOf("FICTION")).isEqualTo(EditorialContentType.FICTION);
+    assertThat(EditorialContentType.valueOf("EXPLAINER")).isEqualTo(EditorialContentType.EXPLAINER);
+    assertThat(EditorialContentType.valueOf("TRAVEL_NARRATIVE"))
+        .isEqualTo(EditorialContentType.TRAVEL_NARRATIVE);
+    assertThat(EditorialContentType.valueOf("DIALOGUE")).isEqualTo(EditorialContentType.DIALOGUE);
+    assertThat(EditorialContentType.valueOf("ANECDOTE")).isEqualTo(EditorialContentType.ANECDOTE);
+
+    assertThatThrownBy(() -> EditorialContentType.valueOf("ARTICLE"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> EditorialContentType.valueOf("SHORT_STORY"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> EditorialContentType.valueOf("ESSAY"))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 }

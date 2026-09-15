@@ -269,6 +269,10 @@ class SoapApplicationTests {
   @Transactional
   void pedagogicalRecommendationsReinforceLearningWithoutExcessiveChallenge() {
     var now = LocalDateTime.now();
+    user =
+        users.save(
+            user.updateProfile(
+                user.name(), user.alias(), user.age(), user.nativeLanguage(), "ped"));
     for (var existing : readings.findAllPlatformReadings()) {
       readingProgress.complete(user.id(), existing.id(), now);
     }
@@ -300,7 +304,7 @@ class SoapApplicationTests {
                 now,
                 ReadingOrigin.PLATFORM,
                 com.soap.soap.domain.model.EditorialLevel.A2,
-                "Pedagogy",
+                "Daily Life & Relationships",
                 com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
     var tooEasy =
         readings.save(
@@ -313,7 +317,7 @@ class SoapApplicationTests {
                 now.plusSeconds(1),
                 ReadingOrigin.PLATFORM,
                 com.soap.soap.domain.model.EditorialLevel.B1,
-                "Pedagogy",
+                "Daily Life & Relationships",
                 com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
     var tooDifficult =
         readings.save(
@@ -326,12 +330,13 @@ class SoapApplicationTests {
                 now.plusSeconds(2),
                 ReadingOrigin.PLATFORM,
                 com.soap.soap.domain.model.EditorialLevel.B2,
-                "Pedagogy",
+                "Daily Life & Relationships",
                 com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
     entityManager.flush();
-    lexicalIndexer.indexReading(ideal.id(), ideal.language(), ideal.content());
-    lexicalIndexer.indexReading(tooEasy.id(), tooEasy.language(), tooEasy.content());
-    lexicalIndexer.indexReading(tooDifficult.id(), tooDifficult.language(), tooDifficult.content());
+    lexicalIndexer.indexReading(ideal.id(), ideal.language().value(), ideal.content());
+    lexicalIndexer.indexReading(tooEasy.id(), tooEasy.language().value(), tooEasy.content());
+    lexicalIndexer.indexReading(
+        tooDifficult.id(), tooDifficult.language().value(), tooDifficult.content());
     authenticateUser();
     try {
       var result = recommendPlatformReadings.recommendPlatformReadings(new PageRequest(0, 3));
@@ -553,7 +558,7 @@ class SoapApplicationTests {
                 now,
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.B1,
-                "Science",
+                "Science & Technology",
                 "continue-cover",
                 com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
     var completed =
@@ -614,7 +619,7 @@ class SoapApplicationTests {
           .andExpect(xpath("//*[local-name()='progressStatus']").evaluatesTo("IN_PROGRESS"))
           .andExpect(xpath("//*[local-name()='coverKey']").evaluatesTo("continue-cover"))
           .andExpect(xpath("//*[local-name()='editorialLevel']").evaluatesTo("B1"))
-          .andExpect(xpath("//*[local-name()='category']").evaluatesTo("Science"));
+          .andExpect(xpath("//*[local-name()='category']").evaluatesTo("Science & Technology"));
       client
           .sendRequest(
               withPayload(
@@ -651,7 +656,7 @@ class SoapApplicationTests {
                 LocalDateTime.parse("2026-09-04T12:00:00"),
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.B1,
-                "Science",
+                "Science & Technology",
                 "history-cover",
                 com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
     readingProgress.startIfAbsent(
@@ -695,7 +700,7 @@ class SoapApplicationTests {
                   .evaluatesTo("B1"))
           .andExpect(
               xpath("//*[local-name()='readings']/*[local-name()='category']")
-                  .evaluatesTo("Science"))
+                  .evaluatesTo("Science & Technology"))
           .andExpect(
               xpath("//*[local-name()='readings']/*[local-name()='coverKey']")
                   .evaluatesTo("history-cover"))
@@ -1887,7 +1892,7 @@ class SoapApplicationTests {
             summary -> {
               assertThat(summary.id()).isEqualTo(reading.id());
               assertThat(summary.title()).isEqualTo(reading.title());
-              assertThat(summary.language()).isEqualTo(reading.language());
+              assertThat(summary.language()).isEqualTo(reading.language().value());
             });
   }
 
@@ -2175,8 +2180,10 @@ class SoapApplicationTests {
     var now = LocalDateTime.now();
     jdbcTemplate.update(
         """
-        insert into readings (id, title, content, language, origin, editorial_level, category, cover_key, editorial_status, created_at)
-        values (?, ?, ?, ?, 'PLATFORM', ?, ?, ?, ?, ?)
+        insert into readings (id, title, content, language, origin, editorial_level, category, cover_key, editorial_status, created_at,
+                              short_description, content_type, region, source_kind, rights_status, adaptation_kind, access_tier)
+        values (?, ?, ?, ?, 'PLATFORM', ?, ?, ?, ?, ?,
+                'Platform short description', 'FICTION', 'GLOBAL', 'ORIGINAL_EDITORIAL', 'ORIGINAL', 'ORIGINAL', 'FREE')
         """,
         id,
         title,

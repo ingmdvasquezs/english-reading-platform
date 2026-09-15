@@ -30,7 +30,7 @@ public class PlatformReadingRecommendationCalculator {
     return new RecommendedPlatformReading(
         reading.id(),
         reading.title(),
-        reading.language(),
+        reading.language() == null ? null : reading.language().value(),
         reading.editorialLevel(),
         reading.category(),
         reading.createdAt(),

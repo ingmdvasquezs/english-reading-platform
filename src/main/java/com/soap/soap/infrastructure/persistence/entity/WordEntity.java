@@ -26,6 +26,6 @@ public class WordEntity extends CreatedAtEntity {
   @Column(name = "normalized_value", nullable = false, length = 100)
   private String normalizedValue;
 
-  @Column(nullable = false, length = 10)
+  @Column(nullable = false, length = 50)
   private String language;
 }

@@ -126,11 +126,11 @@ class ReadingEditorialLifecycleIntegrationTest {
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A1,
-                "NATURE",
+                "Nature & Environment",
                 "pub-cover",
                 EditorialStatus.PUBLISHED));
     entityManager.flush();
-    indexer.indexReading(reading.id(), reading.language(), reading.content());
+    indexer.indexReading(reading.id(), reading.language().value(), reading.content());
 
     // Visible in listPlatformReadings
     var catalogPage = listPlatformReadings.listPlatformReadings(new PageRequest(0, 100));
@@ -166,12 +166,12 @@ class ReadingEditorialLifecycleIntegrationTest {
                 "en",
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
-                EditorialLevel.B1,
-                "HISTORY",
+                EditorialLevel.A1,
+                "History & Memory",
                 "arch-cover",
                 EditorialStatus.ARCHIVED));
     entityManager.flush();
-    indexer.indexReading(reading.id(), reading.language(), reading.content());
+    indexer.indexReading(reading.id(), reading.language().value(), reading.content());
 
     // NOT visible in listPlatformReadings
     var catalogPage = listPlatformReadings.listPlatformReadings(new PageRequest(0, 100));
@@ -232,11 +232,11 @@ class ReadingEditorialLifecycleIntegrationTest {
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A2,
-                "TECH",
+                "Science & Technology",
                 "draft-cover",
                 EditorialStatus.DRAFT));
     entityManager.flush();
-    indexer.indexReading(reading.id(), reading.language(), reading.content());
+    indexer.indexReading(reading.id(), reading.language().value(), reading.content());
 
     // NOT in listPlatformReadings
     var catalogPage = listPlatformReadings.listPlatformReadings(new PageRequest(0, 100));
@@ -288,7 +288,7 @@ class ReadingEditorialLifecycleIntegrationTest {
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A1,
-                "TEST",
+                "Daily Life & Relationships",
                 "cover",
                 EditorialStatus.PUBLISHED));
     var archReading =
@@ -302,7 +302,7 @@ class ReadingEditorialLifecycleIntegrationTest {
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A1,
-                "TEST",
+                "Daily Life & Relationships",
                 "cover",
                 EditorialStatus.ARCHIVED));
     var draftReading =
@@ -316,7 +316,7 @@ class ReadingEditorialLifecycleIntegrationTest {
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A1,
-                "TEST",
+                "Daily Life & Relationships",
                 "cover",
                 EditorialStatus.DRAFT));
     entityManager.flush();
@@ -396,7 +396,7 @@ class ReadingEditorialLifecycleIntegrationTest {
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.B1,
-                "TEST",
+                "Daily Life & Relationships",
                 "cover",
                 EditorialStatus.ARCHIVED));
     var draftReading =
@@ -410,7 +410,7 @@ class ReadingEditorialLifecycleIntegrationTest {
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.B1,
-                "TEST",
+                "Daily Life & Relationships",
                 "cover",
                 EditorialStatus.DRAFT));
     entityManager.flush();

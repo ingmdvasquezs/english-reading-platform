@@ -6,8 +6,10 @@ import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.PlatformReadingHistoryItem;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.domain.model.ReadingProgress;
+import com.soap.soap.domain.model.ReadingProgressStatus;
 import com.soap.soap.infrastructure.persistence.entity.ReadingProgressEntity;
 import com.soap.soap.infrastructure.persistence.repository.JpaReadingProgressRepository;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -61,7 +63,11 @@ public class ReadingProgressPersistenceAdapter implements ReadingProgressReposit
                         item.getCoverKey(),
                         item.getEditorialLevel(),
                         item.getCategory(),
-                        item.getStartedAt()))
+                        item.getStartedAt(),
+                        item.getShortDescription(),
+                        item.getProgressStatus() == ReadingProgressStatus.COMPLETED
+                            ? BigDecimal.valueOf(100.0)
+                            : null))
             .toList(),
         page.getNumber(),
         page.getSize(),

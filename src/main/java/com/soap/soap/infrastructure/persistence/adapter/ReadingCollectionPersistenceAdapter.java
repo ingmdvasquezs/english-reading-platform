@@ -48,4 +48,20 @@ public class ReadingCollectionPersistenceAdapter implements ReadingCollectionRep
         page.getSize(),
         page.getTotalElements());
   }
+
+  // Language‑scoped overload (canonical language tag, no lower())
+  @Override
+  @Transactional(readOnly = true)
+  public PageResult<Reading> findReadings(String key, String language, PageRequest pageRequest) {
+    var page =
+        memberships.findReadingsByCollectionKeyAndLanguage(
+            key,
+            language,
+            org.springframework.data.domain.PageRequest.of(pageRequest.page(), pageRequest.size()));
+    return new PageResult<>(
+        page.getContent().stream().map(readingMapper::toDomain).toList(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements());
+  }
 }

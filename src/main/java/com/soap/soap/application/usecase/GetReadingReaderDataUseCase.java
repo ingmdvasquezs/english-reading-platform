@@ -50,11 +50,15 @@ public class GetReadingReaderDataUseCase implements GetReadingReaderDataPort {
       readingProgress = progress.startIfAbsent(userId, reading.id(), LocalDateTime.now(clock));
     }
 
-    var classifiedTokens = readerContent.prepare(userId, reading.language(), reading.content());
+    var classifiedTokens =
+        readerContent.prepare(
+            userId,
+            reading.language() == null ? null : reading.language().value(),
+            reading.content());
     return new ReadingReaderData(
         reading.id(),
         reading.title(),
-        reading.language(),
+        reading.language() == null ? null : reading.language().value(),
         classifiedTokens,
         readingProgress.status(),
         readingProgress.currentPartOrdinal(),

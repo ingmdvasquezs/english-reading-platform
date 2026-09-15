@@ -134,7 +134,9 @@ class UserProfileUseCasesTest {
             () -> update.updateMyProfile(new UpdateMyProfileCommand("Ada", " ", null, null, "en")))
         .isInstanceOf(InvalidApplicationArgumentException.class);
     assertThatThrownBy(
-            () -> update.updateMyProfile(new UpdateMyProfileCommand("Ada", null, null, null, "fr")))
+            () ->
+                update.updateMyProfile(
+                    new UpdateMyProfileCommand("Ada", null, null, null, "invalid language!")))
         .isInstanceOf(InvalidApplicationArgumentException.class);
   }
 

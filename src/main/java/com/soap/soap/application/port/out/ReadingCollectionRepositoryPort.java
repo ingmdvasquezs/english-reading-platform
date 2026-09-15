@@ -13,4 +13,6 @@ public interface ReadingCollectionRepositoryPort {
   Optional<ReadingCollection> findActiveByKey(String key);
 
   PageResult<Reading> findReadings(String key, PageRequest pageRequest);
+
+  PageResult<Reading> findReadings(String key, String language, PageRequest pageRequest);
 }

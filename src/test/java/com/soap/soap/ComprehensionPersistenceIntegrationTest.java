@@ -90,7 +90,7 @@ class ComprehensionPersistenceIntegrationTest {
                 null,
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A1,
-                "Daily Life",
+                "Daily Life & Relationships",
                 com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
   }
 

@@ -3,11 +3,14 @@ package com.soap.soap.infrastructure.soap.mapper;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.PlatformReadingSummary;
+import com.soap.soap.infrastructure.soap.generated.AccessTierType;
+import com.soap.soap.infrastructure.soap.generated.EditorialContentTypeType;
 import com.soap.soap.infrastructure.soap.generated.EditorialLevelType;
 import com.soap.soap.infrastructure.soap.generated.ListPlatformReadingsRequest;
 import com.soap.soap.infrastructure.soap.generated.ListPlatformReadingsResponse;
 import com.soap.soap.infrastructure.soap.generated.PlatformReadingSummaryType;
 import com.soap.soap.infrastructure.soap.generated.ReadingProgressStatusType;
+import com.soap.soap.infrastructure.soap.generated.RegionType;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -38,6 +41,17 @@ public class ListPlatformReadingsSoapMapper extends SoapMapperSupport {
           ReadingProgressStatusType.fromValue(summary.progressStatus().name()));
     }
     result.setCoverKey(summary.coverKey());
+    result.setShortDescription(summary.shortDescription());
+    if (summary.contentType() != null) {
+      result.setContentType(EditorialContentTypeType.fromValue(summary.contentType().name()));
+    }
+    result.setCountryCode(summary.countryCode());
+    if (summary.region() != null) {
+      result.setRegion(RegionType.fromValue(summary.region().name()));
+    }
+    if (summary.accessTier() != null) {
+      result.setAccessTier(AccessTierType.fromValue(summary.accessTier().name()));
+    }
     return result;
   }
 }

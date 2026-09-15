@@ -48,7 +48,8 @@ public class AnalyzeReadingUseCase implements AnalyzeReadingPort {
     var statuses =
         distinctValues.isEmpty()
             ? Map.<String, com.soap.soap.domain.model.VocabularyStatus>of()
-            : vocabulary.findStatusesByNormalizedValues(userId, reading.language(), distinctValues);
+            : vocabulary.findStatusesByNormalizedValues(
+                userId, reading.language().value(), distinctValues);
     return analyzer.analyze(tokens, statuses);
   }
 }

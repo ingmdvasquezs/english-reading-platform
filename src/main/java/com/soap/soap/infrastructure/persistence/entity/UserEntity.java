@@ -34,9 +34,9 @@ public class UserEntity extends CreatedAtEntity {
 
   private Integer age;
 
-  @Column(name = "native_language", length = 10)
+  @Column(name = "native_language", length = 50)
   private String nativeLanguage;
 
-  @Column(name = "learning_language", nullable = false, length = 10)
+  @Column(name = "learning_language", nullable = false, length = 50)
   private String learningLanguage;
 }

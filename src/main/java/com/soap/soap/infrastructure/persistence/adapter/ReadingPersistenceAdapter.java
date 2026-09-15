@@ -81,7 +81,44 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
                         summary.getCategory(),
                         summary.getCreatedAt(),
                         null,
-                        summary.getCoverKey()))
+                        summary.getCoverKey(),
+                        summary.getShortDescription(),
+                        summary.getContentType(),
+                        summary.getCountryCode(),
+                        summary.getRegion(),
+                        summary.getAccessTier()))
+            .toList(),
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PageResult<PlatformReadingSummary> findPlatformSummaries(
+      String language, PageRequest pageRequest) {
+    var page =
+        repository.findPlatformSummariesByLanguage(
+            language,
+            org.springframework.data.domain.PageRequest.of(pageRequest.page(), pageRequest.size()));
+    return new PageResult<>(
+        page.getContent().stream()
+            .map(
+                summary ->
+                    new PlatformReadingSummary(
+                        summary.getId(),
+                        summary.getTitle(),
+                        summary.getLanguage(),
+                        summary.getEditorialLevel(),
+                        summary.getCategory(),
+                        summary.getCreatedAt(),
+                        null,
+                        summary.getCoverKey(),
+                        summary.getShortDescription(),
+                        summary.getContentType(),
+                        summary.getCountryCode(),
+                        summary.getRegion(),
+                        summary.getAccessTier()))
             .toList(),
         page.getNumber(),
         page.getSize(),
@@ -102,7 +139,12 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
                     summary.getCategory(),
                     summary.getCreatedAt(),
                     null,
-                    summary.getCoverKey()))
+                    summary.getCoverKey(),
+                    summary.getShortDescription(),
+                    summary.getContentType(),
+                    summary.getCountryCode(),
+                    summary.getRegion(),
+                    summary.getAccessTier()))
         .toList();
   }
 

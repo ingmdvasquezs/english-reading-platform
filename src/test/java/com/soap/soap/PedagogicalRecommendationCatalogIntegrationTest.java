@@ -179,14 +179,14 @@ class PedagogicalRecommendationCatalogIntegrationTest {
         "A Republic of Echoes",
         "In an era dominated by hyper partisan rhetoric and self reinforcing informational silos civic discourse degenerates into cacophonous tribalism where deliberative consensus becomes elusive. Epistemological humility and hermeneutic vigilance are indispensable virtues if democratic institutions hope to transcend ideological polarization dismantle systemic dogmatism and restore nuanced societal deliberation for thoughtful citizens seeking collective wisdom.",
         EditorialLevel.C2,
-        "Philosophy, Thought & Meaning",
+        "Culture, Arts & Fiction",
         "a-republic-of-echoes");
 
     createPlatformReading(
         "The Cartographer of Vanishing Roads",
         "Mapping ephemeral pathways across disappearing landscapes requires obsolete geographical instruments intuitive topographical deductions and exquisite perceptual precision. The cartographer documents subterranean fissures forgotten nomadic routes and shifting geological contours before anthropogenic encroachment renders ancestral territories entirely unrecognizable and forever erased from fragile memory.",
         EditorialLevel.C2,
-        "History & Society",
+        "History & Memory",
         null);
   }
 
@@ -207,7 +207,7 @@ class PedagogicalRecommendationCatalogIntegrationTest {
                 coverKey,
                 EditorialStatus.PUBLISHED));
     entityManager.flush();
-    lexicalIndexer.indexReading(saved.id(), saved.language(), saved.content());
+    lexicalIndexer.indexReading(saved.id(), saved.language().value(), saved.content());
   }
 
   @Test
@@ -466,7 +466,7 @@ class PedagogicalRecommendationCatalogIntegrationTest {
     assertThat(catalog.values())
         .allSatisfy(
             reading -> {
-              assertThat(reading.language()).isEqualTo("en");
+              assertThat(reading.language().value()).isEqualTo("en");
               assertThat(reading.category()).isNotBlank();
               assertThat(reading.content()).isNotBlank();
             });

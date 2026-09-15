@@ -111,7 +111,7 @@ class PlatformReadingHistoryIntegrationTest {
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
                 level,
-                "LITERATURE",
+                "Culture, Arts & Fiction",
                 "covers/" + title + ".jpg",
                 status));
     entityManager.flush();
@@ -149,7 +149,7 @@ class PlatformReadingHistoryIntegrationTest {
     var item = match.get();
     assertThat(item.title()).isEqualTo(reading.title());
     assertThat(item.editorialLevel()).isEqualTo(EditorialLevel.A1);
-    assertThat(item.category()).isEqualTo("LITERATURE");
+    assertThat(item.category()).isEqualTo("Culture, Arts & Fiction");
     assertThat(item.coverKey()).isEqualTo(reading.coverKey());
     assertThat(item.progressStatus()).isEqualTo(ReadingProgressStatus.IN_PROGRESS);
   }

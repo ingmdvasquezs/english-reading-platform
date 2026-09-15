@@ -57,7 +57,10 @@ public interface JpaReadingRepository extends JpaRepository<ReadingEntity, UUID>
           """
           select r.id as id, r.title as title, r.language as language,
                  r.editorialLevel as editorialLevel, r.category as category,
-                 r.createdAt as createdAt, r.coverKey as coverKey
+                 r.createdAt as createdAt, r.coverKey as coverKey,
+                 r.shortDescription as shortDescription, r.contentType as contentType,
+                 r.countryCode as countryCode, r.region as region,
+                 r.accessTier as accessTier
           from ReadingEntity r
           where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
             and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
@@ -72,10 +75,38 @@ public interface JpaReadingRepository extends JpaRepository<ReadingEntity, UUID>
   Page<PlatformReadingSummaryView> findPlatformSummaries(Pageable pageable);
 
   @Query(
+      value =
+          """
+          select r.id as id, r.title as title, r.language as language,
+                 r.editorialLevel as editorialLevel, r.category as category,
+                 r.createdAt as createdAt, r.coverKey as coverKey,
+                 r.shortDescription as shortDescription, r.contentType as contentType,
+                 r.countryCode as countryCode, r.region as region,
+                 r.accessTier as accessTier
+          from ReadingEntity r
+          where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
+            and lower(r.language) = lower(:language)
+          order by r.createdAt desc, r.id
+          """,
+      countQuery =
+          """
+          select count(r) from ReadingEntity r
+          where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+            and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
+            and lower(r.language) = lower(:language)
+          """)
+  Page<PlatformReadingSummaryView> findPlatformSummariesByLanguage(
+      @Param("language") String language, Pageable pageable);
+
+  @Query(
       """
       select r.id as id, r.title as title, r.language as language,
              r.editorialLevel as editorialLevel, r.category as category,
-             r.createdAt as createdAt, r.coverKey as coverKey
+             r.createdAt as createdAt, r.coverKey as coverKey,
+             r.shortDescription as shortDescription, r.contentType as contentType,
+             r.countryCode as countryCode, r.region as region,
+             r.accessTier as accessTier
       from ReadingEntity r
       where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
         and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
@@ -107,5 +138,15 @@ public interface JpaReadingRepository extends JpaRepository<ReadingEntity, UUID>
     String getCategory();
 
     String getCoverKey();
+
+    String getShortDescription();
+
+    com.soap.soap.domain.model.EditorialContentType getContentType();
+
+    String getCountryCode();
+
+    com.soap.soap.domain.model.EditorialRegion getRegion();
+
+    com.soap.soap.domain.model.AccessTier getAccessTier();
   }
 }

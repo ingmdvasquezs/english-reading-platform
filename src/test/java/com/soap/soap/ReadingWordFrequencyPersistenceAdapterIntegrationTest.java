@@ -104,7 +104,7 @@ class ReadingWordFrequencyPersistenceAdapterIntegrationTest {
                 null,
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A1,
-                "NATURE",
+                "Nature & Environment",
                 "cover-sky",
                 com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
 
@@ -183,7 +183,7 @@ class ReadingWordFrequencyPersistenceAdapterIntegrationTest {
                 LocalDateTime.now(),
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A2,
-                "Nature",
+                "Nature & Environment",
                 null,
                 EditorialStatus.PUBLISHED));
 
@@ -237,7 +237,7 @@ class ReadingWordFrequencyPersistenceAdapterIntegrationTest {
                 null,
                 ReadingOrigin.PLATFORM,
                 EditorialLevel.A1,
-                "CULTURE",
+                "Culture, Arts & Fiction",
                 "cover-tie",
                 com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
 

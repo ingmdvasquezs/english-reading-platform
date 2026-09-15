@@ -38,6 +38,8 @@ public class ListContinueReadingSoapMapper extends SoapMapperSupport {
     }
     result.setCategory(item.category());
     result.setStartedAt(toXmlDate(item.startedAt()));
+    result.setShortDescription(item.shortDescription());
+    result.setProgressPercentage(item.progressPercentage());
     return result;
   }
 }

@@ -59,9 +59,8 @@ public class ListUserReadingsUseCase implements ListUserReadingsPort {
               .map(TextWordProcessor.Token::normalizedValue)
               .collect(Collectors.toUnmodifiableSet());
       wordsByReading.put(reading.id(), uniqueWords);
-      wordsByLanguage
-          .computeIfAbsent(reading.language(), ignored -> new HashSet<>())
-          .addAll(uniqueWords);
+      String readingLang = reading.language() == null ? null : reading.language().value();
+      wordsByLanguage.computeIfAbsent(readingLang, ignored -> new HashSet<>()).addAll(uniqueWords);
     }
     var statusesByLanguage = new HashMap<String, Map<String, VocabularyStatus>>();
     wordsByLanguage.forEach(
@@ -75,15 +74,17 @@ public class ListUserReadingsUseCase implements ListUserReadingsPort {
         page.content().stream()
             .map(
                 reading -> {
+                  String readingLang =
+                      reading.language() == null ? null : reading.language().value();
                   var compatibility =
                       compatibilityCalculator.calculate(
                           wordsByReading.get(reading.id()),
-                          statusesByLanguage.getOrDefault(reading.language(), Map.of()));
+                          statusesByLanguage.getOrDefault(readingLang, Map.of()));
                   var breakdown = compatibility.breakdown();
                   return new ReadingSummary(
                       reading.id(),
                       reading.title(),
-                      reading.language(),
+                      readingLang,
                       reading.createdAt(),
                       breakdown.uniqueWords(),
                       breakdown.knownWords(),
