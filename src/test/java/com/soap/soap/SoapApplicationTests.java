@@ -13,7 +13,6 @@ import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.exception.WordAlreadyInVocabularyException;
 import com.soap.soap.application.model.DictionaryEntry;
 import com.soap.soap.application.model.PageRequest;
-import com.soap.soap.application.model.PlatformReadingSummary;
 import com.soap.soap.application.model.ReadingSummary;
 import com.soap.soap.application.model.WordMeaning;
 import com.soap.soap.application.port.in.RecommendPlatformReadingsPort;
@@ -27,6 +26,7 @@ import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.port.out.WordRepositoryPort;
 import com.soap.soap.domain.model.EditorialLevel;
+import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.User;
@@ -109,62 +109,37 @@ class SoapApplicationTests {
 
   @Test
   @Transactional
-  void editorialCollectionMigrationSeedsTheAuditedMembershipsWithoutDuplicates() {
+  void legacyCollectionsCleanedUpAndCollectionDomainOperationsWork() {
     var active = collections.findAllActive();
-
-    assertThat(active)
-        .hasSize(6)
-        .extracting(com.soap.soap.domain.model.ReadingCollection::key)
-        .containsExactly(
-            "everyday-life-human-connections",
-            "mysteries-imagination",
-            "science-technology-ideas",
-            "nature-environment",
-            "travel-places-memory",
-            "culture-work-society");
-    assertThat(active)
-        .extracting(com.soap.soap.domain.model.ReadingCollection::displayOrder)
-        .containsExactly(1, 2, 3, 4, 5, 6);
-    assertThat(active)
-        .allMatch(com.soap.soap.domain.model.ReadingCollection::active)
-        .allMatch(collection -> collection.coverKey() == null);
-    assertThat(
-            jdbcTemplate.queryForList(
-                """
-                select c.key, count(rc.reading_id) as membership_count
-                from collections c join reading_collections rc on rc.collection_id = c.id
-                group by c.key order by min(c.display_order)
-                """))
-        .extracting(row -> ((Number) row.get("membership_count")).longValue())
-        .containsExactly(11L, 14L, 20L, 18L, 19L, 33L);
+    assertThat(active).isEmpty();
     assertThat(jdbcTemplate.queryForObject("select count(*) from reading_collections", Long.class))
-        .isEqualTo(115L);
-    assertThat(
-            jdbcTemplate.queryForObject(
-                """
-                select count(*) from (
-                  select collection_id, reading_id from reading_collections
-                  group by collection_id, reading_id having count(*) > 1
-                ) duplicates
-                """,
-                Long.class))
         .isZero();
-    assertThat(
-            jdbcTemplate.queryForObject(
-                """
-                select count(*) from reading_collections rc
-                join readings r on r.id = rc.reading_id
-                where r.title = 'An Island Made of Fog'
-                """,
-                Long.class))
-        .isEqualTo(3L);
 
+    // Create a new collection with a published reading and verify functionality
+    var testColId = UUID.randomUUID();
+    var testReadingId = UUID.randomUUID();
+    insertPlatformReading(
+        testReadingId,
+        "Collection Story",
+        "A story inside collection",
+        "en",
+        EditorialLevel.A1,
+        "Daily Life & Relationships",
+        null,
+        EditorialStatus.PUBLISHED);
+    insertCollection(testColId, "test-collection", "Test Collection", "Description", 1, true);
     jdbcTemplate.update(
-        "update collections set active = false where key = ?", "mysteries-imagination");
+        "insert into reading_collections (collection_id, reading_id, display_order) values (?, ?, ?)",
+        testColId,
+        testReadingId,
+        1);
     assertThat(collections.findAllActive())
-        .hasSize(5)
+        .hasSize(1)
         .extracting(com.soap.soap.domain.model.ReadingCollection::key)
-        .doesNotContain("mysteries-imagination");
+        .containsExactly("test-collection");
+
+    jdbcTemplate.update("update collections set active = false where key = ?", "test-collection");
+    assertThat(collections.findAllActive()).isEmpty();
   }
 
   @Test
@@ -180,7 +155,43 @@ class SoapApplicationTests {
         .andExpect(clientOrSenderFault());
 
     authenticateUser();
+    UUID testReadingId = UUID.randomUUID();
+    UUID testCollectionId = UUID.randomUUID();
     try {
+      client
+          .sendRequest(
+              withPayload(
+                  source(
+                      """
+                    <listCollectionsRequest xmlns="http://soap.com/english-reading/readings"/>
+                    """)))
+          .andExpect(noFault())
+          .andExpect(xpath("count(//*[local-name()='collections'])").evaluatesTo("0"));
+
+      var testReading =
+          insertPlatformReading(
+              testReadingId,
+              "A Morning at the Library",
+              "Every morning, Nora visits the public library to study and read books with her friends.",
+              "en",
+              EditorialLevel.A1,
+              "Daily Life & Relationships",
+              "a-morning-at-the-library",
+              EditorialStatus.PUBLISHED);
+      lexicalIndexer.indexReading(testReading.id(), "en", testReading.content());
+      insertCollection(
+          testCollectionId,
+          "everyday-life-human-connections",
+          "Everyday Life",
+          "Stories about connections",
+          1,
+          true);
+      jdbcTemplate.update(
+          "insert into reading_collections (collection_id, reading_id, display_order) values (?, ?, ?)",
+          testCollectionId,
+          testReadingId,
+          1);
+
       client
           .sendRequest(
               withPayload(
@@ -189,7 +200,7 @@ class SoapApplicationTests {
                       <listCollectionsRequest xmlns="http://soap.com/english-reading/readings"/>
                       """)))
           .andExpect(noFault())
-          .andExpect(xpath("count(//*[local-name()='collections'])").evaluatesTo("6"))
+          .andExpect(xpath("count(//*[local-name()='collections'])").evaluatesTo("1"))
           .andExpect(
               xpath("(//*[local-name()='collections'])[1]/*[local-name()='displayOrder']")
                   .evaluatesTo("1"));
@@ -206,8 +217,8 @@ class SoapApplicationTests {
           .andExpect(noFault())
           .andExpect(xpath("//*[local-name()='page']").evaluatesTo("0"))
           .andExpect(xpath("//*[local-name()='size']").evaluatesTo("2"))
-          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("11"))
-          .andExpect(xpath("count(//*[local-name()='readings'])").evaluatesTo("2"))
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("1"))
+          .andExpect(xpath("count(//*[local-name()='readings'])").evaluatesTo("1"))
           .andExpect(
               xpath("(//*[local-name()='readings'])[1]/*[local-name()='uniqueWords']").exists())
           .andExpect(
@@ -231,7 +242,8 @@ class SoapApplicationTests {
                   .exists())
           .andExpect(
               xpath(
-                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000001']/*[local-name()='coverKey']")
+                      "//*[local-name()='readings'][*[local-name()='readingId']='%s']/*[local-name()='coverKey']"
+                          .formatted(testReadingId))
                   .evaluatesTo("a-morning-at-the-library"));
       client
           .sendRequest(
@@ -244,6 +256,11 @@ class SoapApplicationTests {
                       """)))
           .andExpect(clientOrSenderFault());
     } finally {
+      jdbcTemplate.update(
+          "delete from reading_collections where collection_id = ?", testCollectionId);
+      jdbcTemplate.update("delete from collections where id = ?", testCollectionId);
+      lexicalIndexer.removeReadingIndex(testReadingId);
+      readings.deleteById(testReadingId);
       SecurityContextHolder.clearContext();
     }
   }
@@ -1753,7 +1770,16 @@ class SoapApplicationTests {
     vocabulary.save(
         new UserVocabulary(
             null, user, profileWord, VocabularyStatus.LEARNING, LocalDateTime.now(), null));
-    var platformReading = readings.findAllPlatformReadings().getFirst();
+    var platformReading =
+        insertPlatformReading(
+            UUID.randomUUID(),
+            "Profile Test Reading",
+            "Some sample reading content for profile test",
+            "en",
+            EditorialLevel.A1,
+            "Daily Life & Relationships",
+            null,
+            EditorialStatus.PUBLISHED);
     readingProgress.startIfAbsent(user.id(), platformReading.id(), LocalDateTime.now());
     authenticateUser();
     var client = MockWebServiceClient.createClient(applicationContext);
@@ -1808,6 +1834,7 @@ class SoapApplicationTests {
       assertThat(readingProgress.findByUserIdAndReadingId(user.id(), platformReading.id()))
           .isPresent();
     } finally {
+      readings.deleteById(platformReading.id());
       SecurityContextHolder.clearContext();
     }
   }
@@ -1866,105 +1893,65 @@ class SoapApplicationTests {
 
   @Test
   @Transactional
-  void loadsTheSeededPlatformCatalogWithoutFakeOwners() {
+  void cleanPlatformCatalogHasNoEntriesAndNewPlatformEntriesHaveNoFakeOwners() {
     var catalog = readings.findPlatformSummaries(new PageRequest(0, 100));
-
-    assertThat(catalog.totalElements()).isEqualTo(74);
-    assertThat(catalog.content())
-        .extracting(PlatformReadingSummary::title)
-        .contains(
-            "A Morning at the Library",
-            "Why Cities Need Trees",
-            "The Changing Nature of Work",
-            "When Algorithms Shape Attention",
-            "The Lost Blue Scarf",
-            "The Sparrow and the Red Cup",
-            "A Boat for the Little Island",
-            "The Garden Behind the School",
-            "The Train to Harbor Town",
-            "A Quiet Morning by the River",
-            "The Light in Room Twelve",
-            "Lunch for the Night Team",
-            "The Phone-Free Table",
-            "The Empty Lot Project",
-            "Learning to Ask Better Questions",
-            "The Road Beyond Pine Hill",
-            "The Cost of Constant Attention",
-            "A Market Changes Its Rhythm",
-            "Listening to the Forest at Night",
-            "The Key Beneath the Floor",
-            "The Museum of Unfinished Things",
-            "A City That Predicts Its Citizens",
-            "The Language of the Evening Square",
-            "The Cartographer of Vanishing Roads");
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.A1)
-        .hasSize(13);
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.A2)
-        .hasSize(13);
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.B1)
-        .hasSize(14);
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.B2)
-        .hasSize(14);
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.C1)
-        .hasSize(12);
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.editorialLevel() == EditorialLevel.C2)
-        .hasSize(8);
-    assertThat(catalog.content())
-        .allSatisfy(
-            summary -> {
-              assertThat(summary.language()).isEqualTo("en");
-              assertThat(summary.category()).isNotBlank();
-            });
-    assertThat(catalog.content()).filteredOn(summary -> summary.coverKey() != null).hasSize(63);
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.title().equals("The Camera on Platform Three"))
-        .singleElement()
-        .extracting(PlatformReadingSummary::coverKey)
-        .isEqualTo("the-camera-on-platform-three");
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.title().equals("A Morning at the Library"))
-        .singleElement()
-        .extracting(PlatformReadingSummary::coverKey)
-        .isEqualTo("a-morning-at-the-library");
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.title().equals("Why Cities Need Trees"))
-        .singleElement()
-        .extracting(PlatformReadingSummary::coverKey)
-        .isEqualTo("why-cities-need-trees");
-    assertThat(catalog.content())
-        .filteredOn(summary -> summary.title().equals("Minor Gods of the Waiting Room"))
-        .singleElement()
-        .extracting(PlatformReadingSummary::coverKey)
-        .isEqualTo("minor-gods-of-the-waiting-room");
-    var pagedIds = new java.util.ArrayList<java.util.UUID>();
-    for (var page = 0; page < 8; page++) {
-      pagedIds.addAll(
-          readings.findPlatformSummaries(new PageRequest(page, 10)).content().stream()
-              .map(PlatformReadingSummary::id)
-              .toList());
-    }
-    assertThat(pagedIds).hasSize(74).doesNotHaveDuplicates();
+    assertThat(catalog.totalElements()).isEqualTo(0);
+    assertThat(catalog.content()).isEmpty();
 
     var platformReading =
-        readings
-            .findById(java.util.UUID.fromString("10000000-0000-0000-0000-000000000001"))
-            .orElseThrow();
-    assertThat(platformReading.origin()).isEqualTo(ReadingOrigin.PLATFORM);
-    assertThat(platformReading.user()).isNull();
-    assertThat(platformReading.editorialLevel().name()).isEqualTo("A1");
-    assertThat(platformReading.category()).isEqualTo("Daily Life");
+        insertPlatformReading(
+            UUID.randomUUID(),
+            "A Morning at the Library",
+            "Content of morning at library",
+            "en",
+            EditorialLevel.A1,
+            "Daily Life & Relationships",
+            "a-morning-at-the-library",
+            EditorialStatus.PUBLISHED);
+
+    var updatedCatalog = readings.findPlatformSummaries(new PageRequest(0, 100));
+    assertThat(updatedCatalog.totalElements()).isEqualTo(1);
+    var summary = updatedCatalog.content().getFirst();
+    assertThat(summary.id()).isEqualTo(platformReading.id());
+    assertThat(summary.title()).isEqualTo("A Morning at the Library");
+    assertThat(summary.editorialLevel()).isEqualTo(EditorialLevel.A1);
+    assertThat(summary.category()).isEqualTo("Daily Life & Relationships");
+    assertThat(summary.coverKey()).isEqualTo("a-morning-at-the-library");
+    assertThat(summary.language()).isEqualTo("en");
+
+    var loaded = readings.findById(platformReading.id()).orElseThrow();
+    assertThat(loaded.origin()).isEqualTo(ReadingOrigin.PLATFORM);
+    assertThat(loaded.user()).isNull();
+    assertThat(loaded.editorialLevel()).isEqualTo(EditorialLevel.A1);
+    assertThat(loaded.category()).isEqualTo("Daily Life & Relationships");
   }
 
   @Test
   void authenticatedUserCanListReadAndAnalyzePlatformCatalogEntriesOverSoap() {
     authenticateUser();
     var client = MockWebServiceClient.createClient(applicationContext);
+    var id1 = UUID.randomUUID();
+    var id3 = UUID.randomUUID();
+    var r1 =
+        insertPlatformReading(
+            id1,
+            "A Morning at the Library",
+            "A morning at the library reading books and talking with the kind librarian.",
+            "en",
+            EditorialLevel.A1,
+            "Daily Life & Relationships",
+            "a-morning-at-the-library",
+            EditorialStatus.PUBLISHED);
+    var r3 =
+        insertPlatformReading(
+            id3,
+            "A Work Story",
+            "A short story about work in the modern city.",
+            "en",
+            EditorialLevel.B1,
+            "Work & Society",
+            "the-camera-on-platform-three",
+            EditorialStatus.PUBLISHED);
     try {
       client
           .sendRequest(
@@ -1976,22 +1963,26 @@ class SoapApplicationTests {
                       </listPlatformReadingsRequest>
                       """)))
           .andExpect(noFault())
-          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("74"))
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("2"))
           .andExpect(
               xpath(
-                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000003']/*[local-name()='editorialLevel']")
+                      "//*[local-name()='readings'][*[local-name()='readingId']='%s']/*[local-name()='editorialLevel']"
+                          .formatted(id3))
                   .evaluatesTo("B1"))
           .andExpect(
               xpath(
-                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000003']/*[local-name()='category']")
-                  .evaluatesTo("Work"))
+                      "//*[local-name()='readings'][*[local-name()='readingId']='%s']/*[local-name()='category']"
+                          .formatted(id3))
+                  .evaluatesTo("Work & Society"))
           .andExpect(
               xpath(
-                      "//*[local-name()='readings'][*[local-name()='readingId']='30000000-0000-0000-0000-000000000009']/*[local-name()='coverKey']")
+                      "//*[local-name()='readings'][*[local-name()='readingId']='%s']/*[local-name()='coverKey']"
+                          .formatted(id3))
                   .evaluatesTo("the-camera-on-platform-three"))
           .andExpect(
               xpath(
-                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000001']/*[local-name()='coverKey']")
+                      "//*[local-name()='readings'][*[local-name()='readingId']='%s']/*[local-name()='coverKey']"
+                          .formatted(id1))
                   .evaluatesTo("a-morning-at-the-library"));
 
       client
@@ -2000,9 +1991,10 @@ class SoapApplicationTests {
                   source(
                       """
                       <getReadingRequest xmlns="http://soap.com/english-reading/readings">
-                        <readingId>10000000-0000-0000-0000-000000000001</readingId>
+                        <readingId>%s</readingId>
                       </getReadingRequest>
-                      """)))
+                      """
+                          .formatted(id1))))
           .andExpect(noFault())
           .andExpect(xpath("//*[local-name()='reading']/*[local-name()='userId']").doesNotExist())
           .andExpect(
@@ -2015,9 +2007,10 @@ class SoapApplicationTests {
                   source(
                       """
                       <getReadingReaderDataRequest xmlns="http://soap.com/english-reading/readings">
-                        <readingId>10000000-0000-0000-0000-000000000001</readingId>
+                        <readingId>%s</readingId>
                       </getReadingReaderDataRequest>
-                      """)))
+                      """
+                          .formatted(id1))))
           .andExpect(noFault())
           .andExpect(xpath("//*[local-name()='title']").evaluatesTo("A Morning at the Library"));
 
@@ -2027,18 +2020,44 @@ class SoapApplicationTests {
                   source(
                       """
                       <analyzeReadingRequest xmlns="http://soap.com/english-reading/readings">
-                        <readingId>10000000-0000-0000-0000-000000000001</readingId>
+                        <readingId>%s</readingId>
                       </analyzeReadingRequest>
-                      """)))
+                      """
+                          .formatted(id1))))
           .andExpect(noFault())
           .andExpect(xpath("//*[local-name()='totalTokens']").exists());
     } finally {
+      readings.deleteById(id1);
+      readings.deleteById(id3);
       SecurityContextHolder.clearContext();
     }
   }
 
   @Test
   void recommendsSeededPlatformReadingsOverTheValidatedSoapContract() {
+    var id1 = UUID.randomUUID();
+    var id3 = UUID.randomUUID();
+    insertPlatformReading(
+        id1,
+        "A Morning at the Library",
+        "A quiet library test story.",
+        "en",
+        EditorialLevel.A1,
+        "Daily Life & Relationships",
+        "a-morning-at-the-library",
+        EditorialStatus.PUBLISHED);
+    insertPlatformReading(
+        id3,
+        "The Camera on Platform Three",
+        "A train station mystery test story.",
+        "en",
+        EditorialLevel.B1,
+        "Mystery & Exploration",
+        "the-camera-on-platform-three",
+        EditorialStatus.PUBLISHED);
+    lexicalIndexer.indexReading(id1, "en", "A quiet library test story.");
+    lexicalIndexer.indexReading(id3, "en", "A train station mystery test story.");
+
     authenticateUser();
     var client = MockWebServiceClient.createClient(applicationContext);
     try {
@@ -2054,7 +2073,7 @@ class SoapApplicationTests {
           .andExpect(noFault())
           .andExpect(xpath("//*[local-name()='page']").evaluatesTo("0"))
           .andExpect(xpath("//*[local-name()='size']").evaluatesTo("2"))
-          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("74"))
+          .andExpect(xpath("//*[local-name()='totalElements']").evaluatesTo("2"))
           .andExpect(xpath("count(//*[local-name()='readings'])").evaluatesTo("2"))
           .andExpect(
               xpath("//*[local-name()='readings'][1]/*[local-name()='vocabularyFitPercentage']")
@@ -2082,20 +2101,37 @@ class SoapApplicationTests {
           .andExpect(noFault())
           .andExpect(
               xpath(
-                      "//*[local-name()='readings'][*[local-name()='readingId']='30000000-0000-0000-0000-000000000009']/*[local-name()='coverKey']")
+                      "//*[local-name()='readings'][*[local-name()='readingId']='%s']/*[local-name()='coverKey']"
+                          .formatted(id3))
                   .evaluatesTo("the-camera-on-platform-three"))
           .andExpect(
               xpath(
-                      "//*[local-name()='readings'][*[local-name()='readingId']='10000000-0000-0000-0000-000000000001']/*[local-name()='coverKey']")
+                      "//*[local-name()='readings'][*[local-name()='readingId']='%s']/*[local-name()='coverKey']"
+                          .formatted(id1))
                   .evaluatesTo("a-morning-at-the-library"));
     } finally {
+      lexicalIndexer.removeReadingIndex(id1);
+      lexicalIndexer.removeReadingIndex(id3);
+      readings.deleteById(id1);
+      readings.deleteById(id3);
       SecurityContextHolder.clearContext();
     }
   }
 
   @Test
   void readerDataReflectsUpsertedStatusesForEveryOccurrenceAndSeparatesPlatformUsers() {
-    var platformId = "10000000-0000-0000-0000-000000000001";
+    var pUuid = UUID.randomUUID();
+    var platformId = pUuid.toString();
+    insertPlatformReading(
+        pUuid,
+        "Reader Test",
+        "the the the",
+        "en",
+        EditorialLevel.A1,
+        "Daily Life & Relationships",
+        null,
+        EditorialStatus.PUBLISHED);
+    lexicalIndexer.indexReading(pUuid, "en", "the the the");
     var client = MockWebServiceClient.createClient(applicationContext);
     authenticateUser();
     try {
@@ -2121,8 +2157,68 @@ class SoapApplicationTests {
       authenticateUser(user.id());
       expectReaderStatus(client, platformId, "the", "LEARNING", 3);
     } finally {
+      lexicalIndexer.removeReadingIndex(pUuid);
+      readings.deleteById(pUuid);
       SecurityContextHolder.clearContext();
     }
+  }
+
+  private Reading insertPlatformReading(
+      UUID id,
+      String title,
+      String content,
+      String language,
+      EditorialLevel level,
+      String category,
+      String coverKey,
+      EditorialStatus status) {
+    var now = LocalDateTime.now();
+    jdbcTemplate.update(
+        """
+        insert into readings (id, title, content, language, origin, editorial_level, category, cover_key, editorial_status, created_at)
+        values (?, ?, ?, ?, 'PLATFORM', ?, ?, ?, ?, ?)
+        """,
+        id,
+        title,
+        content,
+        language,
+        level.name(),
+        category,
+        coverKey,
+        status.name(),
+        now);
+    return new Reading(
+        id,
+        null,
+        title,
+        content,
+        language,
+        now,
+        ReadingOrigin.PLATFORM,
+        level,
+        category,
+        coverKey,
+        status);
+  }
+
+  private void insertCollection(
+      UUID id,
+      String key,
+      String displayName,
+      String description,
+      int displayOrder,
+      boolean active) {
+    jdbcTemplate.update(
+        """
+        insert into collections (id, key, display_name, description, display_order, active)
+        values (?, ?, ?, ?, ?, ?)
+        """,
+        id,
+        key,
+        displayName,
+        description,
+        displayOrder,
+        active);
   }
 
   private void setVocabularyStatus(MockWebServiceClient client, String word, String status) {
@@ -2331,6 +2427,16 @@ class SoapApplicationTests {
       vocabulary.save(
           new UserVocabulary(null, user, word, entry.getValue(), LocalDateTime.now(), learnedAt));
     }
+    var platformReading =
+        insertPlatformReading(
+            UUID.randomUUID(),
+            "Platform Preserved",
+            "Platform text content",
+            "en",
+            EditorialLevel.B1,
+            "Culture, Arts & Fiction",
+            null,
+            EditorialStatus.PUBLISHED);
     var vocabularyBefore = vocabulary.findByUserId(user.id(), new PageRequest(0, 100)).content();
     var platformCountBefore = readings.findAllPlatformReadings().size();
     var membershipsBefore =
@@ -2386,8 +2492,7 @@ class SoapApplicationTests {
       assertThat(jdbcTemplate.queryForObject("select count(*) from imported_documents", Long.class))
           .isEqualTo(documentsBefore);
 
-      for (var protectedId :
-          List.of(target.id(), foreign.id(), readings.findAllPlatformReadings().getFirst().id())) {
+      for (var protectedId : List.of(target.id(), foreign.id(), platformReading.id())) {
         client
             .sendRequest(
                 withPayload(
@@ -2402,6 +2507,7 @@ class SoapApplicationTests {
       }
       assertThat(readings.findById(foreign.id())).isPresent();
     } finally {
+      readings.deleteById(platformReading.id());
       SecurityContextHolder.clearContext();
     }
 

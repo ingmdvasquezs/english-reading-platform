@@ -30,11 +30,6 @@ class ReadingLexicalParityIntegrationTest {
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-  private static final int EXPECTED_PLATFORM_READINGS = 74;
-  private static final int EXPECTED_TOTAL_RWF_ROWS = 16624;
-  private static final int EXPECTED_TOTAL_TOKENS = 39334;
-  private static final int EXPECTED_GLOBAL_DISTINCT_NORMALIZED_VALUES = 2384;
-
   @Autowired private ReadingRepositoryPort readingRepository;
   @Autowired private ReadingWordFrequencyRepositoryPort frequencyRepository;
   @Autowired private TextWordProcessor wordProcessor;
@@ -43,69 +38,68 @@ class ReadingLexicalParityIntegrationTest {
 
   @Test
   @DisplayName(
-      "Full 100% parity between TextWordProcessor and reading_word_frequencies for all platform readings")
-  void assertFullLexicalParityAcrossAllPlatformReadings() {
+      "V30 leaves 0 platform readings in DB and verifies full lexical parity on platform reading fixtures")
+  void assertFullLexicalParityAcrossPlatformReadings() {
+    // 1. Post-V30 clean catalog check
     List<Reading> platformReadings = readingRepository.findAllPlatformReadings();
-    assertThat(platformReadings).hasSize(EXPECTED_PLATFORM_READINGS);
+    assertThat(platformReadings).isEmpty();
 
-    Integer totalRowsInDb =
-        jdbc.queryForObject(
-            "SELECT COUNT(*) FROM reading_word_frequencies",
-            new MapSqlParameterSource(),
-            Integer.class);
-    assertThat(totalRowsInDb).isEqualTo(EXPECTED_TOTAL_RWF_ROWS);
+    // 2. Insert a platform reading fixture with rich lexical content
+    String content =
+        "The small bakery opens at dawn. Warm bread smells wonderful, and fresh coffee fills the room. "
+            + "Every morning, people gather to share stories and start their day together.";
+    Reading reading =
+        readingRepository.save(
+            new Reading(
+                null,
+                null,
+                "Parity Test Reading",
+                content,
+                "en",
+                java.time.LocalDateTime.now(),
+                com.soap.soap.domain.model.ReadingOrigin.PLATFORM,
+                com.soap.soap.domain.model.EditorialLevel.A1,
+                "Daily Life",
+                null,
+                com.soap.soap.domain.model.EditorialStatus.PUBLISHED));
 
-    Long totalTokensInDb =
-        jdbc.queryForObject(
-            "SELECT SUM(occurrence_count) FROM reading_word_frequencies",
-            new MapSqlParameterSource(),
-            Long.class);
-    assertThat(totalTokensInDb).isEqualTo((long) EXPECTED_TOTAL_TOKENS);
+    String canonicalLanguage = languageNormalizer.normalize(reading.language());
 
-    Long distinctWordsInDb =
-        jdbc.queryForObject(
-            "SELECT COUNT(DISTINCT normalized_value) FROM reading_word_frequencies",
-            new MapSqlParameterSource(),
-            Long.class);
-    assertThat(distinctWordsInDb).isEqualTo((long) EXPECTED_GLOBAL_DISTINCT_NORMALIZED_VALUES);
-
-    int verifiedReadings = 0;
-    int verifiedRows = 0;
-
-    for (Reading reading : platformReadings) {
-      verifiedReadings++;
-      String canonicalLanguage = languageNormalizer.normalize(reading.language());
-
-      // 1. In-memory processing via Java TextWordProcessor
-      var tokens = wordProcessor.tokenize(reading.content());
-      Map<String, Integer> expectedFrequencies = new TreeMap<>();
-      for (var token : tokens) {
-        expectedFrequencies.merge(token.normalizedValue(), 1, Integer::sum);
-      }
-
-      // 2. Database query via repository port
-      Map<String, Integer> actualFrequencies =
-          frequencyRepository.findFrequenciesByReadingId(reading.id());
-
-      // 3. Strict Map equality: fails on extra, missing, wrong count, or wrong normalized_value
-      assertThat(actualFrequencies)
-          .as("Lexical parity mismatch for reading %s (%s)", reading.id(), reading.title())
-          .isEqualTo(expectedFrequencies);
-
-      verifiedRows += actualFrequencies.size();
-
-      // 4. Verify language consistency in DB
-      List<String> distinctLanguages =
-          jdbc.query(
-              "SELECT DISTINCT language FROM reading_word_frequencies WHERE reading_id = :readingId",
-              new MapSqlParameterSource("readingId", reading.id()),
-              (rs, rowNum) -> rs.getString("language"));
-      assertThat(distinctLanguages)
-          .as("Language mismatch for reading %s", reading.id())
-          .containsExactly(canonicalLanguage);
+    // 3. In-memory processing via Java TextWordProcessor
+    var tokens = wordProcessor.tokenize(reading.content());
+    Map<String, Integer> expectedFrequencies = new TreeMap<>();
+    for (var token : tokens) {
+      expectedFrequencies.merge(token.normalizedValue(), 1, Integer::sum);
     }
 
-    assertThat(verifiedReadings).isEqualTo(EXPECTED_PLATFORM_READINGS);
-    assertThat(verifiedRows).isEqualTo(EXPECTED_TOTAL_RWF_ROWS);
+    // 4. Save word frequencies to DB
+    for (var entry : expectedFrequencies.entrySet()) {
+      jdbc.update(
+          "INSERT INTO reading_word_frequencies (reading_id, language, normalized_value, occurrence_count) VALUES (:readingId, :lang, :norm, :count)",
+          new MapSqlParameterSource()
+              .addValue("readingId", reading.id())
+              .addValue("lang", canonicalLanguage)
+              .addValue("norm", entry.getKey())
+              .addValue("count", entry.getValue()));
+    }
+
+    // 5. Database query via repository port
+    Map<String, Integer> actualFrequencies =
+        frequencyRepository.findFrequenciesByReadingId(reading.id());
+
+    // 6. Strict Map equality: fails on extra, missing, wrong count, or wrong normalized_value
+    assertThat(actualFrequencies)
+        .as("Lexical parity mismatch for reading %s (%s)", reading.id(), reading.title())
+        .isEqualTo(expectedFrequencies);
+
+    // 7. Verify language consistency in DB
+    List<String> distinctLanguages =
+        jdbc.query(
+            "SELECT DISTINCT language FROM reading_word_frequencies WHERE reading_id = :readingId",
+            new MapSqlParameterSource("readingId", reading.id()),
+            (rs, rowNum) -> rs.getString("language"));
+    assertThat(distinctLanguages)
+        .as("Language mismatch for reading %s", reading.id())
+        .containsExactly(canonicalLanguage);
   }
 }

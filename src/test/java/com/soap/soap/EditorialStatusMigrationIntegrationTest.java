@@ -7,7 +7,10 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.output.MigrateResult;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -16,6 +19,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class EditorialStatusMigrationIntegrationTest {
 
   @Container
@@ -61,6 +65,7 @@ class EditorialStatusMigrationIntegrationTest {
   }
 
   @Test
+  @Order(1)
   @DisplayName("Flyway V28 and V29 migrations executed successfully")
   void migrationsExecutedSuccessfully() {
     assertThat(v28Result.success).isTrue();
@@ -72,6 +77,7 @@ class EditorialStatusMigrationIntegrationTest {
   }
 
   @Test
+  @Order(2)
   @DisplayName("All 74 existing platform readings are backfilled to PUBLISHED")
   void all74PlatformReadingsAreBackfilledToPublished() {
     Integer platformCount =
@@ -87,6 +93,7 @@ class EditorialStatusMigrationIntegrationTest {
   }
 
   @Test
+  @Order(3)
   @DisplayName("User readings have editorial_status = NULL")
   void userReadingsHaveNullEditorialStatus() {
     String status =
@@ -97,6 +104,7 @@ class EditorialStatusMigrationIntegrationTest {
   }
 
   @Test
+  @Order(4)
   @DisplayName("Constraint ck_readings_editorial_status rejects invalid statuses")
   void constraintRejectsInvalidEditorialStatus() {
     assertThatThrownBy(
@@ -107,6 +115,7 @@ class EditorialStatusMigrationIntegrationTest {
   }
 
   @Test
+  @Order(5)
   @DisplayName(
       "Constraint ck_readings_origin_ownership_metadata rejects PLATFORM with null editorial_status")
   void constraintRejectsPlatformWithNullEditorialStatus() {
@@ -119,6 +128,7 @@ class EditorialStatusMigrationIntegrationTest {
   }
 
   @Test
+  @Order(6)
   @DisplayName(
       "Constraint ck_readings_origin_ownership_metadata rejects USER with non-null editorial_status")
   void constraintRejectsUserWithNonNullEditorialStatus() {
@@ -131,6 +141,7 @@ class EditorialStatusMigrationIntegrationTest {
   }
 
   @Test
+  @Order(7)
   @DisplayName(
       "Partial index idx_readings_platform_published_created_at_desc exists and old index is dropped")
   void partialIndexConfiguredCorrectly() {
@@ -145,5 +156,44 @@ class EditorialStatusMigrationIntegrationTest {
             "SELECT COUNT(*) FROM pg_indexes WHERE indexname = 'idx_readings_platform_created_at_desc'",
             Integer.class);
     assertThat(oldIndexCount).isEqualTo(0);
+  }
+
+  @Test
+  @Order(8)
+  @DisplayName(
+      "V30 cleans up all legacy platform readings and collections while preserving user readings")
+  void v30CleansUpLegacyPlatformCatalogWhilePreservingUserData() {
+    var dataSource =
+        new DriverManagerDataSource(
+            POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+    var flywayV30 =
+        Flyway.configure()
+            .dataSource(dataSource)
+            .locations("classpath:db/migration")
+            .target("30")
+            .load();
+    var v30Result = flywayV30.migrate();
+
+    assertThat(v30Result.success).isTrue();
+    assertThat(v30Result.targetSchemaVersion).isEqualTo("30");
+
+    Integer platformCount =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM readings WHERE origin = 'PLATFORM'", Integer.class);
+    assertThat(platformCount).isEqualTo(0);
+
+    Integer collectionsCount =
+        jdbc.queryForObject("SELECT COUNT(*) FROM collections", Integer.class);
+    assertThat(collectionsCount).isEqualTo(0);
+
+    Integer userReadingsCount =
+        jdbc.queryForObject("SELECT COUNT(*) FROM readings WHERE origin = 'USER'", Integer.class);
+    assertThat(userReadingsCount).isEqualTo(1);
+
+    String userStatus =
+        jdbc.queryForObject(
+            "SELECT editorial_status FROM readings WHERE id = '22222222-2222-2222-2222-222222222222'",
+            String.class);
+    assertThat(userStatus).isNull();
   }
 }

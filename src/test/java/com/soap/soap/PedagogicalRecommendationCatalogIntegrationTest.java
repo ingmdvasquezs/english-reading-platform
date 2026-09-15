@@ -13,13 +13,17 @@ import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.port.out.WordRepositoryPort;
+import com.soap.soap.application.service.ReadingLexicalIndexer;
 import com.soap.soap.application.service.TextWordProcessor;
 import com.soap.soap.domain.model.EditorialLevel;
+import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.Reading;
+import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.User;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.domain.model.Word;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -44,7 +48,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest(properties = "security.jwt.secret=test-only-secret-with-at-least-32-bytes")
+@SpringBootTest(properties = {"security.jwt.secret=test-only-secret-with-at-least-32-bytes"})
 @Testcontainers
 @ActiveProfiles("local")
 @Transactional
@@ -63,6 +67,8 @@ class PedagogicalRecommendationCatalogIntegrationTest {
   @Autowired private UserVocabularyRepositoryPort vocabulary;
   @Autowired private WordRepositoryPort words;
   @Autowired private TextWordProcessor processor;
+  @Autowired private ReadingLexicalIndexer lexicalIndexer;
+  @Autowired private EntityManager entityManager;
 
   private User user;
   private Map<String, Reading> catalog;
@@ -78,9 +84,130 @@ class PedagogicalRecommendationCatalogIntegrationTest {
                 "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
                 null));
     authenticate(user.id());
+    seedControlledCatalog();
     catalog =
         readings.findAllPlatformReadings().stream()
             .collect(Collectors.toMap(Reading::title, Function.identity()));
+  }
+
+  private void seedControlledCatalog() {
+    createPlatformReading(
+        "The Lost Blue Scarf",
+        "Every morning Lily walks through the green park wearing a warm coat. She would always search for her lost blue scarf under the old oak tree near the river bank while birds sing sweet songs.",
+        EditorialLevel.A1,
+        "Daily Life & Relationships",
+        "the-lost-blue-scarf");
+
+    createPlatformReading(
+        "The Sparrow and the Red Cup",
+        "A small sparrow sits on the wooden table outside the kitchen. A red cup of sweet water is waiting for the bird. It drinks slowly and hops across the bright garden with gentle chirps.",
+        EditorialLevel.A1,
+        "Daily Life & Relationships",
+        "the-sparrow-and-the-red-cup");
+
+    createPlatformReading(
+        "A Morning at the Library",
+        "Nora visits the public library early in the morning. She likes to read simple books and study quiet stories while the librarian smiles warmly and organizes shelves with care.",
+        EditorialLevel.A1,
+        "Work & Society",
+        "a-morning-at-the-library");
+
+    createPlatformReading(
+        "Elena in the Harbor",
+        "Elena arrived in the harbor town on a rainy morning carrying a small suitcase and a quiet desire to build a fresh life. She walked down the busy street toward the local market. The friendly baker greeted her with a warm smile. Elena visited the community library to organize archives. She welcomed each deliberate challenge and valuable opportunity to learn everyday words with genuine curiosity and laughter.",
+        EditorialLevel.A1,
+        "Culture, Arts & Fiction",
+        null);
+
+    createPlatformReading(
+        "Why Cities Need Trees",
+        "Modern cities face rising temperatures and noisy streets. Planting tall green trees provides natural shade cleaner air and peaceful urban spaces. Neighborhoods with dense tree canopies experience better health and stronger social connections among residents.",
+        EditorialLevel.A2,
+        "Nature & Environment",
+        "why-cities-need-trees");
+
+    createPlatformReading(
+        "A Walk by the River",
+        "Walking along the winding river helps people relax after busy working hours. Water currents carry floating leaves toward distant hills while fishermen prepare their nets along the grassy banks under the afternoon sun.",
+        EditorialLevel.A2,
+        "Nature & Environment",
+        null);
+
+    createPlatformReading(
+        "The Empty Lot Project",
+        "Residents gathered to improve their urban neighborhood. They wanted to provide safe areas and change an abandoned square into a vibrant community garden. Through shared experience and collective effort they solved each unexpected challenge. The project offered a valuable opportunity for neighbors to notice local needs decide priorities together and instead build lasting civic solutions.",
+        EditorialLevel.B1,
+        "Work & Society",
+        null);
+
+    createPlatformReading(
+        "Learning to Ask Better Questions",
+        "Effective communication requires asking thoughtful and insightful questions. Rather than accepting superficial answers curious learners explore root causes and examine alternative viewpoints. Developing this cognitive habit enhances problem solving and strengthens collaboration across diverse professional teams.",
+        EditorialLevel.B1,
+        "Work & Society",
+        null);
+
+    createPlatformReading(
+        "The Cost of Constant Attention",
+        "Digital distractions continuously fragment modern human focus and disrupt everyday cognitive workflow. When notifications constantly interrupt deep professional work creative productivity plummets rapidly and chronic intellectual fatigue inevitably accumulates over prolonged periods. Reclaiming sustained concentration demands disciplined personal boundary setting structured restorative downtime and intentional strategic disconnection from overwhelming informational streams. In complex contemporary environments mastering mental presence constitutes an invaluable competitive advantage for reflective thinkers.",
+        EditorialLevel.B2,
+        "Science & Technology",
+        "the-cost-of-constant-attention");
+
+    createPlatformReading(
+        "The Changing Nature of Work",
+        "Technological transformations and remote collaboration are reshaping employment paradigms worldwide. Organizations now emphasize adaptable skill sets cross functional teamwork and continuous self directed education over rigid organizational hierarchies.",
+        EditorialLevel.B2,
+        "Work & Society",
+        null);
+
+    createPlatformReading(
+        "The Museum of Unfinished Things",
+        "Hidden inside an forgotten archival vault the museum exhibits abandoned manuscripts discarded inventions and preliminary sketches of legendary creators. Each incomplete artifact reveals creative vulnerability celebrating intellectual ambition over commercial perfection and inviting philosophical contemplation about human potential and artistic evolution in the modern city.",
+        EditorialLevel.C1,
+        "Culture, Arts & Fiction",
+        null);
+
+    createPlatformReading(
+        "A City That Predicts Its Citizens",
+        "Algorithmic governance and predictive municipal infrastructure now anticipate urban movements allocating public transport and monitoring citizen consumption patterns in real time across the modern city. While efficiency benchmarks rise dramatically civil liberties advocates question algorithmic surveillance loss of civic spontaneity and autonomous human decision making in civic society.",
+        EditorialLevel.C1,
+        "Science & Technology",
+        null);
+
+    createPlatformReading(
+        "A Republic of Echoes",
+        "In an era dominated by hyper partisan rhetoric and self reinforcing informational silos civic discourse degenerates into cacophonous tribalism where deliberative consensus becomes elusive. Epistemological humility and hermeneutic vigilance are indispensable virtues if democratic institutions hope to transcend ideological polarization dismantle systemic dogmatism and restore nuanced societal deliberation for thoughtful citizens seeking collective wisdom.",
+        EditorialLevel.C2,
+        "Philosophy, Thought & Meaning",
+        "a-republic-of-echoes");
+
+    createPlatformReading(
+        "The Cartographer of Vanishing Roads",
+        "Mapping ephemeral pathways across disappearing landscapes requires obsolete geographical instruments intuitive topographical deductions and exquisite perceptual precision. The cartographer documents subterranean fissures forgotten nomadic routes and shifting geological contours before anthropogenic encroachment renders ancestral territories entirely unrecognizable and forever erased from fragile memory.",
+        EditorialLevel.C2,
+        "History & Society",
+        null);
+  }
+
+  private void createPlatformReading(
+      String title, String content, EditorialLevel level, String category, String coverKey) {
+    var saved =
+        readings.save(
+            new Reading(
+                null,
+                null,
+                title,
+                content,
+                "en",
+                LocalDateTime.now(),
+                ReadingOrigin.PLATFORM,
+                level,
+                category,
+                coverKey,
+                EditorialStatus.PUBLISHED));
+    entityManager.flush();
+    lexicalIndexer.indexReading(saved.id(), saved.language(), saved.content());
   }
 
   @Test
@@ -93,7 +220,7 @@ class PedagogicalRecommendationCatalogIntegrationTest {
     var page1 = recommendations.recommendPlatformReadings(new PageRequest(1, 4));
     var page2 = recommendations.recommendPlatformReadings(new PageRequest(2, 4));
 
-    assertThat(firstRun).hasSize(74);
+    assertThat(firstRun).hasSize(14);
     assertThat(ids(secondRun)).containsExactlyElementsOf(ids(firstRun));
     assertThat(firstRun.subList(0, 4))
         .allMatch(reading -> reading.editorialLevel() == EditorialLevel.A1)
@@ -275,7 +402,7 @@ class PedagogicalRecommendationCatalogIntegrationTest {
   @Test
   void separatesContinueReadingFromRecommendationsAndExcludesStartedReadings() {
     var initialCatalog = ranked();
-    assertThat(initialCatalog).hasSize(74);
+    assertThat(initialCatalog).hasSize(14);
 
     var notStarted = reading(initialCatalog.get(0).title());
     var inProgress = reading(initialCatalog.get(1).title());
@@ -305,10 +432,10 @@ class PedagogicalRecommendationCatalogIntegrationTest {
             .collect(Collectors.toSet());
     assertThat(ids(recommended)).noneMatch(continueReadingIds::contains);
 
-    // Criteria F: totalElements excludes IN_PROGRESS and COMPLETED (74 - 2 = 72)
+    // Criteria F: totalElements excludes IN_PROGRESS and COMPLETED (14 - 2 = 12)
     var pagedRecs = recommendations.recommendPlatformReadings(new PageRequest(0, 10));
-    assertThat(pagedRecs.totalElements()).isEqualTo(72);
-    assertThat(recommended).hasSize(72);
+    assertThat(pagedRecs.totalElements()).isEqualTo(12);
+    assertThat(recommended).hasSize(12);
 
     // Criteria I: When all catalog readings are completed or in progress, recommendations is empty
     for (var reading : catalog.values()) {
@@ -320,22 +447,22 @@ class PedagogicalRecommendationCatalogIntegrationTest {
   }
 
   @Test
-  void allSeventyFourRecommendationsAreReachableExactlyOnceAcrossTwelveItemPages() {
+  void allControlledRecommendationsAreReachableAcrossPages() {
     var collected = new ArrayList<RecommendedPlatformReading>();
-    for (var page = 0; page < 7; page++) {
-      var result = recommendations.recommendPlatformReadings(new PageRequest(page, 12));
-      assertThat(result.totalElements()).isEqualTo(74);
+    for (var page = 0; page < 4; page++) {
+      var result = recommendations.recommendPlatformReadings(new PageRequest(page, 4));
+      assertThat(result.totalElements()).isEqualTo(14);
       collected.addAll(result.content());
     }
 
-    assertThat(collected).hasSize(74);
+    assertThat(collected).hasSize(14);
     assertThat(ids(collected)).doesNotHaveDuplicates();
     assertThat(ids(collected)).containsExactlyElementsOf(ids(ranked()));
   }
 
   @Test
-  void expandedCatalogHasExpectedLevelsLanguageCategoriesAndSubstantialContent() {
-    assertThat(catalog).hasSize(74);
+  void controlledCatalogHasExpectedLevelsLanguageCategoriesAndSubstantialContent() {
+    assertThat(catalog).hasSize(14);
     assertThat(catalog.values())
         .allSatisfy(
             reading -> {
@@ -345,27 +472,24 @@ class PedagogicalRecommendationCatalogIntegrationTest {
             });
     assertThat(catalog.values())
         .filteredOn(r -> r.editorialLevel() == EditorialLevel.A1)
-        .hasSize(13);
+        .hasSize(4);
     assertThat(catalog.values())
         .filteredOn(r -> r.editorialLevel() == EditorialLevel.A2)
-        .hasSize(13);
+        .hasSize(2);
     assertThat(catalog.values())
         .filteredOn(r -> r.editorialLevel() == EditorialLevel.B1)
-        .hasSize(14);
+        .hasSize(2);
     assertThat(catalog.values())
         .filteredOn(r -> r.editorialLevel() == EditorialLevel.B2)
-        .hasSize(14);
+        .hasSize(2);
     assertThat(catalog.values())
         .filteredOn(r -> r.editorialLevel() == EditorialLevel.C1)
-        .hasSize(12);
+        .hasSize(2);
     assertThat(catalog.values())
         .filteredOn(r -> r.editorialLevel() == EditorialLevel.C2)
-        .hasSize(8);
+        .hasSize(2);
     assertThat(catalog.values())
-        .filteredOn(r -> r.id().toString().startsWith("30000000-"))
-        .hasSize(50)
-        .allSatisfy(
-            reading -> assertThat(processor.tokenize(reading.content())).hasSizeGreaterThan(300));
+        .allSatisfy(reading -> assertThat(processor.tokenize(reading.content())).isNotEmpty());
   }
 
   @Test
@@ -391,34 +515,30 @@ class PedagogicalRecommendationCatalogIntegrationTest {
   void coverKeysArePersistedAndPropagatedWithoutAffectingRanking() {
     var expected =
         Map.of(
-            "The Camera on Platform Three", "the-camera-on-platform-three",
-            "The Library Book with No Author", "the-library-book-with-no-author",
-            "The Station Outside the Map", "the-station-outside-the-map",
-            "The Coral Ledger", "the-coral-ledger",
-            "The City Beneath the Reservoir", "the-city-beneath-the-reservoir",
-            "The Memory Orchard", "the-memory-orchard",
-            "The Grammar of Tides", "the-grammar-of-tides",
-            "The Unreliable Future Perfect", "the-unreliable-future-perfect");
+            "The Lost Blue Scarf", "the-lost-blue-scarf",
+            "The Sparrow and the Red Cup", "the-sparrow-and-the-red-cup",
+            "A Morning at the Library", "a-morning-at-the-library",
+            "Why Cities Need Trees", "why-cities-need-trees",
+            "The Cost of Constant Attention", "the-cost-of-constant-attention",
+            "A Republic of Echoes", "a-republic-of-echoes");
 
     expected.forEach(
         (title, coverKey) -> assertThat(reading(title).coverKey()).isEqualTo(coverKey));
-    assertThat(catalog.values()).filteredOn(reading -> reading.coverKey() != null).hasSize(63);
-    assertThat(catalog.values()).filteredOn(reading -> reading.coverKey() == null).hasSize(11);
+    assertThat(catalog.values()).filteredOn(reading -> reading.coverKey() != null).hasSize(6);
+    assertThat(catalog.values()).filteredOn(reading -> reading.coverKey() == null).hasSize(8);
     assertThat(reading("A Morning at the Library").coverKey())
         .isEqualTo("a-morning-at-the-library");
     assertThat(reading("Why Cities Need Trees").coverKey()).isEqualTo("why-cities-need-trees");
-    assertThat(reading("Minor Gods of the Waiting Room").coverKey())
-        .isEqualTo("minor-gods-of-the-waiting-room");
     assertThat(
             List.of(
                 reading("The Changing Nature of Work"),
-                reading("The Algorithm That Loved Tuesdays"),
-                reading("The Price of Perfect Timing"),
-                reading("The Museum of Unfinished Things")))
+                reading("The Museum of Unfinished Things"),
+                reading("The Empty Lot Project"),
+                reading("Elena in the Harbor")))
         .allSatisfy(item -> assertThat(item.coverKey()).isNull());
     var rankedById =
         ranked().stream().collect(java.util.stream.Collectors.toMap(r -> r.readingId(), r -> r));
-    assertThat(rankedById.values()).filteredOn(item -> item.coverKey() != null).hasSize(63);
+    assertThat(rankedById.values()).filteredOn(item -> item.coverKey() != null).hasSize(6);
     catalog.values().stream()
         .filter(item -> item.coverKey() != null)
         .forEach(
@@ -447,7 +567,6 @@ class PedagogicalRecommendationCatalogIntegrationTest {
     classifyDistribution(reading, 65, 15);
 
     var result = find(ranked(), reading);
-    // In V2: vocabularyFitPercentage is KnownComfort = min(100, knownTokenCoverage / 95 * 100)
     assertThat(result.vocabularyFitPercentage()).isNotNull();
     assertThat(result.vocabularyFitPercentage()).isGreaterThan(BigDecimal.ZERO);
     assertThat(result.vocabularyFitPercentage()).isLessThanOrEqualTo(new BigDecimal("100.00"));

@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,23 +49,18 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(properties = "security.jwt.secret=test-only-secret-with-at-least-32-bytes")
 @Testcontainers
 @ActiveProfiles("local")
-class ComprehensionSeedIntegrationTest {
+class ComprehensionFlowIntegrationTest {
 
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-  private static final Map<String, UUID> SEEDED_READINGS =
+  private static final UUID READING_ID_1 = UUID.randomUUID();
+  private static final UUID READING_ID_2 = UUID.randomUUID();
+
+  private static final Map<String, UUID> TEST_READINGS =
       Map.of(
-          "A1 - The Lost Blue Scarf", UUID.fromString("20000000-0000-0000-0000-000000000001"),
-          "A2 - A Quiet Morning by the River",
-              UUID.fromString("20000000-0000-0000-0000-000000000006"),
-          "B1 - Learning to Ask Better Questions",
-              UUID.fromString("20000000-0000-0000-0000-000000000011"),
-          "B2 - The Cost of Constant Attention",
-              UUID.fromString("20000000-0000-0000-0000-000000000013"),
-          "C1 - The Museum of Unfinished Things",
-              UUID.fromString("20000000-0000-0000-0000-000000000017"),
-          "C2 - The Inheritance of Dust", UUID.fromString("30000000-0000-0000-0000-000000000048"));
+          "Test Reading One", READING_ID_1,
+          "Test Reading Two", READING_ID_2);
 
   @Autowired private ComprehensionQuizRepositoryPort quizRepository;
   @Autowired private ComprehensionAttemptRepositoryPort attemptRepository;
@@ -78,14 +75,80 @@ class ComprehensionSeedIntegrationTest {
 
   private User testUser;
 
+  @BeforeAll
+  static void seedComprehensionFixture(@Autowired JdbcTemplate jdbc) {
+    insertQuizFixture(jdbc, READING_ID_1, "Test Reading One");
+    insertQuizFixture(jdbc, READING_ID_2, "Test Reading Two");
+  }
+
+  private static void insertQuizFixture(JdbcTemplate jdbc, UUID readingId, String title) {
+    jdbc.update(
+        """
+        INSERT INTO readings (id, user_id, title, content, language, created_at, origin, editorial_level, category, editorial_status)
+        VALUES (?, NULL, ?, 'Sample reading content for comprehension quiz flow testing.', 'en', CURRENT_TIMESTAMP, 'PLATFORM', 'B1', 'Work & Society', 'PUBLISHED')
+        """,
+        readingId,
+        title);
+
+    var types =
+        List.of(
+            QuestionType.FACTUAL,
+            QuestionType.INFERENCE,
+            QuestionType.MAIN_IDEA,
+            QuestionType.FACTUAL,
+            QuestionType.INFERENCE,
+            QuestionType.MAIN_IDEA);
+
+    for (int i = 0; i < types.size(); i++) {
+      var qId = UUID.randomUUID();
+      var qType = types.get(i);
+      int ordinal = i + 1;
+      jdbc.update(
+          """
+          INSERT INTO reading_comprehension_questions (id, reading_id, ordinal, question_type, prompt, explanation, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          """,
+          qId,
+          readingId,
+          ordinal,
+          qType.name(),
+          "Test question prompt " + ordinal + " for " + title,
+          "Explanation for question " + ordinal);
+
+      for (int optOrd = 1; optOrd <= 4; optOrd++) {
+        boolean isCorrect = (optOrd == 1);
+        jdbc.update(
+            """
+            INSERT INTO reading_comprehension_options (id, question_id, ordinal, content, is_correct)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            UUID.randomUUID(),
+            qId,
+            optOrd,
+            "Option " + optOrd + (isCorrect ? " (correct)" : ""),
+            isCorrect);
+      }
+    }
+  }
+
+  @AfterAll
+  static void tearDownFixture(@Autowired JdbcTemplate jdbc) {
+    jdbc.execute("DELETE FROM user_comprehension_answers");
+    jdbc.execute("DELETE FROM user_comprehension_attempts");
+    jdbc.execute("DELETE FROM reading_comprehension_options");
+    jdbc.execute("DELETE FROM reading_comprehension_questions");
+    jdbc.execute("DELETE FROM reading_progress");
+    jdbc.execute("DELETE FROM readings WHERE origin = 'PLATFORM'");
+  }
+
   @BeforeEach
   void setUp() {
     testUser =
         userRepository.save(
             new User(
                 null,
-                "Seed Test User",
-                "seed-test-" + UUID.randomUUID() + "@example.com",
+                "Comprehension Test User",
+                "comp-test-" + UUID.randomUUID() + "@example.com",
                 "hash",
                 null));
 
@@ -102,31 +165,27 @@ class ComprehensionSeedIntegrationTest {
   }
 
   @Test
-  void allSixAuthorizedReadingsHaveQuizzesSeededWithSixQuestionsEach() {
-    SEEDED_READINGS.forEach(
+  void testReadingsHaveQuizzesWithSixQuestionsEach() {
+    TEST_READINGS.forEach(
         (title, readingId) -> {
           var quizOpt = quizRepository.findByReadingId(readingId);
           assertThat(quizOpt).as("Quiz for reading %s should exist", title).isPresent();
           assertThat(quizOpt.get().isAvailable()).isTrue();
           assertThat(quizOpt.get().questions())
-              .as("Reading %s must have 6 questions (V25 + V26)", title)
+              .as("Reading %s must have 6 questions", title)
               .hasSize(6);
         });
   }
 
   @Test
-  void verifiesEditorialIntegrityOfAllSeededQuestionsAndOptions() {
-    var report = new StringBuilder("\n=== V25 + V26 EDITORIAL VERIFICATION REPORT ===\n");
-
-    SEEDED_READINGS.forEach(
+  void verifiesEditorialIntegrityOfSeededQuestionsAndOptions() {
+    TEST_READINGS.forEach(
         (title, readingId) -> {
           var quiz = quizRepository.findByReadingId(readingId).orElseThrow();
           assertThat(quiz.questions())
               .as("Reading %s must have exactly 6 questions", title)
               .hasSize(6);
 
-          int totalOptions = 0;
-          int correctOptionsCount = 0;
           var types = new ArrayList<QuestionType>();
 
           for (int qIndex = 0; qIndex < quiz.questions().size(); qIndex++) {
@@ -140,8 +199,6 @@ class ComprehensionSeedIntegrationTest {
                 .as("Question %d in %s must have 4 options", q.ordinal(), title)
                 .hasSize(4);
 
-            totalOptions += q.options().size();
-
             int correctInQuestion = 0;
             for (int oIndex = 0; oIndex < q.options().size(); oIndex++) {
               ComprehensionOption opt = q.options().get(oIndex);
@@ -149,7 +206,6 @@ class ComprehensionSeedIntegrationTest {
               assertThat(opt.content()).isNotBlank();
               if (opt.isCorrect()) {
                 correctInQuestion++;
-                correctOptionsCount++;
               }
             }
 
@@ -169,25 +225,12 @@ class ComprehensionSeedIntegrationTest {
                   QuestionType.FACTUAL,
                   QuestionType.INFERENCE,
                   QuestionType.MAIN_IDEA);
-
-          report
-              .append(title)
-              .append("\nquestions: ")
-              .append(quiz.questions().size())
-              .append("\noptions: ")
-              .append(totalOptions)
-              .append("\ncorrect-options: ")
-              .append(correctOptionsCount)
-              .append("\n\n");
         });
-
-    System.out.println(report.toString());
   }
 
   @Test
   void preSubmitQuizViewDoesNotExposeCorrectAnswersOrExplanations() {
-    UUID readingId = UUID.fromString("20000000-0000-0000-0000-000000000001");
-
+    UUID readingId = READING_ID_1;
     progressRepository.complete(testUser.id(), readingId, LocalDateTime.now());
 
     var legacyView = getQuizPort.getQuiz(readingId);
@@ -222,7 +265,7 @@ class ComprehensionSeedIntegrationTest {
   @Test
   @Transactional
   void scoresSubmissionCorrectlyAcrossScoringBandsForVersion1AndVersion2() {
-    UUID readingId = UUID.fromString("20000000-0000-0000-0000-000000000001");
+    UUID readingId = READING_ID_1;
     progressRepository.complete(testUser.id(), readingId, LocalDateTime.now());
 
     var quiz = quizRepository.findByReadingId(readingId).orElseThrow();
@@ -357,28 +400,17 @@ class ComprehensionSeedIntegrationTest {
             "SELECT count(*) FROM reading_comprehension_questions WHERE explanation IS NULL OR trim(explanation) = ''",
             Integer.class);
 
-    System.out.println("=== V26 DATABASE INTEGRITY REPORT ===");
-    System.out.println("QUESTION_COUNT = " + questionCount);
-    System.out.println("DISTINCT_QUESTION_IDS = " + distinctQuestionIds);
-    System.out.println("OPTION_COUNT = " + optionCount);
-    System.out.println("DISTINCT_OPTION_IDS = " + distinctOptionIds);
-    System.out.println("QUESTIONS_WITHOUT_CORRECT_OPTION = " + questionsWithoutCorrect);
-    System.out.println("QUESTIONS_WITH_MULTIPLE_CORRECT_OPTIONS = " + questionsWithMultipleCorrect);
-    System.out.println("ORPHAN_QUESTIONS = " + orphanQuestions);
-    System.out.println("ORPHAN_OPTIONS = " + orphanOptions);
-
-    assertThat(questionCount).isEqualTo(36);
-    assertThat(distinctQuestionIds).isEqualTo(36);
-    assertThat(optionCount).isEqualTo(144);
-    assertThat(distinctOptionIds).isEqualTo(144);
+    assertThat(questionCount).isEqualTo(12);
+    assertThat(distinctQuestionIds).isEqualTo(12);
+    assertThat(optionCount).isEqualTo(48);
+    assertThat(distinctOptionIds).isEqualTo(48);
     assertThat(questionsWithoutCorrect).isZero();
     assertThat(questionsWithMultipleCorrect).isZero();
     assertThat(orphanQuestions).isZero();
     assertThat(orphanOptions).isZero();
     assertThat(emptyExplanations).isZero();
 
-    // Verify 6 questions per reading with ordinal 1..6 and 2 of each type
-    SEEDED_READINGS
+    TEST_READINGS
         .values()
         .forEach(
             readingId -> {
@@ -410,10 +442,9 @@ class ComprehensionSeedIntegrationTest {
               assertThat(mainIdeaCount).isEqualTo(2);
             });
 
-    // Verify 4 options per question with ordinal 1..4
     List<UUID> allQuestionIds =
         jdbc.queryForList("SELECT id FROM reading_comprehension_questions", UUID.class);
-    assertThat(allQuestionIds).hasSize(36);
+    assertThat(allQuestionIds).hasSize(12);
     allQuestionIds.forEach(
         questionId -> {
           List<Integer> optionOrdinals =
@@ -427,7 +458,7 @@ class ComprehensionSeedIntegrationTest {
 
   @Test
   void motorVersion2_DeterminismAndDisplayOrdinalsAcrossReadings() {
-    SEEDED_READINGS.forEach(
+    TEST_READINGS.forEach(
         (title, readingId) -> {
           var quiz = quizRepository.findByReadingId(readingId).orElseThrow();
           UUID subId = UUID.randomUUID();
@@ -453,8 +484,8 @@ class ComprehensionSeedIntegrationTest {
   }
 
   @Test
-  void motorVersion1_OnlySelectsV25Questions() {
-    SEEDED_READINGS.forEach(
+  void motorVersion1_OnlySelectsOrdinalsLessThanOrEqualToThree() {
+    TEST_READINGS.forEach(
         (title, readingId) -> {
           var quiz = quizRepository.findByReadingId(readingId).orElseThrow();
           for (int i = 0; i < 30; i++) {
@@ -478,7 +509,7 @@ class ComprehensionSeedIntegrationTest {
 
   @Test
   void motorVersion2_BothCandidatesReachableAcrossSubmissionIdsForEveryReading() {
-    SEEDED_READINGS.forEach(
+    TEST_READINGS.forEach(
         (title, readingId) -> {
           var quiz = quizRepository.findByReadingId(readingId).orElseThrow();
           Set<UUID> chosenQuestionIds = new HashSet<>();
@@ -507,7 +538,7 @@ class ComprehensionSeedIntegrationTest {
   @Test
   @Transactional
   void submissionValidationRulesEnforcedServerSide() {
-    UUID readingId = UUID.fromString("20000000-0000-0000-0000-000000000001");
+    UUID readingId = READING_ID_1;
     progressRepository.complete(testUser.id(), readingId, LocalDateTime.now());
 
     var quiz = quizRepository.findByReadingId(readingId).orElseThrow();
@@ -578,7 +609,7 @@ class ComprehensionSeedIntegrationTest {
   @Test
   @Transactional
   void idempotencyReturnsExistingAttemptWithoutRecalculation() {
-    UUID readingId = UUID.fromString("20000000-0000-0000-0000-000000000001");
+    UUID readingId = READING_ID_1;
     progressRepository.complete(testUser.id(), readingId, LocalDateTime.now());
 
     var quiz = quizRepository.findByReadingId(readingId).orElseThrow();
@@ -615,17 +646,17 @@ class ComprehensionSeedIntegrationTest {
 
   @Test
   @Transactional
-  void historicalAttemptWithV25AnswersReturnsExactThreeHistoricalQuestions() {
-    UUID readingId = UUID.fromString("20000000-0000-0000-0000-000000000001");
+  void historicalAttemptReturnsExactHistoricalQuestions() {
+    UUID readingId = READING_ID_1;
     var quiz = quizRepository.findByReadingId(readingId).orElseThrow();
     assertThat(quiz.questions()).hasSize(6);
 
     UUID historicalAttemptId = UUID.randomUUID();
     UUID historicalSubId = UUID.randomUUID();
-    var v25Questions = quiz.questions().stream().filter(q -> q.ordinal() <= 3).toList();
+    var firstThreeQuestions = quiz.questions().stream().filter(q -> q.ordinal() <= 3).toList();
 
     var historicalAnswers =
-        v25Questions.stream()
+        firstThreeQuestions.stream()
             .map(
                 q ->
                     new UserComprehensionAnswer(
@@ -653,7 +684,7 @@ class ComprehensionSeedIntegrationTest {
     entityManager.clear();
 
     var answers =
-        v25Questions.stream()
+        firstThreeQuestions.stream()
             .map(q -> new AnswerSubmission(q.id(), q.options().get(0).id()))
             .toList();
 
@@ -666,7 +697,7 @@ class ComprehensionSeedIntegrationTest {
     assertThat(result.scorePercentage()).isEqualByComparingTo(new BigDecimal("66.67"));
 
     var returnedQIds = result.questions().stream().map(q -> q.questionId()).toList();
-    var expectedV25QIds = v25Questions.stream().map(ComprehensionQuestion::id).toList();
-    assertThat(returnedQIds).containsExactlyElementsOf(expectedV25QIds);
+    var expectedQIds = firstThreeQuestions.stream().map(ComprehensionQuestion::id).toList();
+    assertThat(returnedQIds).containsExactlyElementsOf(expectedQIds);
   }
 }

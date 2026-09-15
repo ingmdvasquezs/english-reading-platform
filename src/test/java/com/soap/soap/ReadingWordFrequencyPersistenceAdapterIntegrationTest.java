@@ -10,6 +10,7 @@ import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
 import com.soap.soap.application.port.out.WordRepositoryPort;
 import com.soap.soap.application.service.ReadingLexicalIndexer;
 import com.soap.soap.domain.model.EditorialLevel;
+import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.User;
@@ -19,6 +20,7 @@ import com.soap.soap.domain.model.Word;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -170,10 +172,29 @@ class ReadingWordFrequencyPersistenceAdapterIntegrationTest {
                 "hashed",
                 null));
 
+    Reading platformReading =
+        readingRepository.save(
+            new Reading(
+                null,
+                null,
+                "NullIds Platform Reading " + UUID.randomUUID(),
+                "Ocean waves crash on the shore.",
+                "en",
+                LocalDateTime.now(),
+                ReadingOrigin.PLATFORM,
+                EditorialLevel.A2,
+                "Nature",
+                null,
+                EditorialStatus.PUBLISHED));
+
+    frequencyRepository.replaceFrequencies(
+        platformReading.id(),
+        "en",
+        Map.of("ocean", 1, "waves", 1, "crash", 1, "on", 1, "the", 1, "shore", 1));
+
     List<ReadingLexicalEvidence> allEvidence =
         frequencyRepository.findLexicalEvidenceByUserAndLanguage(user.id(), "en", null);
-    // At least the 74 seeded platform readings
-    assertThat(allEvidence.size()).isGreaterThanOrEqualTo(74);
+    assertThat(allEvidence).anyMatch(evidence -> evidence.readingId().equals(platformReading.id()));
   }
 
   @Test
