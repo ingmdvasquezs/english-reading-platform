@@ -22,8 +22,34 @@ public class EditorialImportCliRunner implements ApplicationRunner {
   private final IngestEditorialReadingPort ingestion;
   private final UpdatePlatformReadingProvenancePort provenanceUpdate;
   private final PublishPlatformReadingPort publishReadingPort;
+  private final EditorialCollectionManifestParser collectionParser;
+  private final com.soap.soap.application.port.in.ImportEditorialCollectionPort
+      collectionImportPort;
   private final ConfigurableApplicationContext context;
   private Consumer<Integer> exitStrategy;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public EditorialImportCliRunner(
+      EditorialManifestParser parser,
+      IngestEditorialReadingPort ingestion,
+      UpdatePlatformReadingProvenancePort provenanceUpdate,
+      PublishPlatformReadingPort publishReadingPort,
+      EditorialCollectionManifestParser collectionParser,
+      com.soap.soap.application.port.in.ImportEditorialCollectionPort collectionImportPort,
+      ConfigurableApplicationContext context) {
+    this.parser = parser;
+    this.ingestion = ingestion;
+    this.provenanceUpdate = provenanceUpdate;
+    this.publishReadingPort = publishReadingPort;
+    this.collectionParser = collectionParser;
+    this.collectionImportPort = collectionImportPort;
+    this.context = context;
+    this.exitStrategy =
+        code -> {
+          SpringApplication.exit(context, () -> code);
+          System.exit(code);
+        };
+  }
 
   public EditorialImportCliRunner(
       EditorialManifestParser parser,
@@ -31,16 +57,7 @@ public class EditorialImportCliRunner implements ApplicationRunner {
       UpdatePlatformReadingProvenancePort provenanceUpdate,
       PublishPlatformReadingPort publishReadingPort,
       ConfigurableApplicationContext context) {
-    this.parser = parser;
-    this.ingestion = ingestion;
-    this.provenanceUpdate = provenanceUpdate;
-    this.publishReadingPort = publishReadingPort;
-    this.context = context;
-    this.exitStrategy =
-        code -> {
-          SpringApplication.exit(context, () -> code);
-          System.exit(code);
-        };
+    this(parser, ingestion, provenanceUpdate, publishReadingPort, null, null, context);
   }
 
   // Package-private for testing to prevent System.exit during test execution
@@ -53,8 +70,13 @@ public class EditorialImportCliRunner implements ApplicationRunner {
     boolean hasImport = args.containsOption("editorial-import");
     boolean hasProvenance = args.containsOption("editorial-provenance-update");
     boolean hasPublish = args.containsOption("editorial-publish");
+    boolean hasCollectionImport = args.containsOption("editorial-collection-import");
 
-    int operationsCount = (hasImport ? 1 : 0) + (hasProvenance ? 1 : 0) + (hasPublish ? 1 : 0);
+    int operationsCount =
+        (hasImport ? 1 : 0)
+            + (hasProvenance ? 1 : 0)
+            + (hasPublish ? 1 : 0)
+            + (hasCollectionImport ? 1 : 0);
 
     if (operationsCount == 0) {
       return;
@@ -72,8 +94,10 @@ public class EditorialImportCliRunner implements ApplicationRunner {
       handleImport(args);
     } else if (hasProvenance) {
       handleProvenanceUpdate(args);
-    } else {
+    } else if (hasPublish) {
       handlePublish(args);
+    } else {
+      handleCollectionImport(args);
     }
   }
 
@@ -194,6 +218,45 @@ public class EditorialImportCliRunner implements ApplicationRunner {
     } catch (Exception e) {
       log.error("Editorial publish failed: {}", e.getMessage());
       System.err.println("EDITORIAL_PUBLISH_FAILED: " + e.getMessage());
+      exitCode = 1;
+    } finally {
+      exitStrategy.accept(exitCode);
+    }
+  }
+
+  private void handleCollectionImport(ApplicationArguments args) {
+    int exitCode = 0;
+    try {
+      var values = args.getOptionValues("editorial-collection-import");
+      if (values == null || values.isEmpty() || values.getFirst().isBlank()) {
+        throw new IllegalArgumentException(
+            "Option --editorial-collection-import requires a valid file path");
+      }
+      var path = Path.of(values.getFirst());
+      log.info("Starting editorial collection import from: {}", path);
+
+      var command = collectionParser.parse(path);
+      var result = collectionImportPort.importCollection(command);
+
+      log.info(
+          "Editorial collection import completed successfully: collectionId={}, key={}, created={}, memberships={}",
+          result.collectionId(),
+          result.key(),
+          result.created(),
+          result.membershipsCount());
+      System.out.println(
+          "EDITORIAL_COLLECTION_IMPORT_SUCCESS: collectionId="
+              + result.collectionId()
+              + ", key="
+              + result.key()
+              + ", created="
+              + result.created()
+              + ", membershipsCount="
+              + result.membershipsCount());
+      exitCode = 0;
+    } catch (Exception e) {
+      log.error("Editorial collection import failed: {}", e.getMessage());
+      System.err.println("EDITORIAL_COLLECTION_IMPORT_FAILED: " + e.getMessage());
       exitCode = 1;
     } finally {
       exitStrategy.accept(exitCode);

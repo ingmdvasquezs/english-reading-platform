@@ -65,4 +65,8 @@ public interface JpaReadingCollectionMembershipRepository
       nativeQuery = false)
   Page<ReadingEntity> findReadingsByCollectionKeyAndLanguage(
       @Param("key") String key, @Param("language") String language, Pageable pageable);
+
+  @org.springframework.data.jpa.repository.Modifying
+  @Query("delete from ReadingCollectionMembershipEntity m where m.id.collectionId = :collectionId")
+  void deleteByCollectionId(@Param("collectionId") java.util.UUID collectionId);
 }

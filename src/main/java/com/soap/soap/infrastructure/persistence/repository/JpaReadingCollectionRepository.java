@@ -13,6 +13,8 @@ public interface JpaReadingCollectionRepository
 
   Optional<ReadingCollectionEntity> findByKeyAndActiveTrue(String key);
 
+  Optional<ReadingCollectionEntity> findByKey(String key);
+
   @Query(
       """
       select c from ReadingCollectionEntity c

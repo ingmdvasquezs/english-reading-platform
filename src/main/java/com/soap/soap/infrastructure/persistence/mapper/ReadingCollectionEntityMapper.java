@@ -7,4 +7,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface ReadingCollectionEntityMapper {
   ReadingCollection toDomain(ReadingCollectionEntity entity);
+
+  ReadingCollectionEntity toEntity(ReadingCollection domain);
 }

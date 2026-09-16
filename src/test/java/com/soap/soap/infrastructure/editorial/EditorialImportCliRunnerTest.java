@@ -31,6 +31,8 @@ class EditorialImportCliRunnerTest {
   private IngestEditorialReadingPort ingestion;
   private UpdatePlatformReadingProvenancePort provenanceUpdate;
   private PublishPlatformReadingPort publishReadingPort;
+  private EditorialCollectionManifestParser collectionParser;
+  private com.soap.soap.application.port.in.ImportEditorialCollectionPort collectionImportPort;
   private ConfigurableApplicationContext context;
   private EditorialImportCliRunner runner;
   private AtomicInteger exitCode;
@@ -41,10 +43,19 @@ class EditorialImportCliRunnerTest {
     ingestion = mock(IngestEditorialReadingPort.class);
     provenanceUpdate = mock(UpdatePlatformReadingProvenancePort.class);
     publishReadingPort = mock(PublishPlatformReadingPort.class);
+    collectionParser = mock(EditorialCollectionManifestParser.class);
+    collectionImportPort =
+        mock(com.soap.soap.application.port.in.ImportEditorialCollectionPort.class);
     context = mock(ConfigurableApplicationContext.class);
     runner =
         new EditorialImportCliRunner(
-            parser, ingestion, provenanceUpdate, publishReadingPort, context);
+            parser,
+            ingestion,
+            provenanceUpdate,
+            publishReadingPort,
+            collectionParser,
+            collectionImportPort,
+            context);
     exitCode = new AtomicInteger(-999);
     runner.setExitStrategy(exitCode::set);
   }
@@ -178,6 +189,50 @@ class EditorialImportCliRunnerTest {
     runner.run(args);
 
     verifyNoInteractions(ingestion, provenanceUpdate, publishReadingPort);
+    assertThat(exitCode.get()).isEqualTo(1);
+  }
+
+  @Test
+  void executesCollectionImportAndExitsWithZeroOnSuccess() {
+    var command = mock(com.soap.soap.application.command.ImportEditorialCollectionCommand.class);
+    when(collectionParser.parse(Path.of("collection-path.json"))).thenReturn(command);
+    when(collectionImportPort.importCollection(command))
+        .thenReturn(
+            new com.soap.soap.application.model.ImportEditorialCollectionResult(
+                UUID.randomUUID(), "key", "title", true, 5));
+
+    var args =
+        new DefaultApplicationArguments("--editorial-collection-import=collection-path.json");
+    runner.run(args);
+
+    verify(collectionParser).parse(Path.of("collection-path.json"));
+    verify(collectionImportPort).importCollection(command);
+    assertThat(exitCode.get()).isEqualTo(0);
+  }
+
+  @Test
+  void exitsWithNonZeroOnCollectionImportFailure() {
+    when(collectionParser.parse(any(Path.class)))
+        .thenThrow(
+            new com.soap.soap.application.exception.EditorialCollectionImportException(
+                "Invalid collection"));
+
+    var args = new DefaultApplicationArguments("--editorial-collection-import=invalid.json");
+    runner.run(args);
+
+    verifyNoInteractions(collectionImportPort);
+    assertThat(exitCode.get()).isEqualTo(1);
+  }
+
+  @Test
+  void rejectsCollectionImportCombinedWithOtherOperation() {
+    var args =
+        new DefaultApplicationArguments(
+            "--editorial-collection-import=col.json", "--editorial-publish=" + UUID.randomUUID());
+    runner.run(args);
+
+    verifyNoInteractions(
+        parser, ingestion, provenanceUpdate, publishReadingPort, collectionImportPort);
     assertThat(exitCode.get()).isEqualTo(1);
   }
 }

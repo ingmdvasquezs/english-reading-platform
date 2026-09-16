@@ -15,4 +15,12 @@ public interface ReadingCollectionRepositoryPort {
   PageResult<Reading> findReadings(String key, PageRequest pageRequest);
 
   PageResult<Reading> findReadings(String key, String language, PageRequest pageRequest);
+
+  Optional<ReadingCollection> findByKey(String key);
+
+  ReadingCollection save(ReadingCollection collection);
+
+  void replaceMemberships(
+      java.util.UUID collectionId,
+      List<com.soap.soap.application.model.CollectionMembershipItem> items);
 }

@@ -64,4 +64,44 @@ public class ReadingCollectionPersistenceAdapter implements ReadingCollectionRep
         page.getSize(),
         page.getTotalElements());
   }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<ReadingCollection> findByKey(String key) {
+    return collections.findByKey(key).map(mapper::toDomain);
+  }
+
+  @Override
+  @Transactional
+  public ReadingCollection save(ReadingCollection collection) {
+    var entity = mapper.toEntity(collection);
+    var saved = collections.saveAndFlush(entity);
+    return mapper.toDomain(saved);
+  }
+
+  @Override
+  @Transactional
+  public void replaceMemberships(
+      java.util.UUID collectionId,
+      List<com.soap.soap.application.model.CollectionMembershipItem> items) {
+    memberships.deleteByCollectionId(collectionId);
+    memberships.flush();
+    if (items != null && !items.isEmpty()) {
+      var entities =
+          items.stream()
+              .map(
+                  item -> {
+                    var entity =
+                        new com.soap.soap.infrastructure.persistence.entity
+                            .ReadingCollectionMembershipEntity();
+                    entity.setId(
+                        new com.soap.soap.infrastructure.persistence.entity
+                            .ReadingCollectionMembershipId(collectionId, item.readingId()));
+                    entity.setDisplayOrder(item.displayOrder());
+                    return entity;
+                  })
+              .toList();
+      memberships.saveAllAndFlush(entities);
+    }
+  }
 }
