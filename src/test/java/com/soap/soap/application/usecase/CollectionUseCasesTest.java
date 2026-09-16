@@ -3,6 +3,7 @@ package com.soap.soap.application.usecase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,19 +11,19 @@ import static org.mockito.Mockito.when;
 import com.soap.soap.application.exception.CollectionNotFoundException;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.RecommendedPlatformReading;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingCollectionRepositoryPort;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
-import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
-import com.soap.soap.application.service.PlatformReadingRecommendationCalculator;
-import com.soap.soap.application.service.TextWordProcessor;
+import com.soap.soap.application.service.PlatformReadingPersonalizationService;
 import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingCollection;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.ReadingProgress;
 import com.soap.soap.domain.model.ReadingProgressStatus;
+import com.soap.soap.domain.model.RecommendationReasonCode;
 import com.soap.soap.domain.model.User;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,7 +42,7 @@ class CollectionUseCasesTest {
   @Mock private UserRepositoryPort users;
   @Mock private ReadingCollectionRepositoryPort collections;
   @Mock private ReadingProgressRepositoryPort progress;
-  @Mock private UserVocabularyRepositoryPort vocabulary;
+  @Mock private PlatformReadingPersonalizationService personalizer;
   @Mock private CurrentUserPort currentUser;
   private UUID userId;
 
@@ -73,7 +74,6 @@ class CollectionUseCasesTest {
     assertThatThrownBy(() -> useCase.listCollectionReadings("missing", new PageRequest(0, 10)))
         .isInstanceOf(CollectionNotFoundException.class);
     verify(collections, never()).findReadings(any(), any(), any());
-    verify(collections, never()).findReadings(any(), any());
   }
 
   @Test
@@ -90,20 +90,57 @@ class CollectionUseCasesTest {
         .thenReturn(Optional.of(collection("everyday", 1, null)));
     when(collections.findReadings("everyday", "en", request))
         .thenReturn(new PageResult<>(List.of(reading, secondReading), 1, 2, 11));
-    when(vocabulary.findStatusesByNormalizedValues(
-            userId, "en", Set.of("known", "learning", "new", "ignored", "unknown")))
-        .thenReturn(
-            Map.of(
-                "known", com.soap.soap.domain.model.VocabularyStatus.KNOWN,
-                "learning", com.soap.soap.domain.model.VocabularyStatus.LEARNING,
-                "new", com.soap.soap.domain.model.VocabularyStatus.NEW,
-                "ignored", com.soap.soap.domain.model.VocabularyStatus.IGNORED));
     when(progress.findByUserIdAndReadingIds(userId, Set.of(readingId, secondReadingId)))
         .thenReturn(
             Map.of(
                 readingId,
                 ReadingProgress.completed(
                     userId, readingId, LocalDateTime.now(), LocalDateTime.now())));
+
+    var p1 =
+        new RecommendedPlatformReading(
+            readingId,
+            "First",
+            "en",
+            EditorialLevel.A1,
+            "Daily Life",
+            reading.createdAt(),
+            5,
+            1,
+            1,
+            1,
+            1,
+            1,
+            new java.math.BigDecimal("56.00"),
+            new java.math.BigDecimal("80.00"),
+            ReadingProgressStatus.COMPLETED,
+            null,
+            RecommendationReasonCode.DISCOVERY,
+            null);
+    var p2 =
+        new RecommendedPlatformReading(
+            secondReadingId,
+            "Second",
+            "en",
+            EditorialLevel.A1,
+            "Daily Life",
+            secondReading.createdAt(),
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            new java.math.BigDecimal("100.00"),
+            new java.math.BigDecimal("100.00"),
+            null,
+            null,
+            RecommendationReasonCode.HIGH_VOCABULARY_MATCH,
+            null);
+
+    when(personalizer.personalizeReadings(
+            eq(userId), eq("en"), eq(List.of(reading, secondReading)), any()))
+        .thenReturn(List.of(p1, p2));
 
     var result = useCase().listCollectionReadings("everyday", request);
 
@@ -125,10 +162,13 @@ class CollectionUseCasesTest {
               assertThat(item.vocabularyFitPercentage()).isEqualByComparingTo("56.00");
               assertThat(item.classificationConfidencePercentage()).isEqualByComparingTo("80.00");
             });
-    verify(vocabulary)
-        .findStatusesByNormalizedValues(
-            userId, "en", Set.of("known", "learning", "new", "ignored", "unknown"));
     verify(progress).findByUserIdAndReadingIds(userId, Set.of(readingId, secondReadingId));
+    verify(personalizer)
+        .personalizeReadings(
+            eq(userId),
+            eq("en"),
+            eq(List.of(reading, secondReading)),
+            eq(Map.of(readingId, ReadingProgressStatus.COMPLETED)));
   }
 
   @Test
@@ -147,13 +187,55 @@ class CollectionUseCasesTest {
         .thenReturn(Optional.of(collection("shared", 1, null)));
     when(collections.findReadings("shared", "en", request))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
-    when(vocabulary.findStatusesByNormalizedValues(userId, "en", Set.of("alpha", "beta")))
-        .thenReturn(Map.of("alpha", com.soap.soap.domain.model.VocabularyStatus.KNOWN));
-    when(vocabulary.findStatusesByNormalizedValues(secondUserId, "en", Set.of("alpha", "beta")))
-        .thenReturn(Map.of("alpha", com.soap.soap.domain.model.VocabularyStatus.LEARNING));
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
     when(progress.findByUserIdAndReadingIds(secondUserId, Set.of(reading.id())))
         .thenReturn(Map.of());
+
+    var firstSummary =
+        new RecommendedPlatformReading(
+            reading.id(),
+            "Shared",
+            "en",
+            EditorialLevel.A1,
+            "Daily Life",
+            reading.createdAt(),
+            2,
+            1,
+            0,
+            0,
+            0,
+            1,
+            new java.math.BigDecimal("50.00"),
+            new java.math.BigDecimal("50.00"),
+            null,
+            null,
+            RecommendationReasonCode.DISCOVERY,
+            null);
+    var secondSummary =
+        new RecommendedPlatformReading(
+            reading.id(),
+            "Shared",
+            "en",
+            EditorialLevel.A1,
+            "Daily Life",
+            reading.createdAt(),
+            2,
+            0,
+            1,
+            0,
+            0,
+            1,
+            new java.math.BigDecimal("0.00"),
+            new java.math.BigDecimal("50.00"),
+            null,
+            null,
+            RecommendationReasonCode.DISCOVERY,
+            null);
+
+    when(personalizer.personalizeReadings(eq(userId), eq("en"), eq(List.of(reading)), any()))
+        .thenReturn(List.of(firstSummary));
+    when(personalizer.personalizeReadings(eq(secondUserId), eq("en"), eq(List.of(reading)), any()))
+        .thenReturn(List.of(secondSummary));
 
     var first = useCase().listCollectionReadings("shared", request).content().getFirst();
     var second = useCase().listCollectionReadings("shared", request).content().getFirst();
@@ -162,19 +244,14 @@ class CollectionUseCasesTest {
     assertThat(first.learningWords()).isZero();
     assertThat(second.knownWords()).isZero();
     assertThat(second.learningWords()).isEqualTo(1);
-    verify(vocabulary).findStatusesByNormalizedValues(userId, "en", Set.of("alpha", "beta"));
-    verify(vocabulary).findStatusesByNormalizedValues(secondUserId, "en", Set.of("alpha", "beta"));
+    verify(personalizer).personalizeReadings(eq(userId), eq("en"), eq(List.of(reading)), any());
+    verify(personalizer)
+        .personalizeReadings(eq(secondUserId), eq("en"), eq(List.of(reading)), any());
   }
 
   private ListCollectionReadingsUseCase useCase() {
     return new ListCollectionReadingsUseCase(
-        users,
-        collections,
-        progress,
-        vocabulary,
-        new TextWordProcessor(),
-        new PlatformReadingRecommendationCalculator(),
-        currentUser);
+        users, collections, progress, personalizer, currentUser);
   }
 
   private Reading reading(UUID id, String title, String content) {

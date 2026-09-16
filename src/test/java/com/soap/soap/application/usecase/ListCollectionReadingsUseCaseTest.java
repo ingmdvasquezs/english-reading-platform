@@ -12,13 +12,12 @@ import com.soap.soap.application.exception.CollectionNotFoundException;
 import com.soap.soap.application.exception.UserNotFoundException;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
+import com.soap.soap.application.model.RecommendedPlatformReading;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingCollectionRepositoryPort;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
-import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
-import com.soap.soap.application.service.PlatformReadingRecommendationCalculator;
-import com.soap.soap.application.service.TextWordProcessor;
+import com.soap.soap.application.service.PlatformReadingPersonalizationService;
 import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.Reading;
@@ -43,7 +42,7 @@ class ListCollectionReadingsUseCaseTest {
   @Mock private UserRepositoryPort users;
   @Mock private ReadingCollectionRepositoryPort collections;
   @Mock private ReadingProgressRepositoryPort progress;
-  @Mock private UserVocabularyRepositoryPort vocabulary;
+  @Mock private PlatformReadingPersonalizationService personalizer;
   @Mock private CurrentUserPort currentUser;
 
   private UUID userId;
@@ -54,14 +53,7 @@ class ListCollectionReadingsUseCaseTest {
     userId = UUID.randomUUID();
     when(currentUser.requireUserId()).thenReturn(userId);
     useCase =
-        new ListCollectionReadingsUseCase(
-            users,
-            collections,
-            progress,
-            vocabulary,
-            new TextWordProcessor(),
-            new PlatformReadingRecommendationCalculator(),
-            currentUser);
+        new ListCollectionReadingsUseCase(users, collections, progress, personalizer, currentUser);
   }
 
   @Test
@@ -106,9 +98,25 @@ class ListCollectionReadingsUseCaseTest {
 
     when(collections.findReadings(collectionKey, "fr", request))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
-    when(vocabulary.findStatusesByNormalizedValues(eq(userId), eq("fr"), any()))
-        .thenReturn(Map.of());
     when(progress.findByUserIdAndReadingIds(eq(userId), any())).thenReturn(Map.of());
+    var expectedSummary =
+        new RecommendedPlatformReading(
+            readingId,
+            "Le Petit Prince",
+            "fr",
+            EditorialLevel.A1,
+            "Fiction",
+            reading.createdAt(),
+            10,
+            5,
+            2,
+            1,
+            0,
+            2,
+            new java.math.BigDecimal("50.00"),
+            new java.math.BigDecimal("70.00"));
+    when(personalizer.personalizeReadings(eq(userId), eq("fr"), eq(List.of(reading)), any()))
+        .thenReturn(List.of(expectedSummary));
 
     var result = useCase.listCollectionReadings(collectionKey, request);
 
@@ -162,9 +170,25 @@ class ListCollectionReadingsUseCaseTest {
 
     when(collections.findReadings(collectionKey, "pt-BR", request))
         .thenReturn(new PageResult<>(List.of(reading), 0, 5, 1));
-    when(vocabulary.findStatusesByNormalizedValues(eq(userId), eq("pt-BR"), any()))
-        .thenReturn(Map.of());
     when(progress.findByUserIdAndReadingIds(eq(userId), any())).thenReturn(Map.of());
+    var expectedSummary =
+        new RecommendedPlatformReading(
+            readingId,
+            "Historias do Brasil",
+            "pt-BR",
+            EditorialLevel.B1,
+            "Real Story",
+            reading.createdAt(),
+            10,
+            5,
+            2,
+            1,
+            0,
+            2,
+            new java.math.BigDecimal("50.00"),
+            new java.math.BigDecimal("70.00"));
+    when(personalizer.personalizeReadings(eq(userId), eq("pt-BR"), eq(List.of(reading)), any()))
+        .thenReturn(List.of(expectedSummary));
 
     var result = useCase.listCollectionReadings(collectionKey, request);
 

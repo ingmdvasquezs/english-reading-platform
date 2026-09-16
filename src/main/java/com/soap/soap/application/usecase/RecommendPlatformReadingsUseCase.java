@@ -15,10 +15,10 @@ import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.ReadingWordFrequencyRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
+import com.soap.soap.application.service.PlatformReadingPersonalizationService;
 import com.soap.soap.application.service.RecommendationReasonEvaluator;
 import com.soap.soap.application.service.RecommendationScorerV2;
 import com.soap.soap.domain.model.LanguageTag;
-import com.soap.soap.domain.model.ReadingProgressStatus;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -71,6 +71,7 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
   private final RecommendationScorerV2 scorer;
   private final RecommendationReasonEvaluator reasonEvaluator;
   private final CurrentUserPort currentUser;
+  private final PlatformReadingPersonalizationService personalizer;
   private final int minGlobalClassifiedWords;
 
   @Autowired
@@ -83,6 +84,7 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
       RecommendationScorerV2 scorer,
       RecommendationReasonEvaluator reasonEvaluator,
       CurrentUserPort currentUser,
+      PlatformReadingPersonalizationService personalizer,
       @Value("${recommendation.v2.min-global-classified-words:30}") int minGlobalClassifiedWords) {
     this.users = users;
     this.readings = readings;
@@ -92,7 +94,32 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
     this.scorer = scorer;
     this.reasonEvaluator = reasonEvaluator;
     this.currentUser = currentUser;
+    this.personalizer = personalizer;
     this.minGlobalClassifiedWords = minGlobalClassifiedWords;
+  }
+
+  public RecommendPlatformReadingsUseCase(
+      UserRepositoryPort users,
+      ReadingRepositoryPort readings,
+      ReadingProgressRepositoryPort progress,
+      UserVocabularyRepositoryPort vocabulary,
+      ReadingWordFrequencyRepositoryPort frequencyRepository,
+      RecommendationScorerV2 scorer,
+      RecommendationReasonEvaluator reasonEvaluator,
+      CurrentUserPort currentUser,
+      int minGlobalClassifiedWords) {
+    this(
+        users,
+        readings,
+        progress,
+        vocabulary,
+        frequencyRepository,
+        scorer,
+        reasonEvaluator,
+        currentUser,
+        new PlatformReadingPersonalizationService(
+            vocabulary, frequencyRepository, scorer, reasonEvaluator, minGlobalClassifiedWords),
+        minGlobalClassifiedWords);
   }
 
   public RecommendPlatformReadingsUseCase(
@@ -177,8 +204,7 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
       String language = entry.getKey();
       List<UUID> ids = entry.getValue();
 
-      long globalClassified = vocabulary.countClassifiedWordsByUserAndLanguage(userId, language);
-      coldStartByLanguage.put(language, globalClassified < minGlobalClassifiedWords);
+      coldStartByLanguage.put(language, personalizer.isGlobalColdStart(userId, language));
 
       List<ReadingLexicalEvidence> evidenceList =
           frequencyRepository.findLexicalEvidenceByUserAndLanguage(userId, language, ids);
@@ -197,44 +223,9 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
         continue;
       }
 
-      ReadingProgressStatus progressStatus = null;
-
       boolean candidateColdStart = coldStartByLanguage.getOrDefault(candidate.language(), true);
-      RecommendationScoreV2 score =
-          scorer.score(evidence, candidate.editorialLevel(), candidateColdStart);
-
-      var reasonCode =
-          reasonEvaluator.evaluate(
-              progressStatus,
-              candidateColdStart,
-              score.insufficientEvidence(),
-              score.classificationConfidence(),
-              score.knownTokenCoverage(),
-              score.learningUniqueRatio(),
-              score.uniqueChallenge());
-
-      RecommendedPlatformReading reading =
-          new RecommendedPlatformReading(
-              candidate.id(),
-              candidate.title(),
-              candidate.language(),
-              candidate.editorialLevel(),
-              candidate.category(),
-              candidate.createdAt(),
-              evidence.totalUnique(),
-              evidence.knownUnique(),
-              evidence.learningUnique(),
-              evidence.explicitNewUnique(),
-              evidence.ignoredUnique(),
-              evidence.unclassifiedUnique(),
-              score.knownComfort(),
-              score.classificationConfidence(),
-              progressStatus,
-              candidate.coverKey(),
-              reasonCode,
-              candidate.shortDescription());
-
-      scored.add(new ScoredReading(reading, score));
+      var personalized = personalizer.personalize(candidate, evidence, null, candidateColdStart);
+      scored.add(new ScoredReading(personalized.reading(), personalized.score()));
     }
 
     // 6. Rank deterministically (cold start vs mature)

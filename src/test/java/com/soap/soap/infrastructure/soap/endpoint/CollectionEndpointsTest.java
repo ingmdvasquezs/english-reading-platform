@@ -73,7 +73,8 @@ class CollectionEndpointsTest {
             new java.math.BigDecimal("63.00"),
             new java.math.BigDecimal("80.00"),
             ReadingProgressStatus.IN_PROGRESS,
-            "trees-cover");
+            "trees-cover",
+            com.soap.soap.domain.model.RecommendationReasonCode.CONTINUE_READING);
     when(listReadings.listCollectionReadings("nature", new PageRequest(0, 5)))
         .thenReturn(new PageResult<>(List.of(summary), 0, 5, 18));
 
@@ -88,6 +89,7 @@ class CollectionEndpointsTest {
               assertThat(item.getReadingId()).isEqualTo(summary.readingId().toString());
               assertThat(item.getCoverKey()).isEqualTo("trees-cover");
               assertThat(item.getProgressStatus().value()).isEqualTo("IN_PROGRESS");
+              assertThat(item.getReasonCode().value()).isEqualTo("CONTINUE_READING");
               assertThat(item.getUniqueWords()).isEqualTo(10);
               assertThat(item.getKnownWords()).isEqualTo(4);
               assertThat(item.getLearningWords()).isEqualTo(2);

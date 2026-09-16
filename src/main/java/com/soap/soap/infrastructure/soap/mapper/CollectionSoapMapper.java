@@ -10,6 +10,7 @@ import com.soap.soap.infrastructure.soap.generated.ListCollectionReadingsRequest
 import com.soap.soap.infrastructure.soap.generated.ListCollectionReadingsResponse;
 import com.soap.soap.infrastructure.soap.generated.ListCollectionsResponse;
 import com.soap.soap.infrastructure.soap.generated.ReadingProgressStatusType;
+import com.soap.soap.infrastructure.soap.generated.RecommendationReasonCodeType;
 import com.soap.soap.infrastructure.soap.generated.RecommendedPlatformReadingType;
 import org.springframework.stereotype.Component;
 
@@ -65,6 +66,9 @@ public class CollectionSoapMapper extends SoapMapperSupport {
     if (summary.progressStatus() != null) {
       result.setProgressStatus(
           ReadingProgressStatusType.fromValue(summary.progressStatus().name()));
+    }
+    if (summary.reasonCode() != null) {
+      result.setReasonCode(RecommendationReasonCodeType.fromValue(summary.reasonCode().name()));
     }
     result.setCoverKey(summary.coverKey());
     result.setShortDescription(summary.shortDescription());

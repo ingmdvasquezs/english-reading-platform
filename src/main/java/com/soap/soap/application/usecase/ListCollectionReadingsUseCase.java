@@ -11,16 +11,13 @@ import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingCollectionRepositoryPort;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
-import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
-import com.soap.soap.application.service.PlatformReadingRecommendationCalculator;
-import com.soap.soap.application.service.TextWordProcessor;
+import com.soap.soap.application.service.PlatformReadingPersonalizationService;
 import com.soap.soap.domain.model.LanguageTag;
-import com.soap.soap.domain.model.VocabularyStatus;
+import com.soap.soap.domain.model.Reading;
+import com.soap.soap.domain.model.ReadingProgressStatus;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -33,9 +30,7 @@ public class ListCollectionReadingsUseCase implements ListCollectionReadingsPort
   private final UserRepositoryPort users;
   private final ReadingCollectionRepositoryPort collections;
   private final ReadingProgressRepositoryPort progress;
-  private final UserVocabularyRepositoryPort vocabulary;
-  private final TextWordProcessor wordProcessor;
-  private final PlatformReadingRecommendationCalculator calculator;
+  private final PlatformReadingPersonalizationService personalizer;
   private final CurrentUserPort currentUser;
 
   @Override
@@ -67,71 +62,21 @@ public class ListCollectionReadingsUseCase implements ListCollectionReadingsPort
 
     // Fetch readings scoped to user language
     var page = collections.findReadings(collectionKey, learningLanguage, pageRequest);
-    var wordsByReading = new LinkedHashMap<UUID, Set<String>>();
-    var wordsByLanguage = new HashMap<String, Set<String>>();
-    for (var reading : page.content()) {
-      var uniqueWords =
-          wordProcessor.tokenize(reading.content()).stream()
-              .map(TextWordProcessor.Token::normalizedValue)
-              .collect(Collectors.toUnmodifiableSet());
-      wordsByReading.put(reading.id(), uniqueWords);
-      String readingLang = reading.language() == null ? null : reading.language().value();
-      wordsByLanguage.computeIfAbsent(readingLang, ignored -> new HashSet<>()).addAll(uniqueWords);
+    if (page.content().isEmpty()) {
+      return new PageResult<>(List.of(), page.page(), page.size(), page.totalElements());
     }
-    var statusesByLanguage = new HashMap<String, Map<String, VocabularyStatus>>();
-    wordsByLanguage.forEach(
-        (language, words) ->
-            statusesByLanguage.put(
-                language,
-                words.isEmpty()
-                    ? Map.of()
-                    : vocabulary.findStatusesByNormalizedValues(userId, language, words)));
+
     var progressByReading =
         progress.findByUserIdAndReadingIds(
-            userId,
-            page.content().stream().map(reading -> reading.id()).collect(Collectors.toSet()));
-    var summaries =
-        page.content().stream()
-            .map(
-                reading -> {
-                  String readingLang =
-                      reading.language() == null ? null : reading.language().value();
-                  var calculated =
-                      calculator.calculate(
-                          reading,
-                          wordsByReading.get(reading.id()),
-                          statusesByLanguage.getOrDefault(readingLang, Map.of()));
-                  return withProgress(
-                      calculated,
-                      progressByReading.containsKey(reading.id())
-                          ? progressByReading.get(reading.id()).status()
-                          : null);
-                })
-            .toList();
-    return new PageResult<>(summaries, page.page(), page.size(), page.totalElements());
-  }
+            userId, page.content().stream().map(Reading::id).collect(Collectors.toSet()));
 
-  private static RecommendedPlatformReading withProgress(
-      RecommendedPlatformReading reading,
-      com.soap.soap.domain.model.ReadingProgressStatus progressStatus) {
-    return new RecommendedPlatformReading(
-        reading.readingId(),
-        reading.title(),
-        reading.language(),
-        reading.editorialLevel(),
-        reading.category(),
-        reading.createdAt(),
-        reading.uniqueWords(),
-        reading.knownWords(),
-        reading.learningWords(),
-        reading.explicitNewWords(),
-        reading.ignoredWords(),
-        reading.unclassifiedWords(),
-        reading.vocabularyFitPercentage(),
-        reading.classificationConfidencePercentage(),
-        progressStatus,
-        reading.coverKey(),
-        reading.reasonCode(),
-        reading.shortDescription());
+    Map<UUID, ReadingProgressStatus> progressStatusByReading = new HashMap<>();
+    progressByReading.forEach((id, p) -> progressStatusByReading.put(id, p.status()));
+
+    var summaries =
+        personalizer.personalizeReadings(
+            userId, learningLanguage, page.content(), progressStatusByReading);
+
+    return new PageResult<>(summaries, page.page(), page.size(), page.totalElements());
   }
 }
