@@ -445,7 +445,40 @@ class RecommendPlatformReadingsUseCaseTest {
         .hasMessageContaining("active learning language");
   }
 
+  @Test
+  @DisplayName(
+      "Preserves real Reading shortDescription verbatim without deriving from title or coverKey")
+  void preservesRealShortDescriptionVerbatim() {
+    String realDescription = "An authentic Colombian legend about an ancient river creature.";
+    var readingSummary = summary("The Mohan", EditorialLevel.B1, 1, realDescription);
+
+    when(users.existsById(userId)).thenReturn(true);
+    when(readings.findAllPlatformReadingSummaries()).thenReturn(List.of(readingSummary));
+    when(vocabulary.countClassifiedWordsByUserAndLanguage(userId, "en")).thenReturn(10L);
+    when(progress.findByUserIdAndReadingIds(eq(userId), eq(Set.of(readingSummary.id()))))
+        .thenReturn(Map.of());
+
+    var lexicalEvidence = evidence(readingSummary.id(), 80, 70, 5, 0, 40, 35, 3, 0, 0, 2);
+    when(frequencyRepository.findLexicalEvidenceByUserAndLanguage(
+            eq(userId), eq("en"), eq(List.of(readingSummary.id()))))
+        .thenReturn(List.of(lexicalEvidence));
+
+    var result = useCase.recommendPlatformReadings(new PageRequest(0, 10));
+
+    assertThat(result.content()).hasSize(1);
+    var recommended = result.content().get(0);
+    assertThat(recommended.shortDescription()).isEqualTo(realDescription);
+    assertThat(recommended.shortDescription()).isNotEqualTo(recommended.title());
+    assertThat(recommended.shortDescription()).isNotEqualTo(recommended.coverKey());
+    assertThat(recommended.shortDescription()).isNotEqualTo(recommended.reasonCode().name());
+  }
+
   private PlatformReadingSummary summary(String title, EditorialLevel level, int daysAgo) {
+    return summary(title, level, daysAgo, null);
+  }
+
+  private PlatformReadingSummary summary(
+      String title, EditorialLevel level, int daysAgo, String shortDescription) {
     return new PlatformReadingSummary(
         UUID.randomUUID(),
         title,
@@ -454,7 +487,12 @@ class RecommendPlatformReadingsUseCaseTest {
         "General",
         LocalDateTime.now().minusDays(daysAgo),
         null,
-        "covers/" + title.toLowerCase().replace(' ', '_') + ".jpg");
+        "covers/" + title.toLowerCase().replace(' ', '_') + ".jpg",
+        shortDescription,
+        null,
+        null,
+        null,
+        null);
   }
 
   private ReadingLexicalEvidence evidence(

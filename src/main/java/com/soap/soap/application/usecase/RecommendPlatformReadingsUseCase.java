@@ -231,7 +231,8 @@ public class RecommendPlatformReadingsUseCase implements RecommendPlatformReadin
               score.classificationConfidence(),
               progressStatus,
               candidate.coverKey(),
-              reasonCode);
+              reasonCode,
+              candidate.shortDescription());
 
       scored.add(new ScoredReading(reading, score));
     }

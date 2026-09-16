@@ -388,6 +388,7 @@
             <xs:element name="progressStatus" type="tns:readingProgressStatusType" minOccurs="0"/>
             <xs:element name="coverKey" type="xs:string" minOccurs="0"/>
             <xs:element name="reasonCode" type="tns:recommendationReasonCodeType" minOccurs="0"/>
+            <xs:element name="shortDescription" type="xs:string" minOccurs="0"/>
         </xs:sequence>
     </xs:complexType>
 

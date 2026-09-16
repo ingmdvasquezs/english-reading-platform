@@ -67,6 +67,7 @@ public class CollectionSoapMapper extends SoapMapperSupport {
           ReadingProgressStatusType.fromValue(summary.progressStatus().name()));
     }
     result.setCoverKey(summary.coverKey());
+    result.setShortDescription(summary.shortDescription());
     return result;
   }
 }

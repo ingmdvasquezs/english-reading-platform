@@ -130,6 +130,8 @@ public class ListCollectionReadingsUseCase implements ListCollectionReadingsPort
         reading.vocabularyFitPercentage(),
         reading.classificationConfidencePercentage(),
         progressStatus,
-        reading.coverKey());
+        reading.coverKey(),
+        reading.reasonCode(),
+        reading.shortDescription());
   }
 }

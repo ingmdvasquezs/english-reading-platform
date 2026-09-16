@@ -43,6 +43,8 @@ public class PlatformReadingRecommendationCalculator {
         compatibility.vocabularyFitPercentage(),
         compatibility.classificationConfidencePercentage(),
         null,
-        reading.coverKey());
+        reading.coverKey(),
+        null,
+        reading.shortDescription());
   }
 }

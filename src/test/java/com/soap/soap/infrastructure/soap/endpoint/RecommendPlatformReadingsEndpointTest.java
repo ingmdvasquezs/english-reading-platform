@@ -47,7 +47,8 @@ class RecommendPlatformReadingsEndpointTest {
             new BigDecimal("80.00"),
             null,
             null,
-            com.soap.soap.domain.model.RecommendationReasonCode.HIGH_VOCABULARY_MATCH);
+            com.soap.soap.domain.model.RecommendationReasonCode.HIGH_VOCABULARY_MATCH,
+            "A rich folk tale about water spirits in Colombia");
     when(port.recommendPlatformReadings(new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
@@ -71,6 +72,8 @@ class RecommendPlatformReadingsEndpointTest {
                   .isEqualTo(
                       com.soap.soap.infrastructure.soap.generated.RecommendationReasonCodeType
                           .HIGH_VOCABULARY_MATCH);
+              assertThat(item.getShortDescription())
+                  .isEqualTo("A rich folk tale about water spirits in Colombia");
             });
     verify(port).recommendPlatformReadings(new PageRequest(0, 10));
   }

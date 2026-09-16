@@ -50,6 +50,7 @@ public class RecommendPlatformReadingsSoapMapper extends SoapMapperSupport {
       result.setReasonCode(RecommendationReasonCodeType.fromValue(reading.reasonCode().name()));
     }
     result.setCoverKey(reading.coverKey());
+    result.setShortDescription(reading.shortDescription());
     return result;
   }
 }

@@ -24,7 +24,47 @@ public record RecommendedPlatformReading(
     BigDecimal classificationConfidencePercentage,
     ReadingProgressStatus progressStatus,
     String coverKey,
-    RecommendationReasonCode reasonCode) {
+    RecommendationReasonCode reasonCode,
+    String shortDescription) {
+  public RecommendedPlatformReading(
+      UUID readingId,
+      String title,
+      String language,
+      EditorialLevel editorialLevel,
+      String category,
+      LocalDateTime createdAt,
+      int uniqueWords,
+      int knownWords,
+      int learningWords,
+      int explicitNewWords,
+      int ignoredWords,
+      int unclassifiedWords,
+      BigDecimal vocabularyFitPercentage,
+      BigDecimal classificationConfidencePercentage,
+      ReadingProgressStatus progressStatus,
+      String coverKey,
+      RecommendationReasonCode reasonCode) {
+    this(
+        readingId,
+        title,
+        language,
+        editorialLevel,
+        category,
+        createdAt,
+        uniqueWords,
+        knownWords,
+        learningWords,
+        explicitNewWords,
+        ignoredWords,
+        unclassifiedWords,
+        vocabularyFitPercentage,
+        classificationConfidencePercentage,
+        progressStatus,
+        coverKey,
+        reasonCode,
+        null);
+  }
+
   public RecommendedPlatformReading(
       UUID readingId,
       String title,
