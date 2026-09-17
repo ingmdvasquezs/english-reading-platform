@@ -32,7 +32,10 @@ public interface JpaReadingProgressRepository extends JpaRepository<ReadingProgr
                  p.reading.origin as origin, p.status as progressStatus,
                  p.reading.coverKey as coverKey, p.reading.editorialLevel as editorialLevel,
                  p.reading.category as category, p.startedAt as startedAt,
-                 p.reading.shortDescription as shortDescription
+                 p.reading.shortDescription as shortDescription,
+                 p.currentPartOrdinal as currentPartOrdinal,
+                 p.paginationVersion as paginationVersion,
+                 p.reading.content as content
           from ReadingProgressEntity p
           where p.user.id = :userId
             and p.status = com.soap.soap.domain.model.ReadingProgressStatus.IN_PROGRESS
@@ -77,6 +80,12 @@ public interface JpaReadingProgressRepository extends JpaRepository<ReadingProgr
     LocalDateTime getStartedAt();
 
     String getShortDescription();
+
+    Integer getCurrentPartOrdinal();
+
+    Integer getPaginationVersion();
+
+    String getContent();
   }
 
   @Query(

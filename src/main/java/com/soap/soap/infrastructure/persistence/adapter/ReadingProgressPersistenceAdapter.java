@@ -5,11 +5,11 @@ import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.PlatformReadingHistoryItem;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
+import com.soap.soap.application.service.ReadingProgressCalculator;
+import com.soap.soap.application.service.TextReaderPaginationService;
 import com.soap.soap.domain.model.ReadingProgress;
-import com.soap.soap.domain.model.ReadingProgressStatus;
 import com.soap.soap.infrastructure.persistence.entity.ReadingProgressEntity;
 import com.soap.soap.infrastructure.persistence.repository.JpaReadingProgressRepository;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReadingProgressPersistenceAdapter implements ReadingProgressRepositoryPort {
   private final JpaReadingProgressRepository repository;
+  private final TextReaderPaginationService paginationService;
+  private final ReadingProgressCalculator progressCalculator;
 
   @Override
   @Transactional(readOnly = true)
@@ -54,20 +56,27 @@ public class ReadingProgressPersistenceAdapter implements ReadingProgressReposit
     return new PageResult<>(
         page.getContent().stream()
             .map(
-                item ->
-                    new ContinueReadingItem(
-                        item.getReadingId(),
-                        item.getTitle(),
-                        item.getOrigin(),
-                        item.getProgressStatus(),
-                        item.getCoverKey(),
-                        item.getEditorialLevel(),
-                        item.getCategory(),
-                        item.getStartedAt(),
-                        item.getShortDescription(),
-                        item.getProgressStatus() == ReadingProgressStatus.COMPLETED
-                            ? BigDecimal.valueOf(100.0)
-                            : null))
+                item -> {
+                  Integer totalParts =
+                      paginationService.totalParts(item.getContent(), item.getPaginationVersion());
+                  Integer percentage =
+                      progressCalculator.calculate(
+                          item.getProgressStatus(),
+                          item.getCurrentPartOrdinal(),
+                          item.getPaginationVersion(),
+                          totalParts);
+                  return new ContinueReadingItem(
+                      item.getReadingId(),
+                      item.getTitle(),
+                      item.getOrigin(),
+                      item.getProgressStatus(),
+                      item.getCoverKey(),
+                      item.getEditorialLevel(),
+                      item.getCategory(),
+                      item.getStartedAt(),
+                      item.getShortDescription(),
+                      percentage);
+                })
             .toList(),
         page.getNumber(),
         page.getSize(),

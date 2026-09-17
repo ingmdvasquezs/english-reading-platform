@@ -23,7 +23,6 @@ import com.soap.soap.domain.model.ReadingProgressStatus;
 import com.soap.soap.domain.model.RightsStatus;
 import com.soap.soap.domain.model.SourceKind;
 import com.soap.soap.domain.model.User;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -123,14 +122,14 @@ class ContinueReadingContractTest {
             "Daily Life & Relationships",
             LocalDateTime.now(),
             "Short description for card preview",
-            BigDecimal.valueOf(100.0));
+            100);
 
-    assertThat(completedItem.progressPercentage()).isEqualByComparingTo("100.0");
+    assertThat(completedItem.progressPercentage()).isEqualTo(100);
   }
 
   @Test
   @DisplayName(
-      "2. ListContinueReading returns shortDescription and progressPercentage=null for IN_PROGRESS")
+      "2. ListContinueReading returns shortDescription and progressPercentage=null for started-only IN_PROGRESS")
   void listContinueReadingReturnsShortDescriptionAndNullPercentage() {
     var reading =
         readings.save(
@@ -162,7 +161,7 @@ class ContinueReadingContractTest {
                 null,
                 AccessTier.FREE));
 
-    // User starts reading
+    // User starts reading without advancing to a part
     progress.startIfAbsent(user.id(), reading.id(), LocalDateTime.now());
 
     var result = continueReading.listContinueReading(new PageRequest(0, 10));
@@ -179,5 +178,147 @@ class ContinueReadingContractTest {
         .isEqualTo("A captivating mystery in the heart of the rainforest.");
     assertThat(item.progressStatus()).isEqualTo(ReadingProgressStatus.IN_PROGRESS);
     assertThat(item.progressPercentage()).isNull();
+  }
+
+  @Test
+  @DisplayName(
+      "3. ListContinueReading returns real calculated percentage for IN_PROGRESS with part ordinal")
+  void listContinueReadingReturnsCalculatedPercentageForPlatformReading() {
+    // Reading with 3 paragraphs of 90, 80, 110 words = 2 parts total
+    var p1 =
+        java.util.stream.IntStream.range(0, 90)
+                .mapToObj(i -> "alpha" + i)
+                .collect(java.util.stream.Collectors.joining(" "))
+            + ".";
+    var p2 =
+        java.util.stream.IntStream.range(0, 80)
+                .mapToObj(i -> "beta" + i)
+                .collect(java.util.stream.Collectors.joining(" "))
+            + ".";
+    var p3 =
+        java.util.stream.IntStream.range(0, 110)
+                .mapToObj(i -> "gamma" + i)
+                .collect(java.util.stream.Collectors.joining(" "))
+            + ".";
+    var content = String.join("\n\n", p1, p2, p3);
+
+    var reading =
+        readings.save(
+            new Reading(
+                null,
+                null,
+                "The Two Part Legend",
+                content,
+                LanguageTag.of("en"),
+                LocalDateTime.now(),
+                ReadingOrigin.PLATFORM,
+                EditorialLevel.B1,
+                EditorialCategory.MYSTERY_AND_EXPLORATION.displayName(),
+                "cover-two-part",
+                EditorialStatus.PUBLISHED,
+                "A tale with two parts.",
+                EditorialContentType.MYTH,
+                null,
+                EditorialRegion.SOUTH_AMERICA,
+                SourceKind.ORIGINAL_EDITORIAL,
+                RightsStatus.ORIGINAL,
+                AdaptationKind.ORIGINAL,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                AccessTier.FREE));
+
+    progress.startIfAbsent(user.id(), reading.id(), LocalDateTime.now());
+    // User moves to part 1 of 2 -> 50%
+    progress.updatePosition(user.id(), reading.id(), 1, 1);
+
+    var result = continueReading.listContinueReading(new PageRequest(0, 10));
+    var item =
+        result.content().stream()
+            .filter(r -> r.readingId().equals(reading.id()))
+            .findFirst()
+            .orElseThrow();
+
+    assertThat(item.progressStatus()).isEqualTo(ReadingProgressStatus.IN_PROGRESS);
+    assertThat(item.progressPercentage()).isEqualTo(50);
+
+    // When on the final part (part 2 of 2) while IN_PROGRESS, percentage is capped at 99
+    progress.updatePosition(user.id(), reading.id(), 2, 1);
+    var updatedResult = continueReading.listContinueReading(new PageRequest(0, 10));
+    var updatedItem =
+        updatedResult.content().stream()
+            .filter(r -> r.readingId().equals(reading.id()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(updatedItem.progressPercentage()).isEqualTo(99);
+  }
+
+  @Test
+  @DisplayName("4. ListContinueReading supports USER origin readings with real progress")
+  void listContinueReadingSupportsUserReadings() {
+    var p1 =
+        java.util.stream.IntStream.range(0, 90)
+                .mapToObj(i -> "userword" + i)
+                .collect(java.util.stream.Collectors.joining(" "))
+            + ".";
+    var p2 =
+        java.util.stream.IntStream.range(0, 80)
+                .mapToObj(i -> "userword" + i)
+                .collect(java.util.stream.Collectors.joining(" "))
+            + ".";
+    var p3 =
+        java.util.stream.IntStream.range(0, 110)
+                .mapToObj(i -> "userword" + i)
+                .collect(java.util.stream.Collectors.joining(" "))
+            + ".";
+    var content = String.join("\n\n", p1, p2, p3);
+
+    var userReading =
+        readings.save(
+            new Reading(
+                null,
+                user,
+                "My Personal Story",
+                content,
+                LanguageTag.of("en"),
+                LocalDateTime.now(),
+                ReadingOrigin.USER,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+    progress.startIfAbsent(user.id(), userReading.id(), LocalDateTime.now());
+    progress.updatePosition(user.id(), userReading.id(), 1, 1);
+
+    var result = continueReading.listContinueReading(new PageRequest(0, 10));
+    var item =
+        result.content().stream()
+            .filter(r -> r.readingId().equals(userReading.id()))
+            .findFirst()
+            .orElseThrow();
+
+    assertThat(item.origin()).isEqualTo(ReadingOrigin.USER);
+    assertThat(item.title()).isEqualTo("My Personal Story");
+    assertThat(item.progressPercentage()).isEqualTo(50);
   }
 }
