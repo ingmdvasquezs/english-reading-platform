@@ -3,11 +3,13 @@ package com.soap.soap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.soap.soap.application.exception.HistoricalQuizMutationException;
 import com.soap.soap.application.port.out.ComprehensionAttemptRepositoryPort;
 import com.soap.soap.application.port.out.ComprehensionQuizRepositoryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.domain.model.ComprehensionOption;
+import com.soap.soap.domain.model.ComprehensionQuestion;
 import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.QuestionType;
 import com.soap.soap.domain.model.Reading;
@@ -373,5 +375,327 @@ class ComprehensionPersistenceIntegrationTest {
     assertThat(jpaOptionRepository.findById(optId)).isEmpty();
     assertThat(jpaAttemptRepository.findById(attemptId)).isEmpty();
     assertThat(jpaAnswerRepository.findById(answer.id())).isEmpty();
+  }
+
+  @Test
+  @Transactional
+  void testA_and_B_sameStructureAndContentChangesPreserveQuestionAndOptionIds() {
+    var q1 =
+        createValidDomainQuestion(
+            testReading.id(), 1, "Original Prompt 1", "Original Exp 1", List.of(1, 2, 3, 4), 1);
+    var q2 =
+        createValidDomainQuestion(
+            testReading.id(), 2, "Original Prompt 2", "Original Exp 2", List.of(1, 2, 3, 4), 2);
+
+    quizRepository.replaceQuestions(testReading.id(), List.of(q1, q2));
+    entityManager.flush();
+    entityManager.clear();
+
+    var existingQuestions =
+        jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(testReading.id());
+    assertThat(existingQuestions).hasSize(2);
+    UUID originalQ1Id = existingQuestions.get(0).getId();
+    UUID originalQ2Id = existingQuestions.get(1).getId();
+
+    List<UUID> q1OptIds =
+        existingQuestions.get(0).getOptions().stream()
+            .map(ComprehensionOptionEntity::getId)
+            .toList();
+    List<UUID> q2OptIds =
+        existingQuestions.get(1).getOptions().stream()
+            .map(ComprehensionOptionEntity::getId)
+            .toList();
+
+    // Update: same structure, changed prompts/explanations and option contents/correctness
+    var updatedQ1 =
+        createValidDomainQuestion(
+            testReading.id(), 1, "Updated Prompt 1", "Updated Exp 1", List.of(1, 2, 3, 4), 2);
+    var updatedQ2 =
+        createValidDomainQuestion(
+            testReading.id(), 2, "Updated Prompt 2", "Updated Exp 2", List.of(1, 2, 3, 4), 1);
+
+    quizRepository.replaceQuestions(testReading.id(), List.of(updatedQ1, updatedQ2));
+    entityManager.flush();
+    entityManager.clear();
+
+    var reloadedQuestions =
+        jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(testReading.id());
+    assertThat(reloadedQuestions).hasSize(2);
+
+    // Question IDs strictly preserved
+    assertThat(reloadedQuestions.get(0).getId()).isEqualTo(originalQ1Id);
+    assertThat(reloadedQuestions.get(0).getPrompt()).isEqualTo("Updated Prompt 1");
+    assertThat(reloadedQuestions.get(0).getExplanation()).isEqualTo("Updated Exp 1");
+
+    assertThat(reloadedQuestions.get(1).getId()).isEqualTo(originalQ2Id);
+    assertThat(reloadedQuestions.get(1).getPrompt()).isEqualTo("Updated Prompt 2");
+    assertThat(reloadedQuestions.get(1).getExplanation()).isEqualTo("Updated Exp 2");
+
+    // Option IDs strictly preserved
+    for (int i = 0; i < 4; i++) {
+      assertThat(reloadedQuestions.get(0).getOptions().get(i).getId()).isEqualTo(q1OptIds.get(i));
+      assertThat(reloadedQuestions.get(0).getOptions().get(i).getContent())
+          .isEqualTo("Updated Prompt 1 - Opt " + (i + 1));
+      assertThat(reloadedQuestions.get(0).getOptions().get(i).isCorrect()).isEqualTo((i + 1) == 2);
+
+      assertThat(reloadedQuestions.get(1).getOptions().get(i).getId()).isEqualTo(q2OptIds.get(i));
+      assertThat(reloadedQuestions.get(1).getOptions().get(i).getContent())
+          .isEqualTo("Updated Prompt 2 - Opt " + (i + 1));
+      assertThat(reloadedQuestions.get(1).getOptions().get(i).isCorrect()).isEqualTo((i + 1) == 1);
+    }
+  }
+
+  @Test
+  @Transactional
+  void testC_questionCountChangesWhenHistoricalAnswersReferenceQuizFailsSafely() {
+    var q1 =
+        createValidDomainQuestion(testReading.id(), 1, "Prompt 1", "Exp 1", List.of(1, 2, 3, 4), 1);
+    var q2 =
+        createValidDomainQuestion(testReading.id(), 2, "Prompt 2", "Exp 2", List.of(1, 2, 3, 4), 1);
+
+    quizRepository.replaceQuestions(testReading.id(), List.of(q1, q2));
+    entityManager.flush();
+    entityManager.clear();
+
+    var existingQuestions =
+        jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(testReading.id());
+    UUID q2Id = existingQuestions.get(1).getId();
+    UUID opt21Id = existingQuestions.get(1).getOptions().get(0).getId();
+
+    // Record user attempt and answer referencing Question 2
+    UUID attemptId = UUID.randomUUID();
+    var attempt =
+        new UserComprehensionAttempt(
+            attemptId,
+            testUser.id(),
+            testReading.id(),
+            UUID.randomUUID(),
+            new BigDecimal("100.00"),
+            1,
+            1,
+            LocalDateTime.now(),
+            List.of());
+    var answer = new UserComprehensionAnswer(UUID.randomUUID(), attemptId, q2Id, opt21Id, true);
+    attemptRepository.recordAttempt(attempt, List.of(answer));
+    entityManager.flush();
+    entityManager.clear();
+
+    // Attempt to reduce questions to only Q1 (omitting Q2 which has historical answer)
+    assertThatThrownBy(() -> quizRepository.replaceQuestions(testReading.id(), List.of(q1)))
+        .isInstanceOf(HistoricalQuizMutationException.class)
+        .hasMessageContaining("historical user comprehension answers reference them");
+
+    entityManager.clear();
+    // Verify no questions deleted and historical answers intact
+    assertThat(jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(testReading.id())).hasSize(2);
+    assertThat(jpaAnswerRepository.findById(answer.id())).isPresent();
+  }
+
+  @Test
+  @Transactional
+  void testD_optionCountChangesWhenHistoricalAnswersReferenceOptionsFailsSafely() {
+    var q1 =
+        createValidDomainQuestion(testReading.id(), 1, "Prompt 1", "Exp 1", List.of(1, 2, 3, 4), 1);
+
+    quizRepository.replaceQuestions(testReading.id(), List.of(q1));
+    entityManager.flush();
+    entityManager.clear();
+
+    var existingQuestions =
+        jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(testReading.id());
+    UUID q1Id = existingQuestions.get(0).getId();
+    UUID opt3Id = existingQuestions.get(0).getOptions().get(2).getId();
+
+    // Record user attempt and answer selecting option 3
+    UUID attemptId = UUID.randomUUID();
+    var attempt =
+        new UserComprehensionAttempt(
+            attemptId,
+            testUser.id(),
+            testReading.id(),
+            UUID.randomUUID(),
+            BigDecimal.ZERO,
+            0,
+            1,
+            LocalDateTime.now(),
+            List.of());
+    var answer = new UserComprehensionAnswer(UUID.randomUUID(), attemptId, q1Id, opt3Id, false);
+    attemptRepository.recordAttempt(attempt, List.of(answer));
+    entityManager.flush();
+    entityManager.clear();
+
+    // Attempt to update Q1 with ordinals 1, 2, 4, 5 (omitting option 3 which has historical answer)
+    var incomingQ1WithoutOpt3 =
+        createValidDomainQuestion(testReading.id(), 1, "Prompt 1", "Exp 1", List.of(1, 2, 4, 5), 1);
+
+    assertThatThrownBy(
+            () -> quizRepository.replaceQuestions(testReading.id(), List.of(incomingQ1WithoutOpt3)))
+        .isInstanceOf(HistoricalQuizMutationException.class)
+        .hasMessageContaining("historical user comprehension answers reference them");
+
+    entityManager.clear();
+    // Verify options intact and answer intact
+    var reloaded = jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(testReading.id());
+    assertThat(reloaded.get(0).getOptions()).hasSize(4);
+    assertThat(jpaAnswerRepository.findById(answer.id())).isPresent();
+  }
+
+  @Test
+  @Transactional
+  void testE_noHistoricalAnswersStructuralChangeSafelyDeletesAndAdds() {
+    var q1 =
+        createValidDomainQuestion(
+            testReading.id(), 1, "Original Prompt 1", "Original Exp 1", List.of(1, 2, 3, 4), 1);
+    var q2 =
+        createValidDomainQuestion(
+            testReading.id(),
+            2,
+            "Original Prompt 2 to delete",
+            "Original Exp 2",
+            List.of(1, 2, 3, 4),
+            1);
+
+    quizRepository.replaceQuestions(testReading.id(), List.of(q1, q2));
+    entityManager.flush();
+    entityManager.clear();
+
+    var existing = jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(testReading.id());
+    UUID originalQ1Id = existing.get(0).getId();
+    UUID originalOpt1Id = existing.get(0).getOptions().get(0).getId();
+    UUID originalOpt2Id = existing.get(0).getOptions().get(1).getId();
+    UUID originalQ2Id = existing.get(1).getId();
+
+    // Structural change with NO historical answers:
+    // Q1 keeps options 1 and 2, replaces 3 and 4 with 5 and 6.
+    // Q2 removed.
+    // Q3 added.
+    var modifiedQ1 =
+        createValidDomainQuestion(
+            testReading.id(), 1, "Prompt 1 updated", "Exp 1 updated", List.of(1, 2, 5, 6), 1);
+
+    var newQ3 =
+        createValidDomainQuestion(
+            testReading.id(), 3, "Prompt 3 new", "Exp 3 new", List.of(1, 2, 3, 4), 1);
+
+    quizRepository.replaceQuestions(testReading.id(), List.of(modifiedQ1, newQ3));
+    entityManager.flush();
+    entityManager.clear();
+
+    var reloaded = jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(testReading.id());
+    assertThat(reloaded).hasSize(2);
+
+    // Q1 preserved ID
+    var reloadedQ1 = reloaded.get(0);
+    assertThat(reloadedQ1.getId()).isEqualTo(originalQ1Id);
+    assertThat(reloadedQ1.getPrompt()).isEqualTo("Prompt 1 updated");
+    assertThat(reloadedQ1.getOptions()).hasSize(4);
+
+    // Q1 Option 1 and 2 preserved IDs
+    assertThat(reloadedQ1.getOptions().get(0).getId()).isEqualTo(originalOpt1Id);
+    assertThat(reloadedQ1.getOptions().get(1).getId()).isEqualTo(originalOpt2Id);
+
+    // Q1 Option 5 and 6 are newly created
+    assertThat(reloadedQ1.getOptions().get(2).getOrdinal()).isEqualTo(5);
+    assertThat(reloadedQ1.getOptions().get(3).getOrdinal()).isEqualTo(6);
+
+    // Q2 is completely deleted from repository
+    assertThat(jpaQuestionRepository.findById(originalQ2Id)).isEmpty();
+
+    // Q3 is created with a distinct ID
+    var reloadedQ3 = reloaded.get(1);
+    assertThat(reloadedQ3.getOrdinal()).isEqualTo(3);
+    assertThat(reloadedQ3.getId()).isNotEqualTo(originalQ1Id).isNotEqualTo(originalQ2Id);
+    assertThat(reloadedQ3.getPrompt()).isEqualTo("Prompt 3 new");
+  }
+
+  @Test
+  void testF_transactionRollbackPreventsPartialQuizMutation() {
+    UUID rId = testReading.id();
+
+    // Step 1: initialize quiz with 2 questions in a committed transaction
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          var q1 =
+              createValidDomainQuestion(
+                  rId, 1, "Original Prompt 1", "Exp 1", List.of(1, 2, 3, 4), 1);
+          var q2 =
+              createValidDomainQuestion(
+                  rId, 2, "Original Prompt 2", "Exp 2", List.of(1, 2, 3, 4), 1);
+
+          quizRepository.replaceQuestions(rId, List.of(q1, q2));
+
+          var questions = jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(rId);
+          UUID q2Id = questions.get(1).getId();
+          UUID opt21Id = questions.get(1).getOptions().get(0).getId();
+
+          UUID attemptId = UUID.randomUUID();
+          var attempt =
+              new UserComprehensionAttempt(
+                  attemptId,
+                  testUser.id(),
+                  rId,
+                  UUID.randomUUID(),
+                  new BigDecimal("100.00"),
+                  1,
+                  1,
+                  LocalDateTime.now(),
+                  List.of());
+          var answer =
+              new UserComprehensionAnswer(UUID.randomUUID(), attemptId, q2Id, opt21Id, true);
+          attemptRepository.recordAttempt(attempt, List.of(answer));
+        });
+
+    // Step 2: Attempt replacement that modifies Q1 prompt to PROMPT_SHOULD_ROLLBACK but omits Q2
+    // which has an answer -> must fail and rollback!
+    assertThatThrownBy(
+            () ->
+                transactionTemplate.executeWithoutResult(
+                    status -> {
+                      var modifiedQ1 =
+                          createValidDomainQuestion(
+                              rId, 1, "PROMPT_SHOULD_ROLLBACK", "Exp 1", List.of(1, 2, 3, 4), 1);
+
+                      quizRepository.replaceQuestions(rId, List.of(modifiedQ1));
+                    }))
+        .isInstanceOf(HistoricalQuizMutationException.class);
+
+    // Step 3: Verify in a new transaction that Q1 prompt was rolled back and Q2 still exists
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          var questions = jpaQuestionRepository.findByReadingIdOrderByOrdinalAsc(rId);
+          assertThat(questions).hasSize(2);
+          assertThat(questions.get(0).getPrompt()).isEqualTo("Original Prompt 1");
+          assertThat(questions.get(1).getPrompt()).isEqualTo("Original Prompt 2");
+        });
+  }
+
+  private ComprehensionQuestion createValidDomainQuestion(
+      UUID readingId,
+      int ordinal,
+      String prompt,
+      String explanation,
+      List<Integer> optionOrdinals,
+      int correctOrdinal) {
+    UUID qId = UUID.randomUUID();
+    var options =
+        optionOrdinals.stream()
+            .map(
+                ord ->
+                    new ComprehensionOption(
+                        UUID.randomUUID(),
+                        qId,
+                        ord,
+                        prompt + " - Opt " + ord,
+                        ord == correctOrdinal))
+            .toList();
+    return new ComprehensionQuestion(
+        qId,
+        readingId,
+        ordinal,
+        QuestionType.FACTUAL,
+        prompt,
+        explanation,
+        LocalDateTime.now(),
+        options);
   }
 }

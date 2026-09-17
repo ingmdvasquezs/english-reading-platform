@@ -145,4 +145,34 @@ class EditorialManifestParserTest {
         .isInstanceOf(EditorialManifestParseException.class)
         .hasMessageContaining("Failed to parse manifest JSON");
   }
+
+  @Test
+  void successfullyParsesUpdateContentCommand() {
+    var cmd = parser.parseUpdateContentCommandJson(validJson());
+    assertThat(cmd.adaptationGroupKey()).isEqualTo("fictional-test-story");
+    assertThat(cmd.language()).isEqualTo("en");
+    assertThat(cmd.editorialLevel()).isEqualTo(EditorialLevel.A2);
+    assertThat(cmd.content())
+        .isEqualTo("This is a completely fictitious narrative for test parsing.");
+    assertThat(cmd.questions()).hasSize(1);
+  }
+
+  @Test
+  void successfullyParsesUpdateContentCommandWithNullQuiz() {
+    String jsonWithoutQuiz =
+        """
+        {
+          "schemaVersion": 1,
+          "reading": {
+            "adaptationGroupKey": "story-key",
+            "language": "en",
+            "editorialLevel": "B1",
+            "content": "Story content."
+          }
+        }
+        """;
+    var cmd = parser.parseUpdateContentCommandJson(jsonWithoutQuiz);
+    assertThat(cmd.adaptationGroupKey()).isEqualTo("story-key");
+    assertThat(cmd.questions()).isNull();
+  }
 }

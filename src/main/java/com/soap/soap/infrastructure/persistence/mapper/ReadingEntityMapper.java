@@ -5,8 +5,12 @@ import com.soap.soap.domain.model.Reading;
 import com.soap.soap.infrastructure.persistence.entity.ReadingEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
+import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = UserEntityMapper.class)
+@Mapper(
+    componentModel = MappingConstants.ComponentModel.SPRING,
+    uses = UserEntityMapper.class,
+    unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface ReadingEntityMapper {
 
   Reading toDomain(ReadingEntity entity);

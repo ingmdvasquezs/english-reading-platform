@@ -4,6 +4,7 @@ import com.soap.soap.application.command.UpdatePlatformReadingProvenanceCommand;
 import com.soap.soap.application.port.in.IngestEditorialReadingPort;
 import com.soap.soap.application.port.in.PublishPlatformReadingPort;
 import com.soap.soap.application.port.in.UpdatePlatformReadingProvenancePort;
+import com.soap.soap.application.port.in.UpdatePublishedEditorialContentPort;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -25,6 +26,7 @@ public class EditorialImportCliRunner implements ApplicationRunner {
   private final EditorialCollectionManifestParser collectionParser;
   private final com.soap.soap.application.port.in.ImportEditorialCollectionPort
       collectionImportPort;
+  private final UpdatePublishedEditorialContentPort updateContentPort;
   private final ConfigurableApplicationContext context;
   private Consumer<Integer> exitStrategy;
 
@@ -36,6 +38,7 @@ public class EditorialImportCliRunner implements ApplicationRunner {
       PublishPlatformReadingPort publishReadingPort,
       EditorialCollectionManifestParser collectionParser,
       com.soap.soap.application.port.in.ImportEditorialCollectionPort collectionImportPort,
+      UpdatePublishedEditorialContentPort updateContentPort,
       ConfigurableApplicationContext context) {
     this.parser = parser;
     this.ingestion = ingestion;
@@ -43,6 +46,7 @@ public class EditorialImportCliRunner implements ApplicationRunner {
     this.publishReadingPort = publishReadingPort;
     this.collectionParser = collectionParser;
     this.collectionImportPort = collectionImportPort;
+    this.updateContentPort = updateContentPort;
     this.context = context;
     this.exitStrategy =
         code -> {
@@ -56,8 +60,27 @@ public class EditorialImportCliRunner implements ApplicationRunner {
       IngestEditorialReadingPort ingestion,
       UpdatePlatformReadingProvenancePort provenanceUpdate,
       PublishPlatformReadingPort publishReadingPort,
+      EditorialCollectionManifestParser collectionParser,
+      com.soap.soap.application.port.in.ImportEditorialCollectionPort collectionImportPort,
       ConfigurableApplicationContext context) {
-    this(parser, ingestion, provenanceUpdate, publishReadingPort, null, null, context);
+    this(
+        parser,
+        ingestion,
+        provenanceUpdate,
+        publishReadingPort,
+        collectionParser,
+        collectionImportPort,
+        null,
+        context);
+  }
+
+  public EditorialImportCliRunner(
+      EditorialManifestParser parser,
+      IngestEditorialReadingPort ingestion,
+      UpdatePlatformReadingProvenancePort provenanceUpdate,
+      PublishPlatformReadingPort publishReadingPort,
+      ConfigurableApplicationContext context) {
+    this(parser, ingestion, provenanceUpdate, publishReadingPort, null, null, null, context);
   }
 
   // Package-private for testing to prevent System.exit during test execution
@@ -71,12 +94,14 @@ public class EditorialImportCliRunner implements ApplicationRunner {
     boolean hasProvenance = args.containsOption("editorial-provenance-update");
     boolean hasPublish = args.containsOption("editorial-publish");
     boolean hasCollectionImport = args.containsOption("editorial-collection-import");
+    boolean hasUpdateContent = args.containsOption("editorial-content-update");
 
     int operationsCount =
         (hasImport ? 1 : 0)
             + (hasProvenance ? 1 : 0)
             + (hasPublish ? 1 : 0)
-            + (hasCollectionImport ? 1 : 0);
+            + (hasCollectionImport ? 1 : 0)
+            + (hasUpdateContent ? 1 : 0);
 
     if (operationsCount == 0) {
       return;
@@ -96,8 +121,10 @@ public class EditorialImportCliRunner implements ApplicationRunner {
       handleProvenanceUpdate(args);
     } else if (hasPublish) {
       handlePublish(args);
-    } else {
+    } else if (hasCollectionImport) {
       handleCollectionImport(args);
+    } else {
+      handleUpdateContent(args);
     }
   }
 
@@ -257,6 +284,48 @@ public class EditorialImportCliRunner implements ApplicationRunner {
     } catch (Exception e) {
       log.error("Editorial collection import failed: {}", e.getMessage());
       System.err.println("EDITORIAL_COLLECTION_IMPORT_FAILED: " + e.getMessage());
+      exitCode = 1;
+    } finally {
+      exitStrategy.accept(exitCode);
+    }
+  }
+
+  private void handleUpdateContent(ApplicationArguments args) {
+    int exitCode = 0;
+    try {
+      var values = args.getOptionValues("editorial-content-update");
+      if (values == null || values.isEmpty() || values.getFirst().isBlank()) {
+        throw new IllegalArgumentException(
+            "Option --editorial-content-update requires a valid file path");
+      }
+      var path = Path.of(values.getFirst());
+      log.info("Starting editorial content update from: {}", path);
+
+      var command = parser.parseUpdateContentCommand(path);
+      var result = updateContentPort.updateContent(command);
+
+      log.info(
+          "Editorial content update completed successfully: readingId={}, adaptationGroupKey={}, contentUpdated={}, quizUpdated={}, lexicalFrequencyCount={}",
+          result.readingId(),
+          result.adaptationGroupKey(),
+          result.contentUpdated(),
+          result.quizUpdated(),
+          result.lexicalFrequencyCount());
+      System.out.println(
+          "EDITORIAL_CONTENT_UPDATE_SUCCESS: readingId="
+              + result.readingId()
+              + ", adaptationGroupKey="
+              + result.adaptationGroupKey()
+              + ", contentUpdated="
+              + result.contentUpdated()
+              + ", quizUpdated="
+              + result.quizUpdated()
+              + ", lexicalFrequencyCount="
+              + result.lexicalFrequencyCount());
+      exitCode = 0;
+    } catch (Exception e) {
+      log.error("Editorial content update failed: {}", e.getMessage());
+      System.err.println("EDITORIAL_CONTENT_UPDATE_FAILED: " + e.getMessage());
       exitCode = 1;
     } finally {
       exitStrategy.accept(exitCode);

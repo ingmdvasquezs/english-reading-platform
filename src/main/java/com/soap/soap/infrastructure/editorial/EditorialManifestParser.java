@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soap.soap.application.command.EditorialOptionCommand;
 import com.soap.soap.application.command.EditorialQuestionCommand;
 import com.soap.soap.application.command.IngestEditorialReadingCommand;
+import com.soap.soap.application.command.UpdatePublishedEditorialContentCommand;
 import com.soap.soap.domain.model.AccessTier;
 import com.soap.soap.domain.model.AdaptationKind;
 import com.soap.soap.domain.model.EditorialContentType;
@@ -55,6 +56,72 @@ public class EditorialManifestParser {
     } catch (IOException e) {
       throw new EditorialManifestParseException("Failed to read manifest file: " + path, e);
     }
+  }
+
+  public UpdatePublishedEditorialContentCommand parseUpdateContentCommand(Path path) {
+    if (path == null) {
+      throw new EditorialManifestParseException("Manifest path must not be null");
+    }
+    if (!Files.exists(path)) {
+      throw new EditorialManifestParseException("Manifest file does not exist: " + path);
+    }
+    if (!Files.isRegularFile(path)) {
+      throw new EditorialManifestParseException("Manifest path is not a regular file: " + path);
+    }
+    if (!Files.isReadable(path)) {
+      throw new EditorialManifestParseException("Manifest file is not readable: " + path);
+    }
+
+    try {
+      String json = Files.readString(path);
+      return parseUpdateContentCommandJson(json);
+    } catch (IOException e) {
+      throw new EditorialManifestParseException("Failed to read manifest file: " + path, e);
+    }
+  }
+
+  public UpdatePublishedEditorialContentCommand parseUpdateContentCommandJson(String json) {
+    if (json == null || json.isBlank()) {
+      throw new EditorialManifestParseException("Manifest JSON must not be blank");
+    }
+
+    EditorialManifestDto dto;
+    try {
+      dto = objectMapper.readValue(json, EditorialManifestDto.class);
+    } catch (Exception e) {
+      throw new EditorialManifestParseException(
+          "Failed to parse manifest JSON: " + e.getMessage(), e);
+    }
+
+    if (dto.schemaVersion() == null) {
+      throw new EditorialManifestParseException("Missing required 'schemaVersion' in manifest");
+    }
+    if (dto.schemaVersion() != SUPPORTED_SCHEMA_VERSION) {
+      throw new EditorialManifestParseException(
+          "Unsupported schemaVersion: "
+              + dto.schemaVersion()
+              + ". Only schemaVersion "
+              + SUPPORTED_SCHEMA_VERSION
+              + " is supported");
+    }
+
+    var r = dto.reading();
+    String content = r != null && r.content() != null ? r.content() : dto.content();
+    String language = r != null && r.language() != null ? r.language() : dto.language();
+    String levelStr =
+        r != null && r.editorialLevel() != null ? r.editorialLevel() : dto.editorialLevel();
+    String adaptationGroupKey =
+        r != null && r.adaptationGroupKey() != null
+            ? r.adaptationGroupKey()
+            : dto.adaptationGroupKey();
+
+    EditorialLevel editorialLevel = parseEnum(EditorialLevel.class, levelStr, "editorialLevel");
+
+    List<EditorialQuestionCommand> questions =
+        dto.comprehensionQuiz() == null ? null : parseQuestions(dto.comprehensionQuiz());
+
+    return new UpdatePublishedEditorialContentCommand(
+        adaptationGroupKey, language, editorialLevel, content, questions);
   }
 
   public IngestEditorialReadingCommand parseJson(String json) {

@@ -244,4 +244,34 @@ public record Reading(
   public boolean isAccessibleBy(UUID userId) {
     return origin == ReadingOrigin.PLATFORM || (user != null && userId.equals(user.id()));
   }
+
+  public Reading withContent(String newContent) {
+    return new Reading(
+        this.id,
+        this.user,
+        this.title,
+        newContent,
+        this.language,
+        this.createdAt,
+        this.origin,
+        this.editorialLevel,
+        this.category,
+        this.coverKey,
+        this.editorialStatus,
+        this.shortDescription,
+        this.contentType,
+        this.countryCode,
+        this.region,
+        this.sourceKind,
+        this.rightsStatus,
+        this.adaptationKind,
+        this.sourceLanguage,
+        this.sourceTitle,
+        this.sourceAuthor,
+        this.sourceUrl,
+        this.sourceNotes,
+        this.adaptationGroupKey,
+        this.coverAttribution,
+        this.accessTier);
+  }
 }

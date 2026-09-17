@@ -33,6 +33,7 @@ class EditorialImportCliRunnerTest {
   private PublishPlatformReadingPort publishReadingPort;
   private EditorialCollectionManifestParser collectionParser;
   private com.soap.soap.application.port.in.ImportEditorialCollectionPort collectionImportPort;
+  private com.soap.soap.application.port.in.UpdatePublishedEditorialContentPort updateContentPort;
   private ConfigurableApplicationContext context;
   private EditorialImportCliRunner runner;
   private AtomicInteger exitCode;
@@ -46,6 +47,8 @@ class EditorialImportCliRunnerTest {
     collectionParser = mock(EditorialCollectionManifestParser.class);
     collectionImportPort =
         mock(com.soap.soap.application.port.in.ImportEditorialCollectionPort.class);
+    updateContentPort =
+        mock(com.soap.soap.application.port.in.UpdatePublishedEditorialContentPort.class);
     context = mock(ConfigurableApplicationContext.class);
     runner =
         new EditorialImportCliRunner(
@@ -55,6 +58,7 @@ class EditorialImportCliRunnerTest {
             publishReadingPort,
             collectionParser,
             collectionImportPort,
+            updateContentPort,
             context);
     exitCode = new AtomicInteger(-999);
     runner.setExitStrategy(exitCode::set);
@@ -233,6 +237,55 @@ class EditorialImportCliRunnerTest {
 
     verifyNoInteractions(
         parser, ingestion, provenanceUpdate, publishReadingPort, collectionImportPort);
+    assertThat(exitCode.get()).isEqualTo(1);
+  }
+
+  @Test
+  void executesContentUpdateAndExitsWithZeroOnSuccess() {
+    var command =
+        mock(com.soap.soap.application.command.UpdatePublishedEditorialContentCommand.class);
+    when(parser.parseUpdateContentCommand(Path.of("update-path.json"))).thenReturn(command);
+    when(updateContentPort.updateContent(command))
+        .thenReturn(
+            new com.soap.soap.application.model.UpdatePublishedEditorialContentResult(
+                UUID.randomUUID(), "mohan-pasuncha", true, false, 250));
+
+    var args = new DefaultApplicationArguments("--editorial-content-update=update-path.json");
+    runner.run(args);
+
+    verify(parser).parseUpdateContentCommand(Path.of("update-path.json"));
+    verify(updateContentPort).updateContent(command);
+    assertThat(exitCode.get()).isEqualTo(0);
+  }
+
+  @Test
+  void exitsWithNonZeroOnContentUpdateFailure() {
+    when(parser.parseUpdateContentCommand(any(Path.class)))
+        .thenThrow(
+            new com.soap.soap.application.exception.EditorialContentUpdateException(
+                "Reading not found"));
+
+    var args = new DefaultApplicationArguments("--editorial-content-update=invalid.json");
+    runner.run(args);
+
+    verifyNoInteractions(updateContentPort);
+    assertThat(exitCode.get()).isEqualTo(1);
+  }
+
+  @Test
+  void rejectsContentUpdateCombinedWithOtherOperation() {
+    var args =
+        new DefaultApplicationArguments(
+            "--editorial-content-update=up.json", "--editorial-publish=" + UUID.randomUUID());
+    runner.run(args);
+
+    verifyNoInteractions(
+        parser,
+        ingestion,
+        provenanceUpdate,
+        publishReadingPort,
+        collectionImportPort,
+        updateContentPort);
     assertThat(exitCode.get()).isEqualTo(1);
   }
 }
