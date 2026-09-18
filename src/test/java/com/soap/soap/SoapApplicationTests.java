@@ -1711,7 +1711,9 @@ class SoapApplicationTests {
       // 3. Verify in database
       var updated = vocabulary.findByUserIdAndWordId(user.id(), word.id()).orElseThrow();
       assertThat(updated.status()).isEqualTo(VocabularyStatus.KNOWN);
-      assertThat(updated.reviewStage()).isEqualTo(1);
+      // SRS V2: REMEMBERED → maps to ReviewRating.GOOD via applyRating (not applyReviewAssessment).
+      // reviewStage is NOT mutated in SRS V2 — it remains 0 (pass-through, deprecated V1 field).
+      assertThat(updated.reviewStage()).isEqualTo(0);
       assertThat(updated.nextReviewAt()).isAfter(nowUtc);
     } finally {
       SecurityContextHolder.clearContext();

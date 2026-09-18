@@ -34,6 +34,6 @@ public class VocabularyReviewEndpoint {
   public RecordVocabularyReviewResponse recordVocabularyReview(
       @RequestPayload RecordVocabularyReviewRequest request) {
     return mapper.toResponse(
-        recordPort.recordReview(mapper.toWordId(request), mapper.toAssessment(request)));
+        recordPort.recordReview(mapper.toWordId(request), mapper.toRating(request)));
   }
 }

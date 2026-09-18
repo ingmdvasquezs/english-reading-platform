@@ -4,4 +4,8 @@ import com.soap.soap.application.model.VocabularyReviewPreparation;
 
 public interface PrepareVocabularyReviewPort {
   VocabularyReviewPreparation prepareReview(int size);
+
+  default VocabularyReviewPreparation prepareReview() {
+    return prepareReview(15);
+  }
 }

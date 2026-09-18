@@ -9,10 +9,13 @@ import static org.mockito.Mockito.when;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.UserVocabularyRepositoryPort;
+import com.soap.soap.domain.model.ReviewRating;
+import com.soap.soap.domain.model.SrsState;
 import com.soap.soap.domain.model.User;
 import com.soap.soap.domain.model.UserVocabulary;
 import com.soap.soap.domain.model.VocabularyStatus;
 import com.soap.soap.domain.model.Word;
+import com.soap.soap.domain.service.FsrsScheduler;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -31,20 +34,21 @@ class PrepareVocabularyReviewUseCaseTest {
   @Mock private UserVocabularyRepositoryPort repository;
 
   private final Clock clock = Clock.fixed(Instant.parse("2026-09-11T12:00:00Z"), ZoneOffset.UTC);
+  private final FsrsScheduler scheduler = new FsrsScheduler();
   private PrepareVocabularyReviewUseCase useCase;
   private final UUID userId = UUID.randomUUID();
 
   @BeforeEach
   void setUp() {
-    useCase = new PrepareVocabularyReviewUseCase(currentUser, repository, clock);
+    useCase = new PrepareVocabularyReviewUseCase(currentUser, repository, scheduler, clock);
   }
 
   @Test
   void rejectsInvalidBatchSizes() {
-    for (int invalidSize : List.of(-1, 0, 5, 15, 25, 35, 50)) {
+    for (int invalidSize : List.of(-1, 0, 101, 200)) {
       assertThatThrownBy(() -> useCase.prepareReview(invalidSize))
           .isInstanceOf(InvalidApplicationArgumentException.class)
-          .hasMessageContaining("Review batch size must be 10, 20, or 30");
+          .hasMessageContaining("Review batch size must be between 1 and 100");
     }
   }
 
@@ -68,7 +72,12 @@ class PrepareVocabularyReviewUseCaseTest {
             0L,
             0,
             null,
-            nowUtc.minusHours(1));
+            nowUtc.minusHours(1),
+            SrsState.LEARNING,
+            0.4872,
+            7.6214,
+            1,
+            0);
     var uv2 =
         new UserVocabulary(
             UUID.randomUUID(),
@@ -80,7 +89,12 @@ class PrepareVocabularyReviewUseCaseTest {
             0L,
             3,
             nowUtc.minusDays(14),
-            nowUtc.minusHours(2));
+            nowUtc.minusHours(2),
+            SrsState.REVIEW,
+            13.8206,
+            3.9320,
+            3,
+            0);
 
     when(repository.countDueWords(eq(userId), eq(nowUtc))).thenReturn(2L);
     when(repository.countTotalReviewableWords(eq(userId), eq(nowUtc))).thenReturn(2L);
@@ -92,15 +106,27 @@ class PrepareVocabularyReviewUseCaseTest {
     assertThat(result.dueCount()).isEqualTo(2L);
     assertThat(result.totalReviewableCount()).isEqualTo(2L);
     assertThat(result.entries()).hasSize(2);
-    assertThat(result.entries().get(0).wordId()).isEqualTo(word1.id());
-    assertThat(result.entries().get(0).word()).isEqualTo("would");
-    assertThat(result.entries().get(0).language()).isEqualTo("en");
-    assertThat(result.entries().get(0).status()).isEqualTo(VocabularyStatus.LEARNING);
 
-    assertThat(result.entries().get(1).wordId()).isEqualTo(word2.id());
-    assertThat(result.entries().get(1).word()).isEqualTo("could");
-    assertThat(result.entries().get(1).language()).isEqualTo("en");
-    assertThat(result.entries().get(1).status()).isEqualTo(VocabularyStatus.KNOWN);
+    var entry1 = result.entries().get(0);
+    assertThat(entry1.wordId()).isEqualTo(word1.id());
+    assertThat(entry1.word()).isEqualTo("would");
+    assertThat(entry1.language()).isEqualTo("en");
+    assertThat(entry1.status()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(entry1.srsState()).isEqualTo(SrsState.LEARNING);
+    assertThat(entry1.ratingOptions()).hasSize(4);
+    assertThat(
+            entry1.ratingOptions().stream()
+                .map(com.soap.soap.application.model.ReviewRatingOption::rating))
+        .containsExactly(
+            ReviewRating.AGAIN, ReviewRating.HARD, ReviewRating.GOOD, ReviewRating.EASY);
+
+    var entry2 = result.entries().get(1);
+    assertThat(entry2.wordId()).isEqualTo(word2.id());
+    assertThat(entry2.word()).isEqualTo("could");
+    assertThat(entry2.language()).isEqualTo("en");
+    assertThat(entry2.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(entry2.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(entry2.ratingOptions()).hasSize(4);
 
     verify(repository).findReviewCandidates(userId, nowUtc, 10);
   }
@@ -125,14 +151,19 @@ class PrepareVocabularyReviewUseCaseTest {
               0L,
               0,
               null,
-              nowUtc.minusMinutes(i)));
+              nowUtc.minusMinutes(i),
+              SrsState.LEARNING,
+              0.4872,
+              7.6214,
+              0,
+              0));
     }
 
     when(repository.countDueWords(eq(userId), eq(nowUtc))).thenReturn(4L);
     when(repository.countTotalReviewableWords(eq(userId), eq(nowUtc))).thenReturn(4L);
-    when(repository.findReviewCandidates(eq(userId), eq(nowUtc), eq(10))).thenReturn(items);
+    when(repository.findReviewCandidates(eq(userId), eq(nowUtc), eq(15))).thenReturn(items);
 
-    var result = useCase.prepareReview(10);
+    var result = useCase.prepareReview(15);
 
     assertThat(result.dueCount()).isEqualTo(4L);
     assertThat(result.totalReviewableCount()).isEqualTo(4L);

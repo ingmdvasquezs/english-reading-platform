@@ -49,5 +49,21 @@ public class UserVocabularyEntity {
 
   private LocalDateTime nextReviewAt;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "srs_state", nullable = false, length = 20)
+  private com.soap.soap.domain.model.SrsState srsState;
+
+  @Column(nullable = false, precision = 10, scale = 4)
+  private java.math.BigDecimal stability;
+
+  @Column(nullable = false, precision = 10, scale = 4)
+  private java.math.BigDecimal difficulty;
+
+  @Column(nullable = false)
+  private int repetitions;
+
+  @Column(nullable = false)
+  private int lapses;
+
   @Version private Long version;
 }

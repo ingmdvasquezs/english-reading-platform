@@ -106,8 +106,9 @@ public interface JpaUserVocabularyRepository extends JpaRepository<UserVocabular
         )
       order by
         case
-          when (uv.nextReviewAt is not null and uv.nextReviewAt <= :now and uv.status not in (com.soap.soap.domain.model.VocabularyStatus.IGNORED, com.soap.soap.domain.model.VocabularyStatus.NEW)) then 1
-          when (uv.status = com.soap.soap.domain.model.VocabularyStatus.LEARNING and uv.nextReviewAt is null) then 2
+          when uv.srsState = com.soap.soap.domain.model.SrsState.RELEARNING and uv.nextReviewAt <= :now then 1
+          when uv.srsState = com.soap.soap.domain.model.SrsState.LEARNING and (uv.nextReviewAt <= :now or uv.nextReviewAt is null) then 2
+          when uv.srsState = com.soap.soap.domain.model.SrsState.REVIEW and uv.nextReviewAt <= :now then 3
           else 99
         end asc,
         uv.nextReviewAt asc nulls last,

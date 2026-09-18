@@ -86,10 +86,14 @@ class UserVocabularyTest {
   }
 
   @Test
-  void manualStatusTransitionsRespectAgreedRules() {
+  void manualStatusToKnownUsesSrsV2NotLeitnerStageIntervals() {
+    // SRS V2 policy: when the user manually marks a word KNOWN, nextReviewAt is derived from the
+    // word's current stability — NOT from the legacy Leitner reviewStage ladder (+14d / +30d).
     var nowUtc = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
-    var pastReview = nowUtc.minusDays(2);
-    var base =
+
+    // Case A: word with no prior SRS history (stability = 0.0 → falls back to default 13.8206d)
+    // Use the full constructor with stability=0.0 to simulate a brand-new word without SRS history.
+    var noHistory =
         new UserVocabulary(
             UUID.randomUUID(),
             user,
@@ -99,37 +103,23 @@ class UserVocabularyTest {
             null,
             0L,
             3,
-            pastReview,
-            nowUtc.plusDays(1));
-
-    // manual -> KNOWN: reviewStage = max(3, actual), nextReviewAt scheduled (+14d for stage 3, +30d
-    // for stage 4/5), lastReviewedAt preserved
-    var toKnown = base.changeStatus(VocabularyStatus.KNOWN, clock);
-    assertThat(toKnown.status()).isEqualTo(VocabularyStatus.KNOWN);
-    assertThat(toKnown.reviewStage()).isEqualTo(3);
-    assertThat(toKnown.nextReviewAt()).isEqualTo(nowUtc.plusDays(14));
-    assertThat(toKnown.lastReviewedAt()).isEqualTo(pastReview);
-    assertThat(toKnown.learnedAt()).isEqualTo(nowUtc);
-
-    // manual -> KNOWN with stage 4 preserves stage 4 and schedules +30 days
-    var stage4Base =
-        new UserVocabulary(
-            UUID.randomUUID(),
-            user,
-            word,
-            VocabularyStatus.LEARNING,
-            firstSeenAt,
             null,
-            0L,
-            4,
-            pastReview,
-            nowUtc);
-    var toKnownStage4 = stage4Base.changeStatus(VocabularyStatus.KNOWN, clock);
-    assertThat(toKnownStage4.reviewStage()).isEqualTo(4);
-    assertThat(toKnownStage4.nextReviewAt()).isEqualTo(nowUtc.plusDays(30));
+            nowUtc,
+            SrsState.NEW,
+            0.0, // no SRS history — triggers fallback to 13.8206 in changeStatus(KNOWN)
+            5.0,
+            0,
+            0);
+    var toKnownNoHistory = noHistory.changeStatus(VocabularyStatus.KNOWN, clock);
+    assertThat(toKnownNoHistory.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(toKnownNoHistory.srsState()).isEqualTo(SrsState.REVIEW);
+    // stability=0.0 → falls back to 13.8206 → round → 14 days
+    assertThat(toKnownNoHistory.nextReviewAt()).isEqualTo(nowUtc.plusDays(14));
+    // reviewStage must NOT be mutated by SRS V2 runtime (no +14d/+30d stage arithmetic)
+    assertThat(toKnownNoHistory.reviewStage()).isEqualTo(3); // passed through unchanged
 
-    // manual -> KNOWN with stage 0 promotes to stage 3 and schedules +14 days
-    var stage0Base =
+    // Case B: word already has SRS history with stability = 5.0d
+    var withHistory =
         new UserVocabulary(
             UUID.randomUUID(),
             user,
@@ -139,35 +129,66 @@ class UserVocabularyTest {
             null,
             0L,
             0,
-            null,
-            nowUtc);
-    var toKnownStage0 = stage0Base.changeStatus(VocabularyStatus.KNOWN, clock);
-    assertThat(toKnownStage0.reviewStage()).isEqualTo(3);
-    assertThat(toKnownStage0.nextReviewAt()).isEqualTo(nowUtc.plusDays(14));
+            nowUtc.minusDays(1),
+            nowUtc,
+            SrsState.LEARNING,
+            5.0,
+            6.5,
+            2,
+            0);
+    var toKnownWithHistory = withHistory.changeStatus(VocabularyStatus.KNOWN, clock);
+    assertThat(toKnownWithHistory.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(toKnownWithHistory.srsState()).isEqualTo(SrsState.REVIEW);
+    // stability = 5.0 → round → 5 days (NOT +14d or +30d from Leitner)
+    assertThat(toKnownWithHistory.nextReviewAt()).isEqualTo(nowUtc.plusDays(5));
+    assertThat(toKnownWithHistory.stability()).isEqualTo(5.0);
 
-    // manual -> LEARNING: reviewStage = 0, nextReviewAt = nowUtc, lastReviewedAt = null
-    var toLearning = toKnown.changeStatus(VocabularyStatus.LEARNING, clock);
+    // Case C: word already KNOWN — learnedAt preserved, stability preserved, nextReview
+    // recalculated
+    var alreadyKnown =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.KNOWN,
+            firstSeenAt,
+            firstSeenAt.plusHours(1),
+            0L,
+            4,
+            nowUtc.minusDays(30),
+            nowUtc,
+            SrsState.REVIEW,
+            30.0,
+            4.5,
+            5,
+            1);
+    var toKnownAgain = alreadyKnown.changeStatus(VocabularyStatus.KNOWN, clock);
+    assertThat(toKnownAgain.learnedAt()).isEqualTo(firstSeenAt.plusHours(1)); // preserved
+    assertThat(toKnownAgain.nextReviewAt()).isEqualTo(nowUtc.plusDays(30)); // stability=30→+30d
+    assertThat(toKnownAgain.reviewStage()).isEqualTo(4); // passed through, NOT incremented
+
+    // Case D: manual → LEARNING: reviewStage = 0, SrsState = LEARNING, nextReviewAt = nowUtc
+    var toLearning = alreadyKnown.changeStatus(VocabularyStatus.LEARNING, clock);
     assertThat(toLearning.status()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(toLearning.srsState()).isEqualTo(SrsState.LEARNING);
     assertThat(toLearning.reviewStage()).isEqualTo(0);
     assertThat(toLearning.nextReviewAt()).isEqualTo(nowUtc);
     assertThat(toLearning.lastReviewedAt()).isNull();
     assertThat(toLearning.learnedAt()).isNull();
 
-    // manual -> NEW: reviewStage = 0, nextReviewAt = null, lastReviewedAt = null
+    // Case E: manual → NEW: reviewStage = 0, no dates
     var toNew = toLearning.changeStatus(VocabularyStatus.NEW, clock);
     assertThat(toNew.status()).isEqualTo(VocabularyStatus.NEW);
+    assertThat(toNew.srsState()).isEqualTo(SrsState.NEW);
     assertThat(toNew.reviewStage()).isEqualTo(0);
     assertThat(toNew.nextReviewAt()).isNull();
-    assertThat(toNew.lastReviewedAt()).isNull();
-    assertThat(toNew.learnedAt()).isNull();
 
-    // manual -> IGNORED: reviewStage = 0, nextReviewAt = null, lastReviewedAt = null
+    // Case F: manual → IGNORED: reviewStage = 0, no dates
     var toIgnored = toNew.changeStatus(VocabularyStatus.IGNORED, clock);
     assertThat(toIgnored.status()).isEqualTo(VocabularyStatus.IGNORED);
+    assertThat(toIgnored.srsState()).isEqualTo(SrsState.NEW);
     assertThat(toIgnored.reviewStage()).isEqualTo(0);
     assertThat(toIgnored.nextReviewAt()).isNull();
-    assertThat(toIgnored.lastReviewedAt()).isNull();
-    assertThat(toIgnored.learnedAt()).isNull();
   }
 
   @Test
@@ -269,5 +290,44 @@ class UserVocabularyTest {
     var r6 = r5.applyReviewAssessment(ReviewAssessment.REMEMBERED, clock);
     assertThat(r6.reviewStage()).isEqualTo(5);
     assertThat(r6.nextReviewAt()).isEqualTo(nowUtc.plusDays(30));
+  }
+
+  @Test
+  void applyRatingFollowsFsrsV2Policies() {
+    var nowUtc = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+    var scheduler = new com.soap.soap.domain.service.FsrsScheduler();
+    var learning =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            firstSeenAt,
+            null,
+            0L,
+            0,
+            null,
+            nowUtc,
+            SrsState.LEARNING,
+            0.4872,
+            7.6214,
+            0,
+            0);
+
+    // GOOD on LEARNING -> graduates to REVIEW/KNOWN, +4 days
+    var graduated = learning.applyRating(ReviewRating.GOOD, clock, scheduler);
+    assertThat(graduated.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(graduated.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(graduated.repetitions()).isEqualTo(1);
+    assertThat(graduated.nextReviewAt()).isEqualTo(nowUtc.plusDays(4));
+    assertThat(graduated.learnedAt()).isEqualTo(nowUtc);
+
+    // AGAIN on REVIEW -> lapses to RELEARNING/LEARNING, +10 min step, lapses = 1
+    var lapsed = graduated.applyRating(ReviewRating.AGAIN, clock, scheduler);
+    assertThat(lapsed.status()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(lapsed.srsState()).isEqualTo(SrsState.RELEARNING);
+    assertThat(lapsed.lapses()).isEqualTo(1);
+    assertThat(lapsed.nextReviewAt()).isEqualTo(nowUtc.plusSeconds(600L));
+    assertThat(lapsed.learnedAt()).isNull();
   }
 }

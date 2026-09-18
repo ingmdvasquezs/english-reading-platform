@@ -125,12 +125,15 @@ class InitialVocabularyTestUseCasesTest {
 
     var nowUtc = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
 
-    // 1. KNOWN: stage 3, +14d, learnedAt = nowUtc, lastReviewedAt null
+    // 1. KNOWN: SRS V2 — stage 0 (deprecated legacy field), nextReviewAt +14d from stability
+    //    (w[3]=13.8206→round→14d), learnedAt = nowUtc, lastReviewedAt null
     var knownEntry = byWord.get("world");
     assertThat(knownEntry.status()).isEqualTo(VocabularyStatus.KNOWN);
-    assertThat(knownEntry.reviewStage()).isEqualTo(3);
+    // SRS V2: reviewStage is always 0 for createInitial — it is a deprecated V1 field.
+    assertThat(knownEntry.reviewStage()).isEqualTo(0);
     assertThat(knownEntry.learnedAt()).isEqualTo(nowUtc);
     assertThat(knownEntry.lastReviewedAt()).isNull();
+    // nextReviewAt derived from FSRS-4.5 initial stability for EASY (w[3]=13.8206 → 14 days).
     assertThat(knownEntry.nextReviewAt()).isEqualTo(nowUtc.plusDays(14));
 
     // 2. LEARNING: stage 0, nowUtc (due immediately), learnedAt null, lastReviewedAt null
@@ -198,9 +201,13 @@ class InitialVocabularyTestUseCasesTest {
             .findFirst()
             .orElseThrow();
     assertThat(helloEntry.status()).isEqualTo(VocabularyStatus.KNOWN);
+    // reviewStage is passed through unchanged (legacy V1 field, NOT used for SRS V2 scheduling).
     assertThat(helloEntry.reviewStage()).isEqualTo(4);
+    // SRS V2: nextReviewAt is derived from stability, NOT from Leitner stage 4 → +30d.
+    // existingStage4 has stability = defaultStabilityForStatus(LEARNING) = 0.4872 (legacy
+    // constructor). changeStatus(KNOWN) preserves stability → round(0.4872) = 0 → max(1) = +1 day.
     assertThat(helloEntry.nextReviewAt())
-        .isEqualTo(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC).plusDays(30));
+        .isEqualTo(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC).plusDays(1));
     assertThat(helloEntry.lastReviewedAt()).isEqualTo(LocalDateTime.now(clock).minusDays(2));
   }
 

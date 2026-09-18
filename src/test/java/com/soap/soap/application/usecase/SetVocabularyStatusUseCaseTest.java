@@ -118,7 +118,9 @@ class SetVocabularyStatusUseCaseTest {
 
     assertThat(known.status()).isEqualTo(VocabularyStatus.KNOWN);
     assertThat(known.learnedAt()).isEqualTo(LocalDateTime.parse("2026-08-30T12:00:00"));
-    assertThat(known.reviewStage()).isEqualTo(3);
+    // SRS V2: reviewStage is always 0 for new entries — it is a deprecated V1 field.
+    assertThat(known.reviewStage()).isEqualTo(0);
+    // nextReviewAt derived from initial stability (13.8206 → round → 14 days) — SRS V2 policy.
     assertThat(known.nextReviewAt())
         .isEqualTo(LocalDateTime.parse("2026-08-30T12:00:00").plusDays(14));
   }
@@ -158,7 +160,10 @@ class SetVocabularyStatusUseCaseTest {
     assertThat(ignored.nextReviewAt()).isNull();
     assertThat(ignored.lastReviewedAt()).isNull();
 
-    // 4. Manual KNOWN on existing entry with stage 4: preserves stage 4, schedules +30 days
+    // 4. Manual KNOWN on existing LEARNING entry: SRS V2 derives nextReviewAt from stability,
+    // NOT from Leitner reviewStage. existingStage4 has stability = defaultStabilityForStatus
+    // (LEARNING) = 0.4872 (set by the legacy constructor). SRS V2: round(0.4872) = 0 → max(1) =
+    // +1 day. The Leitner "+30 days for stage 4" logic is eliminated.
     var existingStage4 =
         new UserVocabulary(
             UUID.randomUUID(),
@@ -178,8 +183,11 @@ class SetVocabularyStatusUseCaseTest {
         useCase.setVocabularyStatus(
             new SetVocabularyStatusCommand("learning", "en", VocabularyStatus.KNOWN));
     assertThat(updatedStage4.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(updatedStage4.srsState()).isEqualTo(com.soap.soap.domain.model.SrsState.REVIEW);
+    // reviewStage is passed through unchanged — legacy field, NOT used for scheduling.
     assertThat(updatedStage4.reviewStage()).isEqualTo(4);
-    assertThat(updatedStage4.nextReviewAt()).isEqualTo(nowUtc.plusDays(30));
+    // SRS V2: stability = 0.4872 (LEARNING default) → round → 1 day. NOT Leitner +30d.
+    assertThat(updatedStage4.nextReviewAt()).isEqualTo(nowUtc.plusDays(1));
     assertThat(updatedStage4.lastReviewedAt()).isEqualTo(nowUtc.minusDays(5));
   }
 }
