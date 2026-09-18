@@ -4,8 +4,11 @@ import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.PlatformReadingSummary;
 import com.soap.soap.application.model.ReadingSummary;
+import com.soap.soap.domain.model.DiscoveryTopic;
+import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.Reading;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,17 +29,32 @@ public interface ReadingRepositoryPort {
 
   List<Reading> findAllPlatformReadings();
 
+  default PageResult<Reading> browsePlatformReadings(
+      String collectionKey,
+      String category,
+      EditorialLevel editorialLevel,
+      String language,
+      PageRequest pageRequest) {
+    return browsePlatformReadings(
+        collectionKey, category, editorialLevel, null, null, language, pageRequest);
+  }
+
   PageResult<Reading> browsePlatformReadings(
       String collectionKey,
       String category,
-      com.soap.soap.domain.model.EditorialLevel editorialLevel,
+      EditorialLevel editorialLevel,
+      String countryCode,
+      DiscoveryTopic discoveryTopic,
       String language,
       PageRequest pageRequest);
 
+  Map<String, Long> countPublishedPlatformReadingsByCountryCodes(List<String> countryCodes);
+
+  Map<String, Map<DiscoveryTopic, Long>> countPublishedPlatformReadingsByCountryCodesAndTopics(
+      List<String> countryCodes);
+
   Optional<Reading> findPlatformReadingByAdaptationKey(
-      String adaptationGroupKey,
-      String language,
-      com.soap.soap.domain.model.EditorialLevel editorialLevel);
+      String adaptationGroupKey, String language, EditorialLevel editorialLevel);
 
   Reading save(Reading reading);
 

@@ -22,6 +22,7 @@ import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.application.service.PlatformReadingPersonalizationService;
+import com.soap.soap.domain.model.DiscoveryTopic;
 import com.soap.soap.domain.model.EditorialCategory;
 import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.EditorialStatus;
@@ -119,7 +120,9 @@ class BrowsePlatformReadingsUseCaseTest {
         ReadingProgressStatus.IN_PROGRESS,
         reading.coverKey(),
         RecommendationReasonCode.BALANCED_CHALLENGE,
-        reading.shortDescription());
+        reading.shortDescription(),
+        reading.countryCode(),
+        reading.discoveryTopic());
   }
 
   @Test
@@ -130,8 +133,29 @@ class BrowsePlatformReadingsUseCaseTest {
     assertThatThrownBy(
             () ->
                 useCase.browsePlatformReadings(
-                    new BrowsePlatformReadingsQuery(null, null, null, null)))
+                    new BrowsePlatformReadingsQuery(null, null, null, null, null, null)))
         .isInstanceOf(InvalidApplicationArgumentException.class);
+  }
+
+  @Test
+  void throwsExceptionWhenCountryCodeIsInvalid() {
+    mockUser("en");
+
+    assertThatThrownBy(
+            () ->
+                useCase.browsePlatformReadings(
+                    new BrowsePlatformReadingsQuery(
+                        null, null, null, "colombia", null, new PageRequest(0, 10))))
+        .isInstanceOf(InvalidApplicationArgumentException.class)
+        .hasMessageContaining("Country code must be 2 uppercase ISO letters");
+
+    assertThatThrownBy(
+            () ->
+                useCase.browsePlatformReadings(
+                    new BrowsePlatformReadingsQuery(
+                        null, null, null, "co", null, new PageRequest(0, 10))))
+        .isInstanceOf(InvalidApplicationArgumentException.class)
+        .hasMessageContaining("Country code must be 2 uppercase ISO letters");
   }
 
   @Test
@@ -141,7 +165,8 @@ class BrowsePlatformReadingsUseCaseTest {
     assertThatThrownBy(
             () ->
                 useCase.browsePlatformReadings(
-                    new BrowsePlatformReadingsQuery(null, null, null, new PageRequest(0, 10))))
+                    new BrowsePlatformReadingsQuery(
+                        null, null, null, null, null, new PageRequest(0, 10))))
         .isInstanceOf(UserNotFoundException.class);
   }
 
@@ -154,7 +179,7 @@ class BrowsePlatformReadingsUseCaseTest {
             () ->
                 useCase.browsePlatformReadings(
                     new BrowsePlatformReadingsQuery(
-                        "unknown-collection", null, null, new PageRequest(0, 10))))
+                        "unknown-collection", null, null, null, null, new PageRequest(0, 10))))
         .isInstanceOf(CollectionNotFoundException.class);
   }
 
@@ -167,7 +192,8 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(
             UUID.randomUUID(), "Candileja", EditorialLevel.B2, "Culture, Arts & Fiction");
 
-    when(readings.browsePlatformReadings(null, null, null, "en", new PageRequest(0, 10)))
+    when(readings.browsePlatformReadings(
+            null, null, null, null, null, "en", new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading1, reading2), 0, 10, 2));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading1.id(), reading2.id())))
@@ -193,7 +219,7 @@ class BrowsePlatformReadingsUseCaseTest {
 
     var result =
         useCase.browsePlatformReadings(
-            new BrowsePlatformReadingsQuery(null, null, null, new PageRequest(0, 10)));
+            new BrowsePlatformReadingsQuery(null, null, null, null, null, new PageRequest(0, 10)));
 
     assertThat(result.content()).containsExactly(rec1, rec2);
     assertThat(result.totalElements()).isEqualTo(2);
@@ -210,7 +236,7 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            null, "Culture, Arts & Fiction", null, "en", new PageRequest(0, 10)))
+            null, "Culture, Arts & Fiction", null, null, null, "en", new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
@@ -222,12 +248,17 @@ class BrowsePlatformReadingsUseCaseTest {
     var result =
         useCase.browsePlatformReadings(
             new BrowsePlatformReadingsQuery(
-                null, EditorialCategory.CULTURE_ARTS_AND_FICTION, null, new PageRequest(0, 10)));
+                null,
+                EditorialCategory.CULTURE_ARTS_AND_FICTION,
+                null,
+                null,
+                null,
+                new PageRequest(0, 10)));
 
     assertThat(result.content()).containsExactly(rec);
     verify(readings)
         .browsePlatformReadings(
-            null, "Culture, Arts & Fiction", null, "en", new PageRequest(0, 10));
+            null, "Culture, Arts & Fiction", null, null, null, "en", new PageRequest(0, 10));
   }
 
   @Test
@@ -237,7 +268,7 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            null, null, EditorialLevel.B1, "en", new PageRequest(0, 10)))
+            null, null, EditorialLevel.B1, null, null, "en", new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
@@ -248,11 +279,92 @@ class BrowsePlatformReadingsUseCaseTest {
 
     var result =
         useCase.browsePlatformReadings(
-            new BrowsePlatformReadingsQuery(null, null, EditorialLevel.B1, new PageRequest(0, 10)));
+            new BrowsePlatformReadingsQuery(
+                null, null, EditorialLevel.B1, null, null, new PageRequest(0, 10)));
 
     assertThat(result.content()).containsExactly(rec);
     verify(readings)
-        .browsePlatformReadings(null, null, EditorialLevel.B1, "en", new PageRequest(0, 10));
+        .browsePlatformReadings(
+            null, null, EditorialLevel.B1, null, null, "en", new PageRequest(0, 10));
+  }
+
+  @Test
+  void filtersByCountryCodeOnly() {
+    mockUser("en");
+    var reading =
+        platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
+
+    when(readings.browsePlatformReadings(
+            null, null, null, "CO", null, "en", new PageRequest(0, 10)))
+        .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
+
+    when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
+
+    var rec = recommendedReading(reading, new BigDecimal("88.00"));
+    when(personalizer.personalizeReadings(eq(userId), eq("en"), eq(List.of(reading)), any()))
+        .thenReturn(List.of(rec));
+
+    var result =
+        useCase.browsePlatformReadings(
+            new BrowsePlatformReadingsQuery(null, null, null, "CO", null, new PageRequest(0, 10)));
+
+    assertThat(result.content()).containsExactly(rec);
+    verify(readings)
+        .browsePlatformReadings(null, null, null, "CO", null, "en", new PageRequest(0, 10));
+  }
+
+  @Test
+  void filtersByDiscoveryTopicOnly() {
+    mockUser("en");
+    var reading =
+        platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
+
+    when(readings.browsePlatformReadings(
+            null, null, null, null, DiscoveryTopic.MYTHS_AND_LEGENDS, "en", new PageRequest(0, 10)))
+        .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
+
+    when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
+
+    var rec = recommendedReading(reading, new BigDecimal("88.00"));
+    when(personalizer.personalizeReadings(eq(userId), eq("en"), eq(List.of(reading)), any()))
+        .thenReturn(List.of(rec));
+
+    var result =
+        useCase.browsePlatformReadings(
+            new BrowsePlatformReadingsQuery(
+                null, null, null, null, DiscoveryTopic.MYTHS_AND_LEGENDS, new PageRequest(0, 10)));
+
+    assertThat(result.content()).containsExactly(rec);
+    verify(readings)
+        .browsePlatformReadings(
+            null, null, null, null, DiscoveryTopic.MYTHS_AND_LEGENDS, "en", new PageRequest(0, 10));
+  }
+
+  @Test
+  void filtersByCountryAndTopicCombined() {
+    mockUser("en");
+    var reading =
+        platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
+
+    when(readings.browsePlatformReadings(
+            null, null, null, "CO", DiscoveryTopic.MYTHS_AND_LEGENDS, "en", new PageRequest(0, 10)))
+        .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
+
+    when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
+
+    var rec = recommendedReading(reading, new BigDecimal("88.00"));
+    when(personalizer.personalizeReadings(eq(userId), eq("en"), eq(List.of(reading)), any()))
+        .thenReturn(List.of(rec));
+
+    var result =
+        useCase.browsePlatformReadings(
+            new BrowsePlatformReadingsQuery(
+                null, null, null, "CO", DiscoveryTopic.MYTHS_AND_LEGENDS, new PageRequest(0, 10)));
+
+    assertThat(result.content()).containsExactly(rec);
+    verify(readings)
+        .browsePlatformReadings(
+            null, null, null, "CO", DiscoveryTopic.MYTHS_AND_LEGENDS, "en", new PageRequest(0, 10));
   }
 
   @Test
@@ -262,7 +374,13 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            null, "Culture, Arts & Fiction", EditorialLevel.B1, "en", new PageRequest(0, 10)))
+            null,
+            "Culture, Arts & Fiction",
+            EditorialLevel.B1,
+            null,
+            null,
+            "en",
+            new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
@@ -277,12 +395,20 @@ class BrowsePlatformReadingsUseCaseTest {
                 null,
                 EditorialCategory.CULTURE_ARTS_AND_FICTION,
                 EditorialLevel.B1,
+                null,
+                null,
                 new PageRequest(0, 10)));
 
     assertThat(result.content()).containsExactly(rec);
     verify(readings)
         .browsePlatformReadings(
-            null, "Culture, Arts & Fiction", EditorialLevel.B1, "en", new PageRequest(0, 10));
+            null,
+            "Culture, Arts & Fiction",
+            EditorialLevel.B1,
+            null,
+            null,
+            "en",
+            new PageRequest(0, 10));
   }
 
   @Test
@@ -304,7 +430,13 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            "colombian-myths-legends", null, EditorialLevel.B1, "en", new PageRequest(0, 10)))
+            "colombian-myths-legends",
+            null,
+            EditorialLevel.B1,
+            null,
+            null,
+            "en",
+            new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
@@ -316,24 +448,36 @@ class BrowsePlatformReadingsUseCaseTest {
     var result =
         useCase.browsePlatformReadings(
             new BrowsePlatformReadingsQuery(
-                "colombian-myths-legends", null, EditorialLevel.B1, new PageRequest(0, 10)));
+                "colombian-myths-legends",
+                null,
+                EditorialLevel.B1,
+                null,
+                null,
+                new PageRequest(0, 10)));
 
     assertThat(result.content()).containsExactly(rec);
     verify(readings)
         .browsePlatformReadings(
-            "colombian-myths-legends", null, EditorialLevel.B1, "en", new PageRequest(0, 10));
+            "colombian-myths-legends",
+            null,
+            EditorialLevel.B1,
+            null,
+            null,
+            "en",
+            new PageRequest(0, 10));
   }
 
   @Test
   void returnsEmptyPageImmediatelyWhenNoReadingsMatch() {
     mockUser("en");
     when(readings.browsePlatformReadings(
-            null, null, EditorialLevel.A1, "en", new PageRequest(0, 10)))
+            null, null, EditorialLevel.A1, null, null, "en", new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(), 0, 10, 0));
 
     var result =
         useCase.browsePlatformReadings(
-            new BrowsePlatformReadingsQuery(null, null, EditorialLevel.A1, new PageRequest(0, 10)));
+            new BrowsePlatformReadingsQuery(
+                null, null, EditorialLevel.A1, null, null, new PageRequest(0, 10)));
 
     assertThat(result.content()).isEmpty();
     assertThat(result.totalElements()).isZero();
@@ -347,7 +491,7 @@ class BrowsePlatformReadingsUseCaseTest {
     // Test size 5
     var reading5 =
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
-    when(readings.browsePlatformReadings(null, null, null, "en", new PageRequest(0, 5)))
+    when(readings.browsePlatformReadings(null, null, null, null, null, "en", new PageRequest(0, 5)))
         .thenReturn(new PageResult<>(List.of(reading5), 0, 5, 15));
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading5.id()))).thenReturn(Map.of());
     when(personalizer.personalizeReadings(eq(userId), eq("en"), eq(List.of(reading5)), any()))
@@ -355,11 +499,12 @@ class BrowsePlatformReadingsUseCaseTest {
 
     var res5 =
         useCase.browsePlatformReadings(
-            new BrowsePlatformReadingsQuery(null, null, null, new PageRequest(0, 5)));
+            new BrowsePlatformReadingsQuery(null, null, null, null, null, new PageRequest(0, 5)));
     assertThat(res5.content()).hasSize(1);
 
     // Exactly 1 call to readings, 1 to progress, 1 to personalizer
-    verify(readings).browsePlatformReadings(null, null, null, "en", new PageRequest(0, 5));
+    verify(readings)
+        .browsePlatformReadings(null, null, null, null, null, "en", new PageRequest(0, 5));
     verify(progress).findByUserIdAndReadingIds(userId, Set.of(reading5.id()));
     verify(personalizer).personalizeReadings(eq(userId), eq("en"), eq(List.of(reading5)), any());
   }

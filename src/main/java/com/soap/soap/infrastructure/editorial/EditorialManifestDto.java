@@ -30,6 +30,7 @@ public record EditorialManifestDto(
     @JsonProperty("coverKey") String coverKey,
     @JsonProperty("coverAttribution") String coverAttribution,
     @JsonProperty("accessTier") String accessTier,
+    @JsonProperty("discoveryTopic") String discoveryTopic,
     @JsonProperty("comprehensionQuiz") List<QuestionDto> comprehensionQuiz) {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -54,7 +55,8 @@ public record EditorialManifestDto(
       @JsonProperty("adaptationGroupKey") String adaptationGroupKey,
       @JsonProperty("coverKey") String coverKey,
       @JsonProperty("coverAttribution") String coverAttribution,
-      @JsonProperty("accessTier") String accessTier) {}
+      @JsonProperty("accessTier") String accessTier,
+      @JsonProperty("discoveryTopic") String discoveryTopic) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record QuestionDto(

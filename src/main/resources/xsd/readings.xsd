@@ -390,6 +390,8 @@
             <xs:element name="coverKey" type="xs:string" minOccurs="0"/>
             <xs:element name="reasonCode" type="tns:recommendationReasonCodeType" minOccurs="0"/>
             <xs:element name="shortDescription" type="xs:string" minOccurs="0"/>
+            <xs:element name="countryCode" type="xs:string" minOccurs="0"/>
+            <xs:element name="discoveryTopic" type="xs:string" minOccurs="0"/>
         </xs:sequence>
     </xs:complexType>
 
@@ -563,6 +565,8 @@
             <xs:element name="collectionKey" type="xs:string" minOccurs="0"/>
             <xs:element name="category" type="xs:string" minOccurs="0"/>
             <xs:element name="editorialLevel" type="tns:editorialLevelType" minOccurs="0"/>
+            <xs:element name="countryCode" type="xs:string" minOccurs="0"/>
+            <xs:element name="discoveryTopic" type="xs:string" minOccurs="0"/>
             <xs:element name="page" type="xs:int"/>
             <xs:element name="size" type="xs:int"/>
         </xs:sequence></xs:complexType>
@@ -890,6 +894,61 @@
                 <xs:element name="readingId" type="xs:string"/>
                 <xs:element name="hasAttempt" type="xs:boolean"/>
                 <xs:element name="attempt" type="tns:comprehensionAttemptResultType" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="discoveryHeroImageType">
+        <xs:sequence>
+            <xs:element name="assetKey" type="xs:string"/>
+            <xs:element name="location" type="xs:string" minOccurs="0"/>
+            <xs:element name="alt" type="xs:string" minOccurs="0"/>
+            <xs:element name="displayOrder" type="xs:int"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="discoveryTopicSummaryType">
+        <xs:sequence>
+            <xs:element name="key" type="xs:string"/>
+            <xs:element name="displayName" type="xs:string"/>
+            <xs:element name="displayOrder" type="xs:int"/>
+            <xs:element name="readingCount" type="xs:int"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="discoveryCountrySummaryType">
+        <xs:sequence>
+            <xs:element name="countryCode" type="xs:string"/>
+            <xs:element name="displayName" type="xs:string"/>
+            <xs:element name="tagline" type="xs:string"/>
+            <xs:element name="description" type="xs:string"/>
+            <xs:element name="displayOrder" type="xs:int"/>
+            <xs:element name="readingCount" type="xs:int"/>
+            <xs:element name="heroImages" type="tns:discoveryHeroImageType" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="topics" type="tns:discoveryTopicSummaryType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="discoveryRegionDetailsType">
+        <xs:sequence>
+            <xs:element name="key" type="xs:string"/>
+            <xs:element name="displayName" type="xs:string"/>
+            <xs:element name="subtitle" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="getDiscoveryRegionOverviewRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="regionKey" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="getDiscoveryRegionOverviewResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="region" type="tns:discoveryRegionDetailsType"/>
+                <xs:element name="countries" type="tns:discoveryCountrySummaryType" minOccurs="0" maxOccurs="unbounded"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>

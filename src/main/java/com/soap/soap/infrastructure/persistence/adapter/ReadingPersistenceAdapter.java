@@ -162,12 +162,16 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
       String collectionKey,
       String category,
       com.soap.soap.domain.model.EditorialLevel editorialLevel,
+      String countryCode,
+      com.soap.soap.domain.model.DiscoveryTopic discoveryTopic,
       String language,
       PageRequest pageRequest) {
 
     boolean hasCollection = collectionKey != null && !collectionKey.isBlank();
     boolean hasCategory = category != null && !category.isBlank();
     boolean hasLevel = editorialLevel != null;
+    boolean hasCountry = countryCode != null && !countryCode.isBlank();
+    boolean hasTopic = discoveryTopic != null;
 
     StringBuilder dataJpql = new StringBuilder();
     StringBuilder countJpql = new StringBuilder();
@@ -212,6 +216,16 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
       countJpql.append(" AND r.editorialLevel = :editorialLevel");
     }
 
+    if (hasCountry) {
+      dataJpql.append(" AND r.countryCode = :countryCode");
+      countJpql.append(" AND r.countryCode = :countryCode");
+    }
+
+    if (hasTopic) {
+      dataJpql.append(" AND r.discoveryTopic = :discoveryTopic");
+      countJpql.append(" AND r.discoveryTopic = :discoveryTopic");
+    }
+
     if (hasCollection) {
       dataJpql.append(" ORDER BY m.displayOrder ASC, r.id ASC");
     } else {
@@ -239,6 +253,14 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
       query.setParameter("editorialLevel", editorialLevel);
       countQuery.setParameter("editorialLevel", editorialLevel);
     }
+    if (hasCountry) {
+      query.setParameter("countryCode", countryCode);
+      countQuery.setParameter("countryCode", countryCode);
+    }
+    if (hasTopic) {
+      query.setParameter("discoveryTopic", discoveryTopic);
+      countQuery.setParameter("discoveryTopic", discoveryTopic);
+    }
 
     query.setFirstResult(pageRequest.page() * pageRequest.size());
     query.setMaxResults(pageRequest.size());
@@ -249,6 +271,64 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
 
     List<Reading> content = entities.stream().map(mapper::toDomain).toList();
     return new PageResult<>(content, pageRequest.page(), pageRequest.size(), total);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public java.util.Map<String, Long> countPublishedPlatformReadingsByCountryCodes(
+      List<String> countryCodes) {
+    if (countryCodes == null || countryCodes.isEmpty()) {
+      return java.util.Map.of();
+    }
+    List<Object[]> rows =
+        entityManager
+            .createQuery(
+                "SELECT r.countryCode, count(r.id) FROM ReadingEntity r "
+                    + "WHERE r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM "
+                    + "AND r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED "
+                    + "AND r.countryCode IN (:countryCodes) "
+                    + "GROUP BY r.countryCode",
+                Object[].class)
+            .setParameter("countryCodes", countryCodes)
+            .getResultList();
+
+    java.util.Map<String, Long> result = new java.util.HashMap<>();
+    for (Object[] row : rows) {
+      result.put((String) row[0], ((Number) row[1]).longValue());
+    }
+    return result;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public java.util.Map<String, java.util.Map<com.soap.soap.domain.model.DiscoveryTopic, Long>>
+      countPublishedPlatformReadingsByCountryCodesAndTopics(List<String> countryCodes) {
+    if (countryCodes == null || countryCodes.isEmpty()) {
+      return java.util.Map.of();
+    }
+    List<Object[]> rows =
+        entityManager
+            .createQuery(
+                "SELECT r.countryCode, r.discoveryTopic, count(r.id) FROM ReadingEntity r "
+                    + "WHERE r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM "
+                    + "AND r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED "
+                    + "AND r.countryCode IN (:countryCodes) "
+                    + "AND r.discoveryTopic IS NOT NULL "
+                    + "GROUP BY r.countryCode, r.discoveryTopic",
+                Object[].class)
+            .setParameter("countryCodes", countryCodes)
+            .getResultList();
+
+    java.util.Map<String, java.util.Map<com.soap.soap.domain.model.DiscoveryTopic, Long>> result =
+        new java.util.HashMap<>();
+    for (Object[] row : rows) {
+      String country = (String) row[0];
+      com.soap.soap.domain.model.DiscoveryTopic topic =
+          (com.soap.soap.domain.model.DiscoveryTopic) row[1];
+      Long count = ((Number) row[2]).longValue();
+      result.computeIfAbsent(country, k -> new java.util.HashMap<>()).put(topic, count);
+    }
+    return result;
   }
 
   @Override

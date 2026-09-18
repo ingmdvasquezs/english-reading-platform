@@ -107,4 +107,8 @@ public class ReadingEntity extends CreatedAtEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "access_tier", length = 20)
   private AccessTier accessTier;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "discovery_topic", length = 50)
+  private com.soap.soap.domain.model.DiscoveryTopic discoveryTopic;
 }

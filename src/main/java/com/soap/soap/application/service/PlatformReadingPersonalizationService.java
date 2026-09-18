@@ -75,6 +75,36 @@ public class PlatformReadingPersonalizationService {
       ReadingProgressStatus progressStatus,
       ReadingLexicalEvidence evidence,
       boolean isGlobalColdStart) {
+    return personalize(
+        readingId,
+        title,
+        language,
+        editorialLevel,
+        category,
+        createdAt,
+        coverKey,
+        shortDescription,
+        null,
+        null,
+        progressStatus,
+        evidence,
+        isGlobalColdStart);
+  }
+
+  public PersonalizationResult personalize(
+      UUID readingId,
+      String title,
+      String language,
+      EditorialLevel editorialLevel,
+      String category,
+      LocalDateTime createdAt,
+      String coverKey,
+      String shortDescription,
+      String countryCode,
+      com.soap.soap.domain.model.DiscoveryTopic discoveryTopic,
+      ReadingProgressStatus progressStatus,
+      ReadingLexicalEvidence evidence,
+      boolean isGlobalColdStart) {
 
     RecommendationScoreV2 score = scorer.score(evidence, editorialLevel, isGlobalColdStart);
 
@@ -116,7 +146,9 @@ public class PlatformReadingPersonalizationService {
             progressStatus,
             coverKey,
             reasonCode,
-            shortDescription);
+            shortDescription,
+            countryCode,
+            discoveryTopic);
 
     return new PersonalizationResult(reading, score);
   }
@@ -135,6 +167,8 @@ public class PlatformReadingPersonalizationService {
         candidate.createdAt(),
         candidate.coverKey(),
         candidate.shortDescription(),
+        candidate.countryCode(),
+        null,
         progressStatus,
         evidence,
         isGlobalColdStart);
@@ -154,6 +188,8 @@ public class PlatformReadingPersonalizationService {
         reading.createdAt(),
         reading.coverKey(),
         reading.shortDescription(),
+        reading.countryCode(),
+        reading.discoveryTopic(),
         progressStatus,
         evidence,
         isGlobalColdStart);

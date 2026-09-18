@@ -112,7 +112,8 @@ public class IngestEditorialReadingUseCase implements IngestEditorialReadingPort
             command.sourceNotes(),
             command.adaptationGroupKey().trim(),
             command.coverAttribution(),
-            command.accessTier());
+            command.accessTier(),
+            command.discoveryTopic());
 
     var savedReading = readings.saveAndFlush(readingToSave);
 

@@ -183,6 +183,8 @@ public class EditorialManifestParser {
     String coverAttribution =
         r != null && r.coverAttribution() != null ? r.coverAttribution() : dto.coverAttribution();
     String accessTierStr = r != null && r.accessTier() != null ? r.accessTier() : dto.accessTier();
+    String discoveryTopicStr =
+        r != null && r.discoveryTopic() != null ? r.discoveryTopic() : dto.discoveryTopic();
 
     EditorialLevel editorialLevel = parseEnum(EditorialLevel.class, levelStr, "editorialLevel");
     EditorialContentType contentType =
@@ -193,6 +195,9 @@ public class EditorialManifestParser {
     AdaptationKind adaptationKind =
         parseEnum(AdaptationKind.class, adaptationKindStr, "adaptationKind");
     AccessTier accessTier = parseEnum(AccessTier.class, accessTierStr, "accessTier");
+    com.soap.soap.domain.model.DiscoveryTopic discoveryTopic =
+        parseEnum(
+            com.soap.soap.domain.model.DiscoveryTopic.class, discoveryTopicStr, "discoveryTopic");
 
     List<EditorialQuestionCommand> questions = parseQuestions(dto.comprehensionQuiz());
 
@@ -218,6 +223,7 @@ public class EditorialManifestParser {
         coverKey,
         coverAttribution,
         accessTier,
+        discoveryTopic,
         questions);
   }
 

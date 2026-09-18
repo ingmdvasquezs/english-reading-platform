@@ -48,8 +48,33 @@ public class BrowsePlatformReadingsSoapMapper extends SoapMapperSupport {
             ? request.getCollectionKey().trim()
             : null;
 
+    String countryCode =
+        request.getCountryCode() != null && !request.getCountryCode().isBlank()
+            ? request.getCountryCode().trim().toUpperCase()
+            : null;
+    if (countryCode != null && !countryCode.matches("^[A-Z]{2}$")) {
+      throw new InvalidApplicationArgumentException(
+          "Country code must be 2 uppercase ISO letters: " + request.getCountryCode());
+    }
+
+    com.soap.soap.domain.model.DiscoveryTopic discoveryTopic = null;
+    if (request.getDiscoveryTopic() != null && !request.getDiscoveryTopic().isBlank()) {
+      try {
+        discoveryTopic =
+            com.soap.soap.domain.model.DiscoveryTopic.fromString(request.getDiscoveryTopic());
+      } catch (IllegalArgumentException e) {
+        throw new InvalidApplicationArgumentException(
+            "Unknown discovery topic: " + request.getDiscoveryTopic());
+      }
+    }
+
     return new BrowsePlatformReadingsQuery(
-        collectionKey, category, level, new PageRequest(request.getPage(), request.getSize()));
+        collectionKey,
+        category,
+        level,
+        countryCode,
+        discoveryTopic,
+        new PageRequest(request.getPage(), request.getSize()));
   }
 
   public BrowsePlatformReadingsResponse toResponse(PageResult<RecommendedPlatformReading> page) {
@@ -86,6 +111,10 @@ public class BrowsePlatformReadingsSoapMapper extends SoapMapperSupport {
     }
     result.setCoverKey(reading.coverKey());
     result.setShortDescription(reading.shortDescription());
+    result.setCountryCode(reading.countryCode());
+    if (reading.discoveryTopic() != null) {
+      result.setDiscoveryTopic(reading.discoveryTopic().name());
+    }
     return result;
   }
 }

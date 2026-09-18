@@ -8,6 +8,7 @@ import com.soap.soap.application.exception.ConcurrentVocabularyModificationExcep
 import com.soap.soap.application.exception.DictionaryInvalidResponseException;
 import com.soap.soap.application.exception.DictionaryTimeoutException;
 import com.soap.soap.application.exception.DictionaryUnavailableException;
+import com.soap.soap.application.exception.DiscoveryRegionNotFoundException;
 import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
 import com.soap.soap.application.exception.ExternalProviderException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
@@ -29,6 +30,7 @@ public final class SoapFaultClassifier {
       List.of(
           AliasAlreadyInUseException.class,
           CollectionNotFoundException.class,
+          DiscoveryRegionNotFoundException.class,
           AuthenticationRequiredException.class,
           EmailAlreadyRegisteredException.class,
           ConcurrentVocabularyModificationException.class,

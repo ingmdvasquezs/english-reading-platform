@@ -175,4 +175,41 @@ class EditorialManifestParserTest {
     assertThat(cmd.adaptationGroupKey()).isEqualTo("story-key");
     assertThat(cmd.questions()).isNull();
   }
+
+  @Test
+  void successfullyParsesManifestWithDiscoveryTopic(@TempDir Path tempDir) throws Exception {
+    String json =
+        """
+        {
+          "schemaVersion": 1,
+          "reading": {
+            "title": "The Mohan",
+            "content": "A legend from Tolima.",
+            "language": "en",
+            "editorialLevel": "B1",
+            "category": "Culture, Arts & Fiction",
+            "shortDescription": "Legend of Mohan",
+            "contentType": "MYTH",
+            "countryCode": "CO",
+            "region": "SOUTH_AMERICA",
+            "sourceKind": "ORIGINAL_EDITORIAL",
+            "rightsStatus": "ORIGINAL",
+            "adaptationKind": "ORIGINAL",
+            "adaptationGroupKey": "the-mohan",
+            "coverKey": "hero-colombia-el-mohan",
+            "accessTier": "FREE",
+            "discoveryTopic": "MYTHS_AND_LEGENDS"
+          },
+          "comprehensionQuiz": []
+        }
+        """;
+    var file = tempDir.resolve("mohan-manifest.json");
+    Files.writeString(file, json);
+
+    var command = parser.parse(file);
+
+    assertThat(command.discoveryTopic())
+        .isEqualTo(com.soap.soap.domain.model.DiscoveryTopic.MYTHS_AND_LEGENDS);
+    assertThat(command.countryCode()).isEqualTo("CO");
+  }
 }

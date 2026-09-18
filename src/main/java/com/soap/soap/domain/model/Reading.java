@@ -30,7 +30,8 @@ public record Reading(
     String sourceNotes,
     String adaptationGroupKey,
     String coverAttribution,
-    AccessTier accessTier) {
+    AccessTier accessTier,
+    DiscoveryTopic discoveryTopic) {
 
   public Reading {
     Objects.requireNonNull(origin, "Reading origin must not be null");
@@ -57,7 +58,8 @@ public record Reading(
           || sourceNotes != null
           || adaptationGroupKey != null
           || coverAttribution != null
-          || accessTier != null) {
+          || accessTier != null
+          || discoveryTopic != null) {
         throw new IllegalArgumentException(
             "User reading must not have platform metadata or editorial status");
       }
@@ -241,6 +243,64 @@ public record Reading(
         editorialStatus);
   }
 
+  /** Backward-compatible 26-argument constructor before discoveryTopic. */
+  public Reading(
+      UUID id,
+      User user,
+      String title,
+      String content,
+      LanguageTag language,
+      LocalDateTime createdAt,
+      ReadingOrigin origin,
+      EditorialLevel editorialLevel,
+      String category,
+      String coverKey,
+      EditorialStatus editorialStatus,
+      String shortDescription,
+      EditorialContentType contentType,
+      String countryCode,
+      EditorialRegion region,
+      SourceKind sourceKind,
+      RightsStatus rightsStatus,
+      AdaptationKind adaptationKind,
+      LanguageTag sourceLanguage,
+      String sourceTitle,
+      String sourceAuthor,
+      String sourceUrl,
+      String sourceNotes,
+      String adaptationGroupKey,
+      String coverAttribution,
+      AccessTier accessTier) {
+    this(
+        id,
+        user,
+        title,
+        content,
+        language,
+        createdAt,
+        origin,
+        editorialLevel,
+        category,
+        coverKey,
+        editorialStatus,
+        shortDescription,
+        contentType,
+        countryCode,
+        region,
+        sourceKind,
+        rightsStatus,
+        adaptationKind,
+        sourceLanguage,
+        sourceTitle,
+        sourceAuthor,
+        sourceUrl,
+        sourceNotes,
+        adaptationGroupKey,
+        coverAttribution,
+        accessTier,
+        null);
+  }
+
   public boolean isAccessibleBy(UUID userId) {
     return origin == ReadingOrigin.PLATFORM || (user != null && userId.equals(user.id()));
   }
@@ -272,6 +332,7 @@ public record Reading(
         this.sourceNotes,
         this.adaptationGroupKey,
         this.coverAttribution,
-        this.accessTier);
+        this.accessTier,
+        this.discoveryTopic);
   }
 }

@@ -63,6 +63,13 @@ public class BrowsePlatformReadingsUseCase implements BrowsePlatformReadingsPort
     }
     String learningLanguage = LanguageTag.of(user.learningLanguage()).value();
 
+    if (query.countryCode() != null && !query.countryCode().isBlank()) {
+      if (!query.countryCode().matches("^[A-Z]{2}$")) {
+        throw new InvalidApplicationArgumentException(
+            "Country code must be 2 uppercase ISO letters: " + query.countryCode());
+      }
+    }
+
     String categoryDisplayName = query.category() != null ? query.category().displayName() : null;
 
     var page =
@@ -70,6 +77,8 @@ public class BrowsePlatformReadingsUseCase implements BrowsePlatformReadingsPort
             query.collectionKey(),
             categoryDisplayName,
             query.editorialLevel(),
+            query.countryCode(),
+            query.discoveryTopic(),
             learningLanguage,
             query.pageRequest());
 

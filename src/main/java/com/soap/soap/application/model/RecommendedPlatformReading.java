@@ -25,7 +25,52 @@ public record RecommendedPlatformReading(
     ReadingProgressStatus progressStatus,
     String coverKey,
     RecommendationReasonCode reasonCode,
-    String shortDescription) {
+    String shortDescription,
+    String countryCode,
+    com.soap.soap.domain.model.DiscoveryTopic discoveryTopic) {
+
+  public RecommendedPlatformReading(
+      UUID readingId,
+      String title,
+      String language,
+      EditorialLevel editorialLevel,
+      String category,
+      LocalDateTime createdAt,
+      int uniqueWords,
+      int knownWords,
+      int learningWords,
+      int explicitNewWords,
+      int ignoredWords,
+      int unclassifiedWords,
+      BigDecimal vocabularyFitPercentage,
+      BigDecimal classificationConfidencePercentage,
+      ReadingProgressStatus progressStatus,
+      String coverKey,
+      RecommendationReasonCode reasonCode,
+      String shortDescription) {
+    this(
+        readingId,
+        title,
+        language,
+        editorialLevel,
+        category,
+        createdAt,
+        uniqueWords,
+        knownWords,
+        learningWords,
+        explicitNewWords,
+        ignoredWords,
+        unclassifiedWords,
+        vocabularyFitPercentage,
+        classificationConfidencePercentage,
+        progressStatus,
+        coverKey,
+        reasonCode,
+        shortDescription,
+        null,
+        null);
+  }
+
   public RecommendedPlatformReading(
       UUID readingId,
       String title,
