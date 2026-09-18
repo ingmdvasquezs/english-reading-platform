@@ -29,4 +29,19 @@ public interface JpaReadingCollectionRepository
       order by c.displayOrder asc, c.id asc
       """)
   List<ReadingCollectionEntity> findActiveWithPublishedReadings();
+
+  @Query(
+      """
+      select c, count(r.id)
+      from ReadingCollectionEntity c
+      left join ReadingCollectionMembershipEntity m on m.id.collectionId = c.id
+      left join ReadingEntity r on r.id = m.id.readingId
+        and r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+        and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
+      where c.active = true
+      group by c.id, c.key, c.displayName, c.description, c.displayOrder, c.active, c.coverKey
+      having count(r.id) > 0
+      order by c.displayOrder asc, c.id asc
+      """)
+  List<Object[]> findActiveWithPublishedReadingCounts();
 }

@@ -1,9 +1,6 @@
 package com.soap.soap.domain.model;
 
-import java.util.Arrays;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * The 8 canonical thematic categories for platform editorial content. Persistent labels match
@@ -29,21 +26,29 @@ public enum EditorialCategory {
     return displayName;
   }
 
-  private static final Map<String, EditorialCategory> BY_DISPLAY_NAME =
-      Arrays.stream(values())
-          .collect(
-              Collectors.toUnmodifiableMap(
-                  c -> c.displayName.toLowerCase(java.util.Locale.ROOT), Function.identity()));
+  private static final Map<String, EditorialCategory> LOOKUP;
 
-  public static EditorialCategory fromDisplayName(String name) {
+  static {
+    java.util.Map<String, EditorialCategory> map = new java.util.HashMap<>();
+    for (EditorialCategory cat : values()) {
+      map.put(cat.displayName().toLowerCase(java.util.Locale.ROOT), cat);
+      map.put(cat.name().toLowerCase(java.util.Locale.ROOT), cat);
+    }
+    LOOKUP = java.util.Collections.unmodifiableMap(map);
+  }
+
+  public static EditorialCategory fromString(String name) {
     if (name == null || name.isBlank()) {
       return null;
     }
-    EditorialCategory category =
-        BY_DISPLAY_NAME.get(name.trim().toLowerCase(java.util.Locale.ROOT));
+    EditorialCategory category = LOOKUP.get(name.trim().toLowerCase(java.util.Locale.ROOT));
     if (category == null) {
       throw new IllegalArgumentException("Unknown editorial category: " + name);
     }
     return category;
+  }
+
+  public static EditorialCategory fromDisplayName(String name) {
+    return fromString(name);
   }
 }

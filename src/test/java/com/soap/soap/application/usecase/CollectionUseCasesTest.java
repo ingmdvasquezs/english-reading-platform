@@ -54,15 +54,20 @@ class CollectionUseCasesTest {
 
   @Test
   void listsOnlyTheActiveCollectionsReturnedByPersistenceInEditorialOrder() {
-    var first = collection("everyday", 1, null);
-    var second = collection("mysteries", 2, "optional-cover");
+    var first =
+        new com.soap.soap.application.model.CollectionSummary(
+            UUID.randomUUID(), "everyday", "Everyday", "Desc", 1, true, null, 10);
+    var second =
+        new com.soap.soap.application.model.CollectionSummary(
+            UUID.randomUUID(), "mysteries", "Mysteries", "Desc", 2, true, "optional-cover", 5);
     when(users.existsById(userId)).thenReturn(true);
-    when(collections.findAllActive()).thenReturn(List.of(first, second));
+    when(collections.findAllActiveSummaries()).thenReturn(List.of(first, second));
 
     var result = new ListCollectionsUseCase(users, collections, currentUser).listCollections();
 
     assertThat(result).containsExactly(first, second);
     assertThat(result.getFirst().coverKey()).isNull();
+    assertThat(result.getFirst().readingCount()).isEqualTo(10);
   }
 
   @Test

@@ -8,6 +8,7 @@ import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.infrastructure.persistence.mapper.ReadingEntityMapper;
 import com.soap.soap.infrastructure.persistence.repository.JpaReadingRepository;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
   private final JpaReadingRepository repository;
   private final ReadingEntityMapper mapper;
+  private final EntityManager entityManager;
 
   @Override
   @Transactional(readOnly = true)
@@ -152,6 +154,101 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
   @Transactional(readOnly = true)
   public List<Reading> findAllPlatformReadings() {
     return repository.findAllPlatformReadings().stream().map(mapper::toDomain).toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PageResult<Reading> browsePlatformReadings(
+      String collectionKey,
+      String category,
+      com.soap.soap.domain.model.EditorialLevel editorialLevel,
+      String language,
+      PageRequest pageRequest) {
+
+    boolean hasCollection = collectionKey != null && !collectionKey.isBlank();
+    boolean hasCategory = category != null && !category.isBlank();
+    boolean hasLevel = editorialLevel != null;
+
+    StringBuilder dataJpql = new StringBuilder();
+    StringBuilder countJpql = new StringBuilder();
+
+    if (hasCollection) {
+      dataJpql.append(
+          "SELECT r FROM ReadingCollectionMembershipEntity m "
+              + "JOIN ReadingCollectionEntity c ON c.id = m.id.collectionId "
+              + "JOIN ReadingEntity r ON r.id = m.id.readingId "
+              + "WHERE c.key = :collectionKey AND c.active = true "
+              + "AND r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM "
+              + "AND r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED "
+              + "AND r.language = :language");
+      countJpql.append(
+          "SELECT count(r) FROM ReadingCollectionMembershipEntity m "
+              + "JOIN ReadingCollectionEntity c ON c.id = m.id.collectionId "
+              + "JOIN ReadingEntity r ON r.id = m.id.readingId "
+              + "WHERE c.key = :collectionKey AND c.active = true "
+              + "AND r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM "
+              + "AND r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED "
+              + "AND r.language = :language");
+    } else {
+      dataJpql.append(
+          "SELECT r FROM ReadingEntity r "
+              + "WHERE r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM "
+              + "AND r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED "
+              + "AND r.language = :language");
+      countJpql.append(
+          "SELECT count(r) FROM ReadingEntity r "
+              + "WHERE r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM "
+              + "AND r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED "
+              + "AND r.language = :language");
+    }
+
+    if (hasCategory) {
+      dataJpql.append(" AND r.category = :category");
+      countJpql.append(" AND r.category = :category");
+    }
+
+    if (hasLevel) {
+      dataJpql.append(" AND r.editorialLevel = :editorialLevel");
+      countJpql.append(" AND r.editorialLevel = :editorialLevel");
+    }
+
+    if (hasCollection) {
+      dataJpql.append(" ORDER BY m.displayOrder ASC, r.id ASC");
+    } else {
+      dataJpql.append(" ORDER BY r.createdAt DESC, r.id ASC");
+    }
+
+    var query =
+        entityManager.createQuery(
+            dataJpql.toString(),
+            com.soap.soap.infrastructure.persistence.entity.ReadingEntity.class);
+    var countQuery = entityManager.createQuery(countJpql.toString(), Long.class);
+
+    query.setParameter("language", language);
+    countQuery.setParameter("language", language);
+
+    if (hasCollection) {
+      query.setParameter("collectionKey", collectionKey);
+      countQuery.setParameter("collectionKey", collectionKey);
+    }
+    if (hasCategory) {
+      query.setParameter("category", category);
+      countQuery.setParameter("category", category);
+    }
+    if (hasLevel) {
+      query.setParameter("editorialLevel", editorialLevel);
+      countQuery.setParameter("editorialLevel", editorialLevel);
+    }
+
+    query.setFirstResult(pageRequest.page() * pageRequest.size());
+    query.setMaxResults(pageRequest.size());
+
+    List<com.soap.soap.infrastructure.persistence.entity.ReadingEntity> entities =
+        query.getResultList();
+    Long total = countQuery.getSingleResult();
+
+    List<Reading> content = entities.stream().map(mapper::toDomain).toList();
+    return new PageResult<>(content, pageRequest.page(), pageRequest.size(), total);
   }
 
   @Override

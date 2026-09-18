@@ -10,6 +10,8 @@ import java.util.Optional;
 public interface ReadingCollectionRepositoryPort {
   List<ReadingCollection> findAllActive();
 
+  List<com.soap.soap.application.model.CollectionSummary> findAllActiveSummaries();
+
   Optional<ReadingCollection> findActiveByKey(String key);
 
   PageResult<Reading> findReadings(String key, PageRequest pageRequest);

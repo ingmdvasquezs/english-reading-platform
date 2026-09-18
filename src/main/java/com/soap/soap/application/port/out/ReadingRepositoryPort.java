@@ -26,6 +26,13 @@ public interface ReadingRepositoryPort {
 
   List<Reading> findAllPlatformReadings();
 
+  PageResult<Reading> browsePlatformReadings(
+      String collectionKey,
+      String category,
+      com.soap.soap.domain.model.EditorialLevel editorialLevel,
+      String language,
+      PageRequest pageRequest);
+
   Optional<Reading> findPlatformReadingByAdaptationKey(
       String adaptationGroupKey,
       String language,

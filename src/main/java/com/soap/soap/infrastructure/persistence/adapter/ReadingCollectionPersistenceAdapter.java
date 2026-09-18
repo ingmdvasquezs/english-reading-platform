@@ -31,6 +31,28 @@ public class ReadingCollectionPersistenceAdapter implements ReadingCollectionRep
 
   @Override
   @Transactional(readOnly = true)
+  public List<com.soap.soap.application.model.CollectionSummary> findAllActiveSummaries() {
+    return collections.findActiveWithPublishedReadingCounts().stream()
+        .map(
+            row -> {
+              var entity =
+                  (com.soap.soap.infrastructure.persistence.entity.ReadingCollectionEntity) row[0];
+              int count = ((Number) row[1]).intValue();
+              return new com.soap.soap.application.model.CollectionSummary(
+                  entity.getId(),
+                  entity.getKey(),
+                  entity.getDisplayName(),
+                  entity.getDescription(),
+                  entity.getDisplayOrder(),
+                  entity.isActive(),
+                  entity.getCoverKey(),
+                  count);
+            })
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public Optional<ReadingCollection> findActiveByKey(String key) {
     return collections.findByKeyAndActiveTrue(key).map(mapper::toDomain);
   }

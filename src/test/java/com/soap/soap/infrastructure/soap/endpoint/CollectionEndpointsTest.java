@@ -10,7 +10,6 @@ import com.soap.soap.application.model.RecommendedPlatformReading;
 import com.soap.soap.application.port.in.ListCollectionReadingsPort;
 import com.soap.soap.application.port.in.ListCollectionsPort;
 import com.soap.soap.domain.model.EditorialLevel;
-import com.soap.soap.domain.model.ReadingCollection;
 import com.soap.soap.domain.model.ReadingProgressStatus;
 import com.soap.soap.infrastructure.soap.generated.ListCollectionReadingsRequest;
 import com.soap.soap.infrastructure.soap.generated.ListCollectionsRequest;
@@ -32,8 +31,8 @@ class CollectionEndpointsTest {
   @Test
   void mapsCollectionIncludingNullableCoverKey() {
     var collection =
-        new ReadingCollection(
-            UUID.randomUUID(), "nature", "Nature", "Natural worlds", 4, true, null);
+        new com.soap.soap.application.model.CollectionSummary(
+            UUID.randomUUID(), "nature", "Nature", "Natural worlds", 4, true, null, 7);
     when(listCollections.listCollections()).thenReturn(List.of(collection));
 
     var response =
@@ -47,6 +46,7 @@ class CollectionEndpointsTest {
               assertThat(item.getKey()).isEqualTo("nature");
               assertThat(item.getDisplayOrder()).isEqualTo(4);
               assertThat(item.getCoverKey()).isNull();
+              assertThat(item.getReadingCount()).isEqualTo(7);
             });
   }
 

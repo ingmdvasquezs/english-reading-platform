@@ -1,5 +1,6 @@
 package com.soap.soap.infrastructure.soap.mapper;
 
+import com.soap.soap.application.model.CollectionSummary;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.RecommendedPlatformReading;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CollectionSoapMapper extends SoapMapperSupport {
-  public ListCollectionsResponse toResponse(Iterable<ReadingCollection> collections) {
+  public ListCollectionsResponse toResponse(Iterable<CollectionSummary> collections) {
     var response = new ListCollectionsResponse();
     for (var collection : collections) {
       response.getCollections().add(toCollection(collection));
@@ -37,7 +38,18 @@ public class CollectionSoapMapper extends SoapMapperSupport {
     return response;
   }
 
-  private CollectionType toCollection(ReadingCollection collection) {
+  public CollectionType toCollection(CollectionSummary collection) {
+    var result = new CollectionType();
+    result.setKey(collection.key());
+    result.setDisplayName(collection.displayName());
+    result.setDescription(collection.description());
+    result.setDisplayOrder(collection.displayOrder());
+    result.setCoverKey(collection.coverKey());
+    result.setReadingCount(collection.readingCount());
+    return result;
+  }
+
+  public CollectionType toCollection(ReadingCollection collection) {
     var result = new CollectionType();
     result.setKey(collection.key());
     result.setDisplayName(collection.displayName());

@@ -1,11 +1,11 @@
 package com.soap.soap.application.usecase;
 
 import com.soap.soap.application.exception.UserNotFoundException;
+import com.soap.soap.application.model.CollectionSummary;
 import com.soap.soap.application.port.in.ListCollectionsPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.ReadingCollectionRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
-import com.soap.soap.domain.model.ReadingCollection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -20,11 +20,11 @@ public class ListCollectionsUseCase implements ListCollectionsPort {
 
   @Override
   @Transactional(readOnly = true)
-  public List<ReadingCollection> listCollections() {
+  public List<CollectionSummary> listCollections() {
     var userId = currentUser.requireUserId();
     if (!users.existsById(userId)) {
       throw new UserNotFoundException(userId);
     }
-    return collections.findAllActive();
+    return collections.findAllActiveSummaries();
   }
 }
