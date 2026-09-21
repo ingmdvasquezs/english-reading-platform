@@ -560,6 +560,13 @@
         </xs:sequence></xs:extension></xs:complexContent></xs:complexType>
     </xs:element>
 
+    <xs:simpleType name="platformReadingSortType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="DEFAULT"/>
+            <xs:enumeration value="CREATED_AT_DESC"/>
+        </xs:restriction>
+    </xs:simpleType>
+
     <xs:element name="browsePlatformReadingsRequest">
         <xs:complexType><xs:sequence>
             <xs:element name="collectionKey" type="xs:string" minOccurs="0"/>
@@ -567,6 +574,7 @@
             <xs:element name="editorialLevel" type="tns:editorialLevelType" minOccurs="0"/>
             <xs:element name="countryCode" type="xs:string" minOccurs="0"/>
             <xs:element name="discoveryTopic" type="xs:string" minOccurs="0"/>
+            <xs:element name="sort" type="tns:platformReadingSortType" minOccurs="0"/>
             <xs:element name="page" type="xs:int"/>
             <xs:element name="size" type="xs:int"/>
         </xs:sequence></xs:complexType>
@@ -982,6 +990,50 @@
             <xs:sequence>
                 <xs:element name="region" type="tns:discoveryRegionDetailsType"/>
                 <xs:element name="countries" type="tns:discoveryCountrySummaryType" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="discoveryShelfType">
+        <xs:sequence>
+            <xs:element name="key" type="xs:string"/>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="description" type="xs:string" minOccurs="0"/>
+            <xs:element name="displayOrder" type="xs:int"/>
+            <xs:element name="coverKey" type="xs:string" minOccurs="0"/>
+            <xs:element name="type" type="xs:string"/>
+            <xs:element name="totalReadings" type="xs:int"/>
+            <xs:element name="readings" type="tns:recommendedPlatformReadingType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="latinAmericaDiscoveryType">
+        <xs:sequence>
+            <xs:element name="region" type="tns:discoveryRegionDetailsType"/>
+            <xs:element name="countries" type="tns:discoveryCountrySummaryType" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="defaultCountryCode" type="xs:string"/>
+            <xs:element name="defaultTopicKey" type="xs:string" minOccurs="0"/>
+            <xs:element name="readings" type="tns:recommendedPlatformReadingType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="getDiscoveryHomeRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="maxContinueReading" type="xs:int" minOccurs="0"/>
+                <xs:element name="maxForYou" type="xs:int" minOccurs="0"/>
+                <xs:element name="maxShelfReadings" type="xs:int" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="getDiscoveryHomeResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="continueReading" type="tns:continueReadingItemType" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element name="forYou" type="tns:recommendedPlatformReadingType" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element name="latinAmerica" type="tns:latinAmericaDiscoveryType" minOccurs="0"/>
+                <xs:element name="shelves" type="tns:discoveryShelfType" minOccurs="0" maxOccurs="unbounded"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>

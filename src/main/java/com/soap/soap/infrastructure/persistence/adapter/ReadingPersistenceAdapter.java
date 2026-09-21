@@ -5,6 +5,7 @@ import com.soap.soap.application.model.PageResult;
 import com.soap.soap.application.model.PlatformReadingSummary;
 import com.soap.soap.application.model.ReadingSummary;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
+import com.soap.soap.domain.model.PlatformReadingSort;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.infrastructure.persistence.mapper.ReadingEntityMapper;
 import com.soap.soap.infrastructure.persistence.repository.JpaReadingRepository;
@@ -158,12 +159,46 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
 
   @Override
   @Transactional(readOnly = true)
+  public List<Reading> findRecentPlatformReadings(String language, int page, int size) {
+    return repository
+        .findRecentPlatformReadings(
+            language, org.springframework.data.domain.PageRequest.of(page, size))
+        .getContent()
+        .stream()
+        .map(mapper::toDomain)
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public PageResult<Reading> browsePlatformReadings(
       String collectionKey,
       String category,
       com.soap.soap.domain.model.EditorialLevel editorialLevel,
       String countryCode,
       com.soap.soap.domain.model.DiscoveryTopic discoveryTopic,
+      String language,
+      PageRequest pageRequest) {
+    return browsePlatformReadings(
+        collectionKey,
+        category,
+        editorialLevel,
+        countryCode,
+        discoveryTopic,
+        PlatformReadingSort.DEFAULT,
+        language,
+        pageRequest);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PageResult<Reading> browsePlatformReadings(
+      String collectionKey,
+      String category,
+      com.soap.soap.domain.model.EditorialLevel editorialLevel,
+      String countryCode,
+      com.soap.soap.domain.model.DiscoveryTopic discoveryTopic,
+      PlatformReadingSort sort,
       String language,
       PageRequest pageRequest) {
 
@@ -226,7 +261,9 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
       countJpql.append(" AND r.discoveryTopic = :discoveryTopic");
     }
 
-    if (hasCollection) {
+    if (sort == PlatformReadingSort.CREATED_AT_DESC) {
+      dataJpql.append(" ORDER BY r.createdAt DESC, r.id ASC");
+    } else if (hasCollection) {
       dataJpql.append(" ORDER BY m.displayOrder ASC, r.id ASC");
     } else {
       dataJpql.append(" ORDER BY r.createdAt DESC, r.id ASC");

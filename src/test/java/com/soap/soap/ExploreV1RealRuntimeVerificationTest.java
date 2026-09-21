@@ -9,6 +9,7 @@ import com.soap.soap.application.port.in.ListCollectionReadingsPort;
 import com.soap.soap.application.port.in.ListCollectionsPort;
 import com.soap.soap.domain.model.EditorialCategory;
 import com.soap.soap.domain.model.EditorialLevel;
+import com.soap.soap.domain.model.PlatformReadingSort;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -227,5 +228,101 @@ class ExploreV1RealRuntimeVerificationTest {
     System.out.println("reasonCode: " + sample.reasonCode());
     System.out.println("progressStatus: " + sample.progressStatus());
     System.out.println("===================================");
+  }
+
+  @Test
+  @DisplayName(
+      "11. browsePlatformReadings with sort = CREATED_AT_DESC applies DB ordering before pagination across pages")
+  void testBrowsePlatformReadingsSortCreatedAtDescAcrossPages() {
+    // Page 0 (size 5)
+    var page0 =
+        browsePlatformReadingsPort.browsePlatformReadings(
+            new BrowsePlatformReadingsQuery(
+                null,
+                null,
+                null,
+                null,
+                null,
+                PlatformReadingSort.CREATED_AT_DESC,
+                new PageRequest(0, 5)));
+    assertThat(page0.content()).hasSize(5);
+
+    // Page 1 (size 5)
+    var page1 =
+        browsePlatformReadingsPort.browsePlatformReadings(
+            new BrowsePlatformReadingsQuery(
+                null,
+                null,
+                null,
+                null,
+                null,
+                PlatformReadingSort.CREATED_AT_DESC,
+                new PageRequest(1, 5)));
+    assertThat(page1.content()).hasSize(5);
+
+    // Within page 0: non-ascending createdAt
+    for (int i = 0; i < page0.content().size() - 1; i++) {
+      var current = page0.content().get(i).createdAt();
+      var next = page0.content().get(i + 1).createdAt();
+      if (current != null && next != null) {
+        assertThat(current).isAfterOrEqualTo(next);
+      }
+    }
+
+    // Boundary between page 0 last item and page 1 first item
+    var lastOfPage0 = page0.content().get(4).createdAt();
+    var firstOfPage1 = page1.content().get(0).createdAt();
+    if (lastOfPage0 != null && firstOfPage1 != null) {
+      assertThat(lastOfPage0).isAfterOrEqualTo(firstOfPage1);
+    }
+
+    // No duplicate reading IDs between page 0 and page 1
+    var page0Ids = page0.content().stream().map(c -> c.readingId()).toList();
+    var page1Ids = page1.content().stream().map(c -> c.readingId()).toList();
+    assertThat(page0Ids).doesNotContainAnyElementsOf(page1Ids);
+  }
+
+  @Test
+  @DisplayName(
+      "12. Collection deep browse with sort = CREATED_AT_DESC sorts by createdAt instead of collection displayOrder")
+  void testCollectionSortCreatedAtDescOverridesDisplayOrder() {
+    var defaultSorted =
+        browsePlatformReadingsPort.browsePlatformReadings(
+            new BrowsePlatformReadingsQuery(
+                "colombian-myths-legends",
+                null,
+                null,
+                null,
+                null,
+                PlatformReadingSort.DEFAULT,
+                new PageRequest(0, 15)));
+
+    var newestSorted =
+        browsePlatformReadingsPort.browsePlatformReadings(
+            new BrowsePlatformReadingsQuery(
+                "colombian-myths-legends",
+                null,
+                null,
+                null,
+                null,
+                PlatformReadingSort.CREATED_AT_DESC,
+                new PageRequest(0, 15)));
+
+    assertThat(defaultSorted.content()).hasSize(15);
+    assertThat(newestSorted.content()).hasSize(15);
+
+    // Both contain the same readings
+    assertThat(newestSorted.content().stream().map(c -> c.readingId()).toList())
+        .containsExactlyInAnyOrderElementsOf(
+            defaultSorted.content().stream().map(c -> c.readingId()).toList());
+
+    // Newest sorted is ordered by createdAt descending
+    for (int i = 0; i < newestSorted.content().size() - 1; i++) {
+      var current = newestSorted.content().get(i).createdAt();
+      var next = newestSorted.content().get(i + 1).createdAt();
+      if (current != null && next != null) {
+        assertThat(current).isAfterOrEqualTo(next);
+      }
+    }
   }
 }

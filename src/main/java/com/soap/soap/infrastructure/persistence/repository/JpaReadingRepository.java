@@ -128,6 +128,17 @@ public interface JpaReadingRepository extends JpaRepository<ReadingEntity, UUID>
       """)
   List<ReadingEntity> findAllPlatformReadings();
 
+  @Query(
+      """
+      select r from ReadingEntity r
+      where r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+        and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
+        and (:language is null or r.language = :language)
+      order by r.createdAt desc, r.id
+      """)
+  Page<ReadingEntity> findRecentPlatformReadings(
+      @Param("language") String language, Pageable pageable);
+
   interface ReadingSummaryView {
     UUID getId();
 

@@ -68,12 +68,19 @@ public class BrowsePlatformReadingsSoapMapper extends SoapMapperSupport {
       }
     }
 
+    com.soap.soap.domain.model.PlatformReadingSort sort =
+        com.soap.soap.domain.model.PlatformReadingSort.DEFAULT;
+    if (request.getSort() != null) {
+      sort = com.soap.soap.domain.model.PlatformReadingSort.valueOf(request.getSort().value());
+    }
+
     return new BrowsePlatformReadingsQuery(
         collectionKey,
         category,
         level,
         countryCode,
         discoveryTopic,
+        sort,
         new PageRequest(request.getPage(), request.getSize()));
   }
 

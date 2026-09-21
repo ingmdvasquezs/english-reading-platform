@@ -156,4 +156,42 @@ class BrowsePlatformReadingsEndpointTest {
               assertThat(item.getShortDescription()).isEqualTo("A legendary river creature.");
             });
   }
+
+  @Test
+  void mapsRequestWithSortCreatedAtDescCorrectly() {
+    var request = new BrowsePlatformReadingsRequest();
+    request.setSort(
+        com.soap.soap.infrastructure.soap.generated.PlatformReadingSortType.CREATED_AT_DESC);
+    request.setPage(0);
+    request.setSize(10);
+
+    when(port.browsePlatformReadings(any())).thenReturn(new PageResult<>(List.of(), 0, 10, 0));
+
+    endpoint.browsePlatformReadings(request);
+
+    var captor = ArgumentCaptor.forClass(BrowsePlatformReadingsQuery.class);
+    verify(port).browsePlatformReadings(captor.capture());
+
+    var query = captor.getValue();
+    assertThat(query.sort())
+        .isEqualTo(com.soap.soap.domain.model.PlatformReadingSort.CREATED_AT_DESC);
+  }
+
+  @Test
+  void mapsRequestWithSortDefaultCorrectly() {
+    var request = new BrowsePlatformReadingsRequest();
+    request.setSort(com.soap.soap.infrastructure.soap.generated.PlatformReadingSortType.DEFAULT);
+    request.setPage(0);
+    request.setSize(10);
+
+    when(port.browsePlatformReadings(any())).thenReturn(new PageResult<>(List.of(), 0, 10, 0));
+
+    endpoint.browsePlatformReadings(request);
+
+    var captor = ArgumentCaptor.forClass(BrowsePlatformReadingsQuery.class);
+    verify(port).browsePlatformReadings(captor.capture());
+
+    var query = captor.getValue();
+    assertThat(query.sort()).isEqualTo(com.soap.soap.domain.model.PlatformReadingSort.DEFAULT);
+  }
 }

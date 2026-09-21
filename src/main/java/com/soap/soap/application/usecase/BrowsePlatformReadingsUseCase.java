@@ -79,6 +79,9 @@ public class BrowsePlatformReadingsUseCase implements BrowsePlatformReadingsPort
             query.editorialLevel(),
             query.countryCode(),
             query.discoveryTopic(),
+            query.sort() != null
+                ? query.sort()
+                : com.soap.soap.domain.model.PlatformReadingSort.DEFAULT,
             learningLanguage,
             query.pageRequest());
 

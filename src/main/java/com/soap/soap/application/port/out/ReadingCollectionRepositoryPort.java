@@ -20,6 +20,9 @@ public interface ReadingCollectionRepositoryPort {
 
   Optional<ReadingCollection> findByKey(String key);
 
+  java.util.Map<java.util.UUID, List<Reading>> findTopReadingsByCollectionIds(
+      List<java.util.UUID> collectionIds, String language, int limitPerCollection);
+
   ReadingCollection save(ReadingCollection collection);
 
   void replaceMemberships(

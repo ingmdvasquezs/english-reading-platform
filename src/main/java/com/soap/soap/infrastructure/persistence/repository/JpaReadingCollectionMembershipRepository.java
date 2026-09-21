@@ -66,6 +66,21 @@ public interface JpaReadingCollectionMembershipRepository
   Page<ReadingEntity> findReadingsByCollectionKeyAndLanguage(
       @Param("key") String key, @Param("language") String language, Pageable pageable);
 
+  @Query(
+      """
+      select m.id.collectionId, r
+      from ReadingCollectionMembershipEntity m
+      join ReadingEntity r on r.id = m.id.readingId
+      where m.id.collectionId in :collectionIds
+        and r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM
+        and r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED
+        and (:language is null or r.language = :language)
+      order by m.id.collectionId, m.displayOrder, r.id
+      """)
+  java.util.List<Object[]> findMembershipsByCollectionIds(
+      @Param("collectionIds") java.util.List<java.util.UUID> collectionIds,
+      @Param("language") String language);
+
   @org.springframework.data.jpa.repository.Modifying
   @Query("delete from ReadingCollectionMembershipEntity m where m.id.collectionId = :collectionId")
   void deleteByCollectionId(@Param("collectionId") java.util.UUID collectionId);

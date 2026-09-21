@@ -26,6 +26,7 @@ import com.soap.soap.domain.model.DiscoveryTopic;
 import com.soap.soap.domain.model.EditorialCategory;
 import com.soap.soap.domain.model.EditorialLevel;
 import com.soap.soap.domain.model.EditorialStatus;
+import com.soap.soap.domain.model.PlatformReadingSort;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingCollection;
 import com.soap.soap.domain.model.ReadingOrigin;
@@ -193,7 +194,14 @@ class BrowsePlatformReadingsUseCaseTest {
             UUID.randomUUID(), "Candileja", EditorialLevel.B2, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            null, null, null, null, null, "en", new PageRequest(0, 10)))
+            null,
+            null,
+            null,
+            null,
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading1, reading2), 0, 10, 2));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading1.id(), reading2.id())))
@@ -236,7 +244,14 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            null, "Culture, Arts & Fiction", null, null, null, "en", new PageRequest(0, 10)))
+            null,
+            "Culture, Arts & Fiction",
+            null,
+            null,
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
@@ -258,7 +273,14 @@ class BrowsePlatformReadingsUseCaseTest {
     assertThat(result.content()).containsExactly(rec);
     verify(readings)
         .browsePlatformReadings(
-            null, "Culture, Arts & Fiction", null, null, null, "en", new PageRequest(0, 10));
+            null,
+            "Culture, Arts & Fiction",
+            null,
+            null,
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10));
   }
 
   @Test
@@ -268,7 +290,14 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            null, null, EditorialLevel.B1, null, null, "en", new PageRequest(0, 10)))
+            null,
+            null,
+            EditorialLevel.B1,
+            null,
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
@@ -285,7 +314,14 @@ class BrowsePlatformReadingsUseCaseTest {
     assertThat(result.content()).containsExactly(rec);
     verify(readings)
         .browsePlatformReadings(
-            null, null, EditorialLevel.B1, null, null, "en", new PageRequest(0, 10));
+            null,
+            null,
+            EditorialLevel.B1,
+            null,
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10));
   }
 
   @Test
@@ -295,7 +331,14 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            null, null, null, "CO", null, "en", new PageRequest(0, 10)))
+            null,
+            null,
+            null,
+            "CO",
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
@@ -310,7 +353,15 @@ class BrowsePlatformReadingsUseCaseTest {
 
     assertThat(result.content()).containsExactly(rec);
     verify(readings)
-        .browsePlatformReadings(null, null, null, "CO", null, "en", new PageRequest(0, 10));
+        .browsePlatformReadings(
+            null,
+            null,
+            null,
+            "CO",
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10));
   }
 
   @Test
@@ -320,7 +371,14 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            null, null, null, null, DiscoveryTopic.MYTHS_AND_LEGENDS, "en", new PageRequest(0, 10)))
+            null,
+            null,
+            null,
+            null,
+            DiscoveryTopic.MYTHS_AND_LEGENDS,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
@@ -337,7 +395,14 @@ class BrowsePlatformReadingsUseCaseTest {
     assertThat(result.content()).containsExactly(rec);
     verify(readings)
         .browsePlatformReadings(
-            null, null, null, null, DiscoveryTopic.MYTHS_AND_LEGENDS, "en", new PageRequest(0, 10));
+            null,
+            null,
+            null,
+            null,
+            DiscoveryTopic.MYTHS_AND_LEGENDS,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10));
   }
 
   @Test
@@ -347,7 +412,14 @@ class BrowsePlatformReadingsUseCaseTest {
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
 
     when(readings.browsePlatformReadings(
-            null, null, null, "CO", DiscoveryTopic.MYTHS_AND_LEGENDS, "en", new PageRequest(0, 10)))
+            null,
+            null,
+            null,
+            "CO",
+            DiscoveryTopic.MYTHS_AND_LEGENDS,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
 
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
@@ -364,7 +436,14 @@ class BrowsePlatformReadingsUseCaseTest {
     assertThat(result.content()).containsExactly(rec);
     verify(readings)
         .browsePlatformReadings(
-            null, null, null, "CO", DiscoveryTopic.MYTHS_AND_LEGENDS, "en", new PageRequest(0, 10));
+            null,
+            null,
+            null,
+            "CO",
+            DiscoveryTopic.MYTHS_AND_LEGENDS,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10));
   }
 
   @Test
@@ -379,6 +458,7 @@ class BrowsePlatformReadingsUseCaseTest {
             EditorialLevel.B1,
             null,
             null,
+            PlatformReadingSort.DEFAULT,
             "en",
             new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
@@ -407,6 +487,7 @@ class BrowsePlatformReadingsUseCaseTest {
             EditorialLevel.B1,
             null,
             null,
+            PlatformReadingSort.DEFAULT,
             "en",
             new PageRequest(0, 10));
   }
@@ -435,6 +516,7 @@ class BrowsePlatformReadingsUseCaseTest {
             EditorialLevel.B1,
             null,
             null,
+            PlatformReadingSort.DEFAULT,
             "en",
             new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
@@ -463,6 +545,7 @@ class BrowsePlatformReadingsUseCaseTest {
             EditorialLevel.B1,
             null,
             null,
+            PlatformReadingSort.DEFAULT,
             "en",
             new PageRequest(0, 10));
   }
@@ -471,7 +554,14 @@ class BrowsePlatformReadingsUseCaseTest {
   void returnsEmptyPageImmediatelyWhenNoReadingsMatch() {
     mockUser("en");
     when(readings.browsePlatformReadings(
-            null, null, EditorialLevel.A1, null, null, "en", new PageRequest(0, 10)))
+            null,
+            null,
+            EditorialLevel.A1,
+            null,
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10)))
         .thenReturn(new PageResult<>(List.of(), 0, 10, 0));
 
     var result =
@@ -491,7 +581,8 @@ class BrowsePlatformReadingsUseCaseTest {
     // Test size 5
     var reading5 =
         platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
-    when(readings.browsePlatformReadings(null, null, null, null, null, "en", new PageRequest(0, 5)))
+    when(readings.browsePlatformReadings(
+            null, null, null, null, null, PlatformReadingSort.DEFAULT, "en", new PageRequest(0, 5)))
         .thenReturn(new PageResult<>(List.of(reading5), 0, 5, 15));
     when(progress.findByUserIdAndReadingIds(userId, Set.of(reading5.id()))).thenReturn(Map.of());
     when(personalizer.personalizeReadings(eq(userId), eq("en"), eq(List.of(reading5)), any()))
@@ -504,8 +595,88 @@ class BrowsePlatformReadingsUseCaseTest {
 
     // Exactly 1 call to readings, 1 to progress, 1 to personalizer
     verify(readings)
-        .browsePlatformReadings(null, null, null, null, null, "en", new PageRequest(0, 5));
+        .browsePlatformReadings(
+            null, null, null, null, null, PlatformReadingSort.DEFAULT, "en", new PageRequest(0, 5));
     verify(progress).findByUserIdAndReadingIds(userId, Set.of(reading5.id()));
     verify(personalizer).personalizeReadings(eq(userId), eq("en"), eq(List.of(reading5)), any());
+  }
+
+  @Test
+  void passesExplicitSortCreatedAtDescToRepository() {
+    mockUser("en");
+    var reading =
+        platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
+    when(readings.browsePlatformReadings(
+            null,
+            null,
+            null,
+            null,
+            null,
+            PlatformReadingSort.CREATED_AT_DESC,
+            "en",
+            new PageRequest(0, 10)))
+        .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
+    when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
+    when(personalizer.personalizeReadings(eq(userId), eq("en"), eq(List.of(reading)), any()))
+        .thenReturn(List.of(recommendedReading(reading, new BigDecimal("90.00"))));
+
+    var result =
+        useCase.browsePlatformReadings(
+            new BrowsePlatformReadingsQuery(
+                null,
+                null,
+                null,
+                null,
+                null,
+                PlatformReadingSort.CREATED_AT_DESC,
+                new PageRequest(0, 10)));
+
+    assertThat(result.content()).hasSize(1);
+    verify(readings)
+        .browsePlatformReadings(
+            null,
+            null,
+            null,
+            null,
+            null,
+            PlatformReadingSort.CREATED_AT_DESC,
+            "en",
+            new PageRequest(0, 10));
+  }
+
+  @Test
+  void defaultsSortToDefaultWhenSortIsNullInQuery() {
+    mockUser("en");
+    var reading =
+        platformReading(UUID.randomUUID(), "Mohan", EditorialLevel.B1, "Culture, Arts & Fiction");
+    when(readings.browsePlatformReadings(
+            null,
+            null,
+            null,
+            null,
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10)))
+        .thenReturn(new PageResult<>(List.of(reading), 0, 10, 1));
+    when(progress.findByUserIdAndReadingIds(userId, Set.of(reading.id()))).thenReturn(Map.of());
+    when(personalizer.personalizeReadings(eq(userId), eq("en"), eq(List.of(reading)), any()))
+        .thenReturn(List.of(recommendedReading(reading, new BigDecimal("90.00"))));
+
+    var query =
+        new BrowsePlatformReadingsQuery(null, null, null, null, null, null, new PageRequest(0, 10));
+    var result = useCase.browsePlatformReadings(query);
+
+    assertThat(result.content()).hasSize(1);
+    verify(readings)
+        .browsePlatformReadings(
+            null,
+            null,
+            null,
+            null,
+            null,
+            PlatformReadingSort.DEFAULT,
+            "en",
+            new PageRequest(0, 10));
   }
 }

@@ -6,6 +6,7 @@ import com.soap.soap.application.model.PlatformReadingSummary;
 import com.soap.soap.application.model.ReadingSummary;
 import com.soap.soap.domain.model.DiscoveryTopic;
 import com.soap.soap.domain.model.EditorialLevel;
+import com.soap.soap.domain.model.PlatformReadingSort;
 import com.soap.soap.domain.model.Reading;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,33 @@ public interface ReadingRepositoryPort {
       String language,
       PageRequest pageRequest) {
     return browsePlatformReadings(
-        collectionKey, category, editorialLevel, null, null, language, pageRequest);
+        collectionKey,
+        category,
+        editorialLevel,
+        null,
+        null,
+        PlatformReadingSort.DEFAULT,
+        language,
+        pageRequest);
+  }
+
+  default PageResult<Reading> browsePlatformReadings(
+      String collectionKey,
+      String category,
+      EditorialLevel editorialLevel,
+      String countryCode,
+      DiscoveryTopic discoveryTopic,
+      String language,
+      PageRequest pageRequest) {
+    return browsePlatformReadings(
+        collectionKey,
+        category,
+        editorialLevel,
+        countryCode,
+        discoveryTopic,
+        PlatformReadingSort.DEFAULT,
+        language,
+        pageRequest);
   }
 
   PageResult<Reading> browsePlatformReadings(
@@ -45,6 +72,7 @@ public interface ReadingRepositoryPort {
       EditorialLevel editorialLevel,
       String countryCode,
       DiscoveryTopic discoveryTopic,
+      PlatformReadingSort sort,
       String language,
       PageRequest pageRequest);
 
@@ -55,6 +83,8 @@ public interface ReadingRepositoryPort {
 
   Optional<Reading> findPlatformReadingByAdaptationKey(
       String adaptationGroupKey, String language, EditorialLevel editorialLevel);
+
+  List<Reading> findRecentPlatformReadings(String language, int page, int size);
 
   Reading save(Reading reading);
 

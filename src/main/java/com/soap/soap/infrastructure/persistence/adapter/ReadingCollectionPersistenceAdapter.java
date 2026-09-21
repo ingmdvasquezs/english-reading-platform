@@ -94,6 +94,30 @@ public class ReadingCollectionPersistenceAdapter implements ReadingCollectionRep
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public java.util.Map<java.util.UUID, List<Reading>> findTopReadingsByCollectionIds(
+      List<java.util.UUID> collectionIds, String language, int limitPerCollection) {
+    if (collectionIds == null || collectionIds.isEmpty() || limitPerCollection <= 0) {
+      return java.util.Map.of();
+    }
+    List<Object[]> rows = memberships.findMembershipsByCollectionIds(collectionIds, language);
+    java.util.Map<java.util.UUID, List<Reading>> result = new java.util.LinkedHashMap<>();
+    for (java.util.UUID id : collectionIds) {
+      result.put(id, new java.util.ArrayList<>());
+    }
+    for (Object[] row : rows) {
+      java.util.UUID collectionId = (java.util.UUID) row[0];
+      com.soap.soap.infrastructure.persistence.entity.ReadingEntity readingEntity =
+          (com.soap.soap.infrastructure.persistence.entity.ReadingEntity) row[1];
+      List<Reading> list = result.get(collectionId);
+      if (list != null && list.size() < limitPerCollection) {
+        list.add(readingMapper.toDomain(readingEntity));
+      }
+    }
+    return result;
+  }
+
+  @Override
   @Transactional
   public ReadingCollection save(ReadingCollection collection) {
     var entity = mapper.toEntity(collection);
