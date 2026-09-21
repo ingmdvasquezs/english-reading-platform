@@ -1,14 +1,14 @@
 package com.soap.soap.application.port.in;
 
+import com.soap.soap.application.model.VocabularyReviewRecordResult;
 import com.soap.soap.domain.model.ReviewAssessment;
 import com.soap.soap.domain.model.ReviewRating;
-import com.soap.soap.domain.model.UserVocabulary;
 import java.util.UUID;
 
 public interface RecordVocabularyReviewPort {
-  UserVocabulary recordReview(UUID wordId, ReviewRating rating);
+  VocabularyReviewRecordResult recordReview(UUID wordId, ReviewRating rating);
 
-  default UserVocabulary recordReview(UUID wordId, ReviewAssessment assessment) {
+  default VocabularyReviewRecordResult recordReview(UUID wordId, ReviewAssessment assessment) {
     if (assessment == null) {
       return recordReview(wordId, (ReviewRating) null);
     }

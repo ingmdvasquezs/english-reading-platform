@@ -62,8 +62,9 @@ class DiscoveryHomeIntegrationTest {
     assertThat(result.latinAmerica().defaultCountryCode()).isEqualTo("CO");
     assertThat(result.latinAmerica().defaultTopicKey()).isEqualTo("MYTHS_AND_LEGENDS");
 
-    // Real DB countries: exactly CO (15 readings, 1 topic, 2 hero images)
-    assertThat(result.latinAmerica().countries()).hasSize(1);
+    // Real DB countries: CO (15 readings, 1 topic, 2 hero images) and MX (5 readings, 5 topics, 2
+    // hero images)
+    assertThat(result.latinAmerica().countries()).hasSize(2);
     var co = result.latinAmerica().countries().get(0);
     assertThat(co.countryCode()).isEqualTo("CO");
     assertThat(co.readingCount()).isEqualTo(15);
@@ -71,26 +72,32 @@ class DiscoveryHomeIntegrationTest {
     assertThat(co.topics().get(0).key()).isEqualTo("MYTHS_AND_LEGENDS");
     assertThat(co.heroImages()).hasSize(2);
 
-    // Default country preview: exactly 8 readings
+    var mx = result.latinAmerica().countries().get(1);
+    assertThat(mx.countryCode()).isEqualTo("MX");
+    assertThat(mx.readingCount()).isEqualTo(5);
+    assertThat(mx.topics()).hasSize(5);
+    assertThat(mx.heroImages()).hasSize(2);
+
+    // Default country preview: exactly 8 readings from Colombia
     assertThat(result.latinAmerica().readings()).hasSize(8);
+    assertThat(result.latinAmerica().readings()).allMatch(r -> "CO".equals(r.countryCode()));
 
     // 3. Dynamic "Nuevas lecturas":
-    // All 15 readings in the real DB are Colombian myths (CO + MYTHS_AND_LEGENDS),
-    // so the remaining 7 readings are semantically redundant with the dominant scope.
-    // Therefore, New shelf is omitted!
+    // All 20 published platform readings currently belong to regional Latin America countries (15
+    // CO, 5 MX).
+    // Per product business rules, content associated with any country in the specialized regional
+    // block
+    // must NOT appear in general Home shelves. Therefore, the dynamic "new" shelf is omitted.
     var newShelf = result.shelves().stream().filter(s -> "new".equals(s.key())).findFirst();
     assertThat(newShelf).isEmpty();
 
     // 4. Generic editorial shelves:
     // colombian-myths-legends is suppressed from generic Home shelves because it is owned by Latin
     // America.
-    // Since there are no other collections in the real DB, generic shelves are empty.
     var colShelf =
         result.shelves().stream()
             .filter(s -> "colombian-myths-legends".equals(s.key()))
             .findFirst();
     assertThat(colShelf).isEmpty();
-
-    assertThat(result.shelves()).isEmpty();
   }
 }

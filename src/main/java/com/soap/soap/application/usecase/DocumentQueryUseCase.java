@@ -14,6 +14,7 @@ import com.soap.soap.application.port.out.ImportedDocumentRepositoryPort;
 import com.soap.soap.application.service.ReaderContentPreparer;
 import com.soap.soap.domain.model.DocumentImportStatus;
 import com.soap.soap.domain.model.ImportedDocument;
+import com.soap.soap.domain.service.DocumentSectionTitleSanitizer;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -61,7 +62,7 @@ public class DocumentQueryUseCase {
                     new DocumentStructureView.Section(
                         section.id(),
                         section.ordinal(),
-                        editorialSectionTitle(section.title()),
+                        DocumentSectionTitleSanitizer.sanitize(section.title()),
                         section.firstUnitId(),
                         section.unitCount()))
             .toList(),
@@ -108,7 +109,7 @@ public class DocumentQueryUseCase {
     return new DocumentUnitReaderData(
         documentId,
         section.id(),
-        section.title(),
+        DocumentSectionTitleSanitizer.sanitize(section.title()),
         section.ordinal(),
         sections.size(),
         unit.id(),
@@ -133,16 +134,6 @@ public class DocumentQueryUseCase {
   void requireReady(ImportedDocument document) {
     if (document.importStatus() != DocumentImportStatus.READY)
       throw new DocumentNotReadyException();
-  }
-
-  private String editorialSectionTitle(String title) {
-    if (title == null || title.isBlank()) return null;
-    var normalized = title.strip();
-    var technical = normalized.toLowerCase(java.util.Locale.ROOT);
-    if (technical.matches("id-idp\\d+")
-        || technical.equals("htmltoc")
-        || technical.matches("page:\\d+")) return null;
-    return normalized;
   }
 
   private DocumentView view(ImportedDocument document, UUID userId) {

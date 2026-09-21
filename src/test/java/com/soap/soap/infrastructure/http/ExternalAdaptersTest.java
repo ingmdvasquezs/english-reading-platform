@@ -266,6 +266,55 @@ class ExternalAdaptersTest {
     assertAzureStatus(HttpStatus.SERVICE_UNAVAILABLE, true);
   }
 
+  @Test
+  void azureDictionaryLookupParsesCandidatesAndCachesResponse() {
+    var b = RestClient.builder().baseUrl("https://translate.test");
+    var s = MockRestServiceServer.bindTo(b).build();
+    var json =
+        """
+        [
+          {
+            "normalizedSource": "merry",
+            "displaySource": "merry",
+            "translations": [
+              {
+                "normalizedTarget": "feliz",
+                "displayTarget": "feliz",
+                "posTag": "ADJ",
+                "confidence": 0.6123,
+                "prefixWord": "",
+                "backTranslations": [
+                  {
+                    "normalizedText": "happy",
+                    "displayText": "happy",
+                    "numExamples": 15,
+                    "frequencyCount": 42
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+        """;
+    s.expect(once(), requestTo(azureDictionaryUrl()))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+    var adapter = azure(b);
+    var results1 = adapter.lookupLexical("merry", "en", "es");
+    assertThat(results1).hasSize(1);
+    var candidate = results1.getFirst();
+    assertThat(candidate.target()).isEqualTo("feliz");
+    assertThat(candidate.posTag()).isEqualTo("ADJ");
+    assertThat(candidate.confidence()).isEqualTo(0.6123);
+    assertThat(candidate.backTranslations()).containsExactly("happy");
+
+    // Second call should hit cache without additional HTTP request
+    var results2 = adapter.lookupLexical("merry", "en", "es");
+    assertThat(results2).hasSize(1);
+    s.verify();
+  }
+
   private void assertAzureStatus(HttpStatus status, boolean retry) {
     var b = RestClient.builder().baseUrl("https://translate.test");
     var s = MockRestServiceServer.bindTo(b).build();
@@ -330,6 +379,10 @@ class ExternalAdaptersTest {
 
   private String azureUrl() {
     return "https://translate.test/translate?api-version=3.0&from=en&to=es";
+  }
+
+  private String azureDictionaryUrl() {
+    return "https://translate.test/dictionary/lookup?api-version=3.0&from=en&to=es";
   }
 
   private record Context(MerriamWebsterDictionaryAdapter adapter, MockRestServiceServer server) {}

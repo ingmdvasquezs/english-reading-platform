@@ -15,19 +15,45 @@ import com.soap.soap.application.port.in.LookupWordPort;
 import com.soap.soap.application.port.out.CurrentUserPort;
 import com.soap.soap.application.port.out.DictionaryPort;
 import com.soap.soap.application.port.out.TranslationPort;
+import com.soap.soap.application.service.LexicalTranslationSelector;
 import com.soap.soap.application.service.TextWordProcessor;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class LookupWordUseCase implements LookupWordPort {
   private final DictionaryPort dictionary;
   private final TranslationPort translation;
   private final TextWordProcessor words;
   private final CurrentUserPort currentUser;
   private final InputLimits limits;
+  private final LexicalTranslationSelector lexicalSelector;
+
+  @Autowired
+  public LookupWordUseCase(
+      DictionaryPort dictionary,
+      TranslationPort translation,
+      TextWordProcessor words,
+      CurrentUserPort currentUser,
+      InputLimits limits,
+      LexicalTranslationSelector lexicalSelector) {
+    this.dictionary = dictionary;
+    this.translation = translation;
+    this.words = words;
+    this.currentUser = currentUser;
+    this.limits = limits;
+    this.lexicalSelector = lexicalSelector;
+  }
+
+  public LookupWordUseCase(
+      DictionaryPort dictionary,
+      TranslationPort translation,
+      TextWordProcessor words,
+      CurrentUserPort currentUser,
+      InputLimits limits) {
+    this(dictionary, translation, words, currentUser, limits, new LexicalTranslationSelector());
+  }
 
   @Override
   public WordLookup lookupWord(String word) {
@@ -103,6 +129,40 @@ public class LookupWordUseCase implements LookupWordPort {
                 && !translations.get(1).isBlank())
             ? translations.get(1)
             : null;
+
+    if (lexicalSelector.isSuspiciousTranslation(normalized, wordTranslation)) {
+      String firstPos = null;
+      var defTokensBuilder = new StringBuilder();
+      if (entry != null && entry.meanings() != null) {
+        for (var meaning : entry.meanings()) {
+          if (firstPos == null
+              && meaning.partOfSpeech() != null
+              && !meaning.partOfSpeech().isBlank()) {
+            firstPos = meaning.partOfSpeech();
+          }
+          if (meaning.definitions() != null) {
+            for (var def : meaning.definitions()) {
+              if (def.definition() != null && !def.definition().isBlank()) {
+                defTokensBuilder.append(def.definition()).append(" ");
+              }
+            }
+          }
+        }
+      }
+      try {
+        var candidates = translation.lookupLexical(normalized, "en", "es");
+        var resolved =
+            lexicalSelector.selectBestCandidate(
+                normalized, firstPos, defTokensBuilder.toString(), exampleTranslation, candidates);
+        if (resolved != null && !resolved.isBlank()) {
+          wordTranslation = resolved;
+        } else {
+          wordTranslation = "";
+        }
+      } catch (Exception exception) {
+        wordTranslation = "";
+      }
+    }
 
     if (entry != null) {
       var meanings = entry.meanings();

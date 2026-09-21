@@ -28,6 +28,8 @@ public interface UserVocabularyRepositoryPort {
 
   Map<UUID, UserVocabulary> findByUserIdAndWordIds(UUID userId, Collection<UUID> wordIds);
 
+  Map<UUID, UserVocabulary> findByIds(Collection<UUID> ids);
+
   UserVocabulary save(UserVocabulary vocabulary);
 
   Collection<UserVocabulary> saveAll(Collection<UserVocabulary> vocabulary);
@@ -35,9 +37,14 @@ public interface UserVocabularyRepositoryPort {
   java.util.List<UserVocabulary> findReviewCandidates(
       UUID userId, java.time.LocalDateTime now, int limit);
 
+  java.util.List<UserVocabulary> findLearnAheadCandidates(
+      UUID userId, java.time.LocalDateTime now, java.time.LocalDateTime maxLearnAhead, int limit);
+
   long countDueWords(UUID userId, java.time.LocalDateTime now);
 
   long countTotalReviewableWords(UUID userId, java.time.LocalDateTime now);
+
+  long countPendingLearningWords(UUID userId);
 
   long countClassifiedWordsByUserAndLanguage(UUID userId, String language);
 }

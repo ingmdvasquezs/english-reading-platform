@@ -141,8 +141,8 @@ public class FsrsScheduler {
               round4(initD),
               reps,
               lapses,
-              nowUtc.plusSeconds(43200L),
-              43200L);
+              nowUtc.plusSeconds(900L),
+              900L);
       case GOOD -> {
         int days = Math.max(1, (int) Math.round(initS));
         yield new SrsCalculationResult(
@@ -198,8 +198,8 @@ public class FsrsScheduler {
             round4(nextD),
             reps,
             lapses,
-            nowUtc.plusSeconds(43200L),
-            43200L);
+            nowUtc.plusSeconds(900L),
+            900L);
       }
       case GOOD -> {
         double s = initStability(ReviewRating.GOOD);
@@ -269,9 +269,9 @@ public class FsrsScheduler {
   // When a REVIEW card lapses (AGAIN), canonical FSRS-4.5 already computed a
   // penalised post-lapse stability (S_lapse).  During the relearning cycle we
   // PRESERVE that stability unchanged — we must not apply ad-hoc multipliers on
-  // top of it.  The only thing we control here is the product scheduling policy:
-  //   AGAIN → +10 min  (still struggling)
-  //   HARD  → +12 h    (half-day step)
+  // top of it.  The product scheduling policy matches Anki single-step behavior:
+  //   AGAIN → +10 min  (1x learning step)
+  //   HARD  → +15 min  (1.5x learning step)
   //   GOOD  → +1 day   (graduated, first short interval)
   //   EASY  → +2 days  (graduated, slightly longer interval)
   // At the next real REVIEW the full FSRS recall-stability formula will be
@@ -297,7 +297,7 @@ public class FsrsScheduler {
               lapses,
               nowUtc.plusSeconds(600L), // +10 min
               600L);
-      // Still in relearning — longer step, preserve post-lapse stability
+      // Still in relearning — 15m step (1.5x of 10m step), preserve post-lapse stability
       case HARD ->
           new SrsCalculationResult(
               SrsState.RELEARNING,
@@ -306,8 +306,8 @@ public class FsrsScheduler {
               round4(nextD),
               reps,
               lapses,
-              nowUtc.plusSeconds(43200L), // +12 h
-              43200L);
+              nowUtc.plusSeconds(900L), // +15 min
+              900L);
       // Graduate — product policy: +1 day, post-lapse stability preserved
       case GOOD ->
           new SrsCalculationResult(

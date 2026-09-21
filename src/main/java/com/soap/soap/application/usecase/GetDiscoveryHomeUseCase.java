@@ -31,6 +31,7 @@ import com.soap.soap.domain.model.ReadingProgressStatus;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -98,8 +99,31 @@ public class GetDiscoveryHomeUseCase implements GetDiscoveryHomePort {
     String defaultCountryCode = null;
     String defaultTopicKey = null;
     Set<DiscoveryTopic> dominantTopics = Collections.emptySet();
+    final Set<String> activeCountryCodesSet;
+    final Set<UUID> specializedCountryReadingIds;
 
     if (countries != null && !countries.isEmpty()) {
+      List<String> activeCountryCodes =
+          countries.stream()
+              .map(DiscoveryCountrySummary::countryCode)
+              .filter(Objects::nonNull)
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .toList();
+
+      activeCountryCodesSet =
+          activeCountryCodes.stream().map(String::toUpperCase).collect(Collectors.toSet());
+
+      Set<UUID> foundSpecializedIds = Collections.emptySet();
+      if (!activeCountryCodes.isEmpty()) {
+        Set<UUID> queryResult =
+            readingRepository.findPublishedPlatformReadingIdsByCountryCodes(activeCountryCodes);
+        if (queryResult != null) {
+          foundSpecializedIds = queryResult;
+        }
+      }
+      specializedCountryReadingIds = foundSpecializedIds;
+
       DiscoveryCountrySummary defaultCountry = countries.get(0);
       defaultCountryCode = defaultCountry.countryCode();
 
@@ -139,6 +163,9 @@ public class GetDiscoveryHomeUseCase implements GetDiscoveryHomePort {
       latamPreviewReadings = latamPage != null ? latamPage.content() : List.of();
       latamPreviewReadingIds =
           latamPreviewReadings.stream().map(Reading::id).collect(Collectors.toSet());
+    } else {
+      activeCountryCodesSet = Collections.emptySet();
+      specializedCountryReadingIds = Collections.emptySet();
     }
 
     // 4. Dynamic "Nuevas lecturas" candidate scan using bounded paginated scan
@@ -152,6 +179,15 @@ public class GetDiscoveryHomeUseCase implements GetDiscoveryHomePort {
         break;
       }
       for (Reading candidate : pageCandidates) {
+        if (specializedCountryReadingIds.contains(candidate.id())) {
+          continue;
+        }
+
+        if (candidate.countryCode() != null
+            && activeCountryCodesSet.contains(candidate.countryCode().trim().toUpperCase())) {
+          continue;
+        }
+
         if (latamPreviewReadingIds.contains(candidate.id())) {
           continue;
         }
@@ -188,9 +224,24 @@ public class GetDiscoveryHomeUseCase implements GetDiscoveryHomePort {
     Map<UUID, List<Reading>> topReadingsByCollection = Collections.emptyMap();
     if (!genericCollections.isEmpty()) {
       List<UUID> genericIds = genericCollections.stream().map(ReadingCollection::id).toList();
-      topReadingsByCollection =
+      Map<UUID, List<Reading>> rawTopReadings =
           readingCollectionRepository.findTopReadingsByCollectionIds(
               genericIds, learningLanguage, query.maxShelfReadings());
+      if (rawTopReadings != null) {
+        topReadingsByCollection = new HashMap<>();
+        for (Map.Entry<UUID, List<Reading>> entry : rawTopReadings.entrySet()) {
+          List<Reading> filtered =
+              entry.getValue().stream()
+                  .filter(r -> !specializedCountryReadingIds.contains(r.id()))
+                  .filter(
+                      r ->
+                          r.countryCode() == null
+                              || !activeCountryCodesSet.contains(
+                                  r.countryCode().trim().toUpperCase()))
+                  .toList();
+          topReadingsByCollection.put(entry.getKey(), filtered);
+        }
+      }
     }
 
     // 6. Single-pass batch personalization

@@ -110,6 +110,8 @@ app:
   languages:
     enabled-learning: ${LANGUAGES_ENABLED_LEARNING:en}
     enabled-content: ${LANGUAGES_ENABLED_CONTENT:en}
+  srs:
+    timezone: ${APP_SRS_TIMEZONE:America/Bogota}
   correlation-id:
     header: X-Correlation-ID
     maximum-length: 64

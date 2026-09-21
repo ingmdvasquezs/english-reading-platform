@@ -54,6 +54,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -117,6 +118,9 @@ class GetDiscoveryHomeUseCaseTest {
     org.mockito.Mockito.lenient()
         .when(recommendPlatformReadingsPort.recommendPlatformReadings(any()))
         .thenReturn(new PageResult<>(List.of(), 0, 8, 0));
+    org.mockito.Mockito.lenient()
+        .when(readingRepository.findPublishedPlatformReadingIdsByCountryCodes(any()))
+        .thenReturn(Collections.emptySet());
   }
 
   @Test
@@ -701,6 +705,78 @@ class GetDiscoveryHomeUseCaseTest {
             any(), any(), any(), eq("MX"), eq(DiscoveryTopic.REAL_STORIES), any(), any());
     verify(readingRepository, never())
         .browsePlatformReadings(any(), any(), any(), eq("CO"), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "13. Multi-country specialized exclusion: readings from active regional countries (CO, MX) excluded from New and generic shelves")
+  void testMultiCountrySpecializedReadingsExcludedFromNewShelfAndGenericShelves() {
+    var region = new DiscoveryRegionDetails("latin-america", "Latinoamérica", null);
+    var coTopic = new DiscoveryTopicSummary("MYTHS_AND_LEGENDS", "Mitos", 1, 1);
+    var co =
+        new DiscoveryCountrySummary(
+            "CO", "Colombia", "Tag", "Desc", 1, 1, List.of(), List.of(coTopic));
+    var mxTopic = new DiscoveryTopicSummary("REAL_STORIES", "Historias", 2, 1);
+    var mx =
+        new DiscoveryCountrySummary(
+            "MX", "México", "Tag", "Desc", 2, 1, List.of(), List.of(mxTopic));
+
+    when(getDiscoveryRegionOverviewPort.getOverview("latin-america"))
+        .thenReturn(new DiscoveryRegionOverviewResult(region, List.of(co, mx)));
+
+    var coReading =
+        createPlatformReading(UUID.randomUUID(), "Mito CO", "CO", DiscoveryTopic.MYTHS_AND_LEGENDS);
+    var mxReading =
+        createPlatformReading(UUID.randomUUID(), "Historia MX", "MX", DiscoveryTopic.REAL_STORIES);
+    var globalReading = createPlatformReading(UUID.randomUUID(), "Classic Tale", null, null);
+
+    when(readingRepository.findPublishedPlatformReadingIdsByCountryCodes(List.of("CO", "MX")))
+        .thenReturn(Set.of(coReading.id(), mxReading.id()));
+
+    when(readingRepository.browsePlatformReadings(
+            any(), any(), any(), eq("CO"), eq(DiscoveryTopic.MYTHS_AND_LEGENDS), any(), any()))
+        .thenReturn(new PageResult<>(List.of(coReading), 0, 8, 1));
+
+    // Candidate list contains CO, MX, and global
+    when(readingRepository.findRecentPlatformReadings(eq("en"), eq(0), eq(20)))
+        .thenReturn(List.of(coReading, mxReading, globalReading));
+
+    // Generic collection contains MX reading and global reading
+    var genericCol =
+        new ReadingCollection(
+            UUID.randomUUID(), "world-stories", "World Stories", "Desc", 1, true, null);
+    when(readingCollectionRepository.findAllActive()).thenReturn(List.of(genericCol));
+    when(readingCollectionRepository.findTopReadingsByCollectionIds(
+            eq(List.of(genericCol.id())), eq("en"), eq(8)))
+        .thenReturn(Map.of(genericCol.id(), List.of(mxReading, globalReading)));
+
+    when(personalizationService.personalizeReadings(any(), any(), anyList(), any()))
+        .thenAnswer(
+            inv -> ((List<Reading>) inv.getArgument(2)).stream().map(this::toRecommended).toList());
+    when(readingProgressRepository.findByUserIdAndReadingIds(any(), anySet()))
+        .thenReturn(Collections.emptyMap());
+
+    DiscoveryHomeResult result = useCase.getDiscoveryHome(new GetDiscoveryHomeQuery(10, 8, 8));
+
+    // Latin America block preview contains CO reading
+    assertThat(result.latinAmerica().readings())
+        .extracting(RecommendedPlatformReading::title)
+        .containsExactly("Mito CO");
+
+    // Dynamic New shelf contains ONLY globalReading; CO and MX readings are excluded
+    var newShelf = result.shelves().stream().filter(s -> "new".equals(s.key())).findFirst();
+    assertThat(newShelf).isPresent();
+    assertThat(newShelf.get().readings())
+        .extracting(RecommendedPlatformReading::title)
+        .containsExactly("Classic Tale");
+
+    // Generic shelf contains ONLY globalReading; MX reading is excluded
+    var genericShelf =
+        result.shelves().stream().filter(s -> "world-stories".equals(s.key())).findFirst();
+    assertThat(genericShelf).isPresent();
+    assertThat(genericShelf.get().readings())
+        .extracting(RecommendedPlatformReading::title)
+        .containsExactly("Classic Tale");
   }
 
   private Reading createPlatformReading(

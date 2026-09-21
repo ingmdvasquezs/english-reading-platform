@@ -1,6 +1,8 @@
 package com.soap.soap.infrastructure.soap.mapper;
 
+import com.soap.soap.application.model.VocabularyReviewItem;
 import com.soap.soap.application.model.VocabularyReviewPreparation;
+import com.soap.soap.application.model.VocabularyReviewRecordResult;
 import com.soap.soap.domain.model.ReviewAssessment;
 import com.soap.soap.domain.model.ReviewRating;
 import com.soap.soap.domain.model.UserVocabulary;
@@ -18,6 +20,7 @@ import com.soap.soap.infrastructure.soap.generated.VocabularyStatusType;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
@@ -35,27 +38,43 @@ public class VocabularyReviewSoapMapper extends VocabularySoapMapperSupport {
     var response = new PrepareVocabularyReviewResponse();
     response.setDueCount(preparation.dueCount());
     response.setTotalReviewableCount(preparation.totalReviewableCount());
+    response.setDailyLimit(preparation.dailyLimit());
+    response.setDailyBaseCompleted(preparation.dailyBaseCompleted());
+    response.setDailyBaseRemaining(preparation.dailyBaseRemaining());
+    response.setPendingLearningCount(preparation.pendingLearningCount());
+    response.setDailyComplete(preparation.dailyComplete());
     for (var item : preparation.entries()) {
-      var soapItem = new ReviewItemType();
-      soapItem.setWordId(item.wordId().toString());
-      soapItem.setWord(item.word());
-      soapItem.setLanguage(item.language());
-      soapItem.setStatus(VocabularyStatusType.fromValue(item.status().name()));
-      if (item.srsState() != null) {
-        soapItem.setSrsState(SrsStateType.fromValue(item.srsState().name()));
+      response.getEntries().add(toSoapReviewItem(item));
+    }
+    if (preparation.learnAheadEntries() != null) {
+      for (var item : preparation.learnAheadEntries()) {
+        response.getLearnAheadEntries().add(toSoapReviewItem(item));
       }
-      if (item.ratingOptions() != null) {
-        for (var opt : item.ratingOptions()) {
-          var soapOpt = new RatingOptionType();
-          soapOpt.setRating(ReviewRatingType.fromValue(opt.rating().name()));
-          soapOpt.setNextReviewAt(toXmlDate(opt.nextReviewAt()));
-          soapOpt.setIntervalSeconds(opt.intervalSeconds());
-          soapItem.getRatingOptions().add(soapOpt);
-        }
-      }
-      response.getEntries().add(soapItem);
     }
     return response;
+  }
+
+  private ReviewItemType toSoapReviewItem(VocabularyReviewItem item) {
+    var soapItem = new ReviewItemType();
+    soapItem.setWordId(item.wordId().toString());
+    soapItem.setWord(item.word());
+    soapItem.setLanguage(item.language());
+    soapItem.setStatus(VocabularyStatusType.fromValue(item.status().name()));
+    if (item.srsState() != null) {
+      soapItem.setSrsState(SrsStateType.fromValue(item.srsState().name()));
+    }
+    if (item.ratingOptions() != null) {
+      for (var opt : item.ratingOptions()) {
+        var soapOpt = new RatingOptionType();
+        soapOpt.setRating(ReviewRatingType.fromValue(opt.rating().name()));
+        soapOpt.setNextReviewAt(toUtcXmlDateTime(opt.nextReviewAt()));
+        soapOpt.setIntervalSeconds(opt.intervalSeconds());
+        soapItem.getRatingOptions().add(soapOpt);
+      }
+    }
+    soapItem.setPendingQueueSequence(item.pendingQueueSequence());
+    soapItem.setBaseOrder(item.baseOrder());
+    return soapItem;
   }
 
   public UUID toWordId(RecordVocabularyReviewRequest request) {
@@ -105,8 +124,29 @@ public class VocabularyReviewSoapMapper extends VocabularySoapMapperSupport {
     }
   }
 
-  public RecordVocabularyReviewResponse toResponse(UserVocabulary vocabulary) {
+  public RecordVocabularyReviewResponse toResponse(VocabularyReviewRecordResult result) {
     var response = new RecordVocabularyReviewResponse();
+    var entry = toReviewResultType(result.vocabulary());
+    entry.setPendingQueueSequence(result.pendingQueueSequence());
+    entry.setBaseOrder(result.baseOrder());
+    if (result.ratingOptions() != null) {
+      for (var opt : result.ratingOptions()) {
+        var soapOpt = new RatingOptionType();
+        soapOpt.setRating(ReviewRatingType.fromValue(opt.rating().name()));
+        soapOpt.setNextReviewAt(toUtcXmlDateTime(opt.nextReviewAt()));
+        soapOpt.setIntervalSeconds(opt.intervalSeconds());
+        entry.getRatingOptions().add(soapOpt);
+      }
+    }
+    response.setEntry(entry);
+    return response;
+  }
+
+  public RecordVocabularyReviewResponse toResponse(UserVocabulary vocabulary) {
+    return toResponse(new VocabularyReviewRecordResult(vocabulary, List.of()));
+  }
+
+  private ReviewResultType toReviewResultType(UserVocabulary vocabulary) {
     var entry = new ReviewResultType();
     entry.setWordId(vocabulary.word().id().toString());
     entry.setStatus(VocabularyStatusType.fromValue(vocabulary.status().name()));
@@ -114,7 +154,7 @@ public class VocabularyReviewSoapMapper extends VocabularySoapMapperSupport {
       entry.setSrsState(SrsStateType.fromValue(vocabulary.srsState().name()));
     }
     if (vocabulary.nextReviewAt() != null) {
-      entry.setNextReviewAt(toXmlDate(vocabulary.nextReviewAt()));
+      entry.setNextReviewAt(toUtcXmlDateTime(vocabulary.nextReviewAt()));
     }
     if (vocabulary.lastReviewedAt() != null && vocabulary.nextReviewAt() != null) {
       entry.setIntervalSeconds(
@@ -127,7 +167,6 @@ public class VocabularyReviewSoapMapper extends VocabularySoapMapperSupport {
         BigDecimal.valueOf(vocabulary.stability()).setScale(4, RoundingMode.HALF_UP));
     entry.setDifficulty(
         BigDecimal.valueOf(vocabulary.difficulty()).setScale(4, RoundingMode.HALF_UP));
-    response.setEntry(entry);
-    return response;
+    return entry;
   }
 }

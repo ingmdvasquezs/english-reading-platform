@@ -1706,13 +1706,16 @@ class SoapApplicationTests {
           .andExpect(
               xpath(
                       "/*[local-name()='recordVocabularyReviewResponse']/*[local-name()='entry']/*[local-name()='status']")
-                  .evaluatesTo("KNOWN"));
+                  .evaluatesTo("LEARNING"))
+          .andExpect(
+              xpath(
+                      "/*[local-name()='recordVocabularyReviewResponse']/*[local-name()='entry']/*[local-name()='srsState']")
+                  .evaluatesTo("REVIEW"));
 
-      // 3. Verify in database
+      // 3. Verify in database: status remains LEARNING (decoupled), srsState graduated to REVIEW
       var updated = vocabulary.findByUserIdAndWordId(user.id(), word.id()).orElseThrow();
-      assertThat(updated.status()).isEqualTo(VocabularyStatus.KNOWN);
-      // SRS V2: REMEMBERED → maps to ReviewRating.GOOD via applyRating (not applyReviewAssessment).
-      // reviewStage is NOT mutated in SRS V2 — it remains 0 (pass-through, deprecated V1 field).
+      assertThat(updated.status()).isEqualTo(VocabularyStatus.LEARNING);
+      assertThat(updated.srsState()).isEqualTo(com.soap.soap.domain.model.SrsState.REVIEW);
       assertThat(updated.reviewStage()).isEqualTo(0);
       assertThat(updated.nextReviewAt()).isAfter(nowUtc);
     } finally {

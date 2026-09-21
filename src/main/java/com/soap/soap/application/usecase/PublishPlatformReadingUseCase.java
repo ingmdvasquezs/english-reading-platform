@@ -100,7 +100,8 @@ public class PublishPlatformReadingUseCase implements PublishPlatformReadingPort
             reading.sourceNotes(),
             reading.adaptationGroupKey(),
             reading.coverAttribution(),
-            reading.accessTier());
+            reading.accessTier(),
+            reading.discoveryTopic());
 
     return readings.save(publishedReading);
   }

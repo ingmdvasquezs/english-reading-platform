@@ -10,8 +10,12 @@ import com.soap.soap.domain.model.Reading;
 import com.soap.soap.infrastructure.persistence.mapper.ReadingEntityMapper;
 import com.soap.soap.infrastructure.persistence.repository.JpaReadingRepository;
 import jakarta.persistence.EntityManager;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -366,6 +370,35 @@ public class ReadingPersistenceAdapter implements ReadingRepositoryPort {
       result.computeIfAbsent(country, k -> new java.util.HashMap<>()).put(topic, count);
     }
     return result;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Set<UUID> findPublishedPlatformReadingIdsByCountryCodes(List<String> countryCodes) {
+    if (countryCodes == null || countryCodes.isEmpty()) {
+      return Collections.emptySet();
+    }
+    List<String> normalizedCodes =
+        countryCodes.stream()
+            .filter(Objects::nonNull)
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .map(String::toUpperCase)
+            .toList();
+    if (normalizedCodes.isEmpty()) {
+      return Collections.emptySet();
+    }
+    List<UUID> ids =
+        entityManager
+            .createQuery(
+                "SELECT r.id FROM ReadingEntity r "
+                    + "WHERE r.origin = com.soap.soap.domain.model.ReadingOrigin.PLATFORM "
+                    + "AND r.editorialStatus = com.soap.soap.domain.model.EditorialStatus.PUBLISHED "
+                    + "AND UPPER(r.countryCode) IN (:countryCodes)",
+                UUID.class)
+            .setParameter("countryCodes", normalizedCodes)
+            .getResultList();
+    return new HashSet<>(ids);
   }
 
   @Override

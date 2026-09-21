@@ -49,6 +49,35 @@ public class UserVocabularyReviewHistoryPersistenceAdapter
     historyRepository.saveAndFlush(entity);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public java.util.List<java.util.UUID> findDistinctUserVocabularyIdsReviewedBetween(
+      java.util.UUID userId, java.time.LocalDateTime start, java.time.LocalDateTime end) {
+    return historyRepository.findDistinctUserVocabularyIdsReviewedBetween(userId, start, end);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public long countDistinctReviewedWordsBetween(
+      java.util.UUID userId, java.time.LocalDateTime start, java.time.LocalDateTime end) {
+    return historyRepository.countDistinctReviewedWordsBetween(userId, start, end);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public java.util.List<com.soap.soap.application.model.ReviewedWordDaySummary>
+      findReviewedWordsSummaryBetween(
+          java.util.UUID userId, java.time.LocalDateTime start, java.time.LocalDateTime end) {
+    return historyRepository.findReviewedWordsSummaryBetween(userId, start, end).stream()
+        .map(
+            row ->
+                new com.soap.soap.application.model.ReviewedWordDaySummary(
+                    (java.util.UUID) row[0],
+                    (java.time.LocalDateTime) row[1],
+                    (java.time.LocalDateTime) row[2]))
+        .toList();
+  }
+
   private static BigDecimal toBigDecimal(double value) {
     return BigDecimal.valueOf(value).setScale(4, RoundingMode.HALF_UP);
   }

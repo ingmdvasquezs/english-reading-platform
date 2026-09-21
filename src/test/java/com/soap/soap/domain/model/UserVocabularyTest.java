@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.soap.soap.domain.exception.InvalidVocabularyStateException;
+import com.soap.soap.domain.service.FsrsScheduler;
+import com.soap.soap.domain.service.VocabularyReviewSchedulingPolicy;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -118,7 +120,7 @@ class UserVocabularyTest {
     // reviewStage must NOT be mutated by SRS V2 runtime (no +14d/+30d stage arithmetic)
     assertThat(toKnownNoHistory.reviewStage()).isEqualTo(3); // passed through unchanged
 
-    // Case B: word already has SRS history with stability = 5.0d
+    // Case B: word already has SRS history with stability = 5.0d and srsState = REVIEW
     var withHistory =
         new UserVocabulary(
             UUID.randomUUID(),
@@ -130,8 +132,8 @@ class UserVocabularyTest {
             0L,
             0,
             nowUtc.minusDays(1),
-            nowUtc,
-            SrsState.LEARNING,
+            nowUtc.plusDays(5),
+            SrsState.REVIEW,
             5.0,
             6.5,
             2,
@@ -139,12 +141,11 @@ class UserVocabularyTest {
     var toKnownWithHistory = withHistory.changeStatus(VocabularyStatus.KNOWN, clock);
     assertThat(toKnownWithHistory.status()).isEqualTo(VocabularyStatus.KNOWN);
     assertThat(toKnownWithHistory.srsState()).isEqualTo(SrsState.REVIEW);
-    // stability = 5.0 → round → 5 days (NOT +14d or +30d from Leitner)
+    // Preserves existing nextReviewAt = nowUtc.plusDays(5)
     assertThat(toKnownWithHistory.nextReviewAt()).isEqualTo(nowUtc.plusDays(5));
     assertThat(toKnownWithHistory.stability()).isEqualTo(5.0);
 
-    // Case C: word already KNOWN — learnedAt preserved, stability preserved, nextReview
-    // recalculated
+    // Case C: word already KNOWN — learnedAt preserved, stability preserved, nextReview preserved
     var alreadyKnown =
         new UserVocabulary(
             UUID.randomUUID(),
@@ -156,7 +157,7 @@ class UserVocabularyTest {
             0L,
             4,
             nowUtc.minusDays(30),
-            nowUtc,
+            nowUtc.plusDays(30),
             SrsState.REVIEW,
             30.0,
             4.5,
@@ -164,16 +165,16 @@ class UserVocabularyTest {
             1);
     var toKnownAgain = alreadyKnown.changeStatus(VocabularyStatus.KNOWN, clock);
     assertThat(toKnownAgain.learnedAt()).isEqualTo(firstSeenAt.plusHours(1)); // preserved
-    assertThat(toKnownAgain.nextReviewAt()).isEqualTo(nowUtc.plusDays(30)); // stability=30→+30d
+    assertThat(toKnownAgain.nextReviewAt()).isEqualTo(nowUtc.plusDays(30)); // preserved
     assertThat(toKnownAgain.reviewStage()).isEqualTo(4); // passed through, NOT incremented
 
-    // Case D: manual → LEARNING: reviewStage = 0, SrsState = LEARNING, nextReviewAt = nowUtc
+    // Case D: manual → LEARNING: preserves SRS memory (SrsState=REVIEW, nextReviewAt, stability)
     var toLearning = alreadyKnown.changeStatus(VocabularyStatus.LEARNING, clock);
     assertThat(toLearning.status()).isEqualTo(VocabularyStatus.LEARNING);
-    assertThat(toLearning.srsState()).isEqualTo(SrsState.LEARNING);
-    assertThat(toLearning.reviewStage()).isEqualTo(0);
-    assertThat(toLearning.nextReviewAt()).isEqualTo(nowUtc);
-    assertThat(toLearning.lastReviewedAt()).isNull();
+    assertThat(toLearning.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(toLearning.stability()).isEqualTo(30.0);
+    assertThat(toLearning.nextReviewAt()).isEqualTo(nowUtc.plusDays(30));
+    assertThat(toLearning.lastReviewedAt()).isEqualTo(nowUtc.minusDays(30));
     assertThat(toLearning.learnedAt()).isNull();
 
     // Case E: manual → NEW: reviewStage = 0, no dates
@@ -314,20 +315,273 @@ class UserVocabularyTest {
             0,
             0);
 
-    // GOOD on LEARNING -> graduates to REVIEW/KNOWN, +4 days
+    // GOOD on LEARNING -> graduates to REVIEW, +1 day under FASE 14.3.7 binary policy;
+    // status=LEARNING & learnedAt=null preserved!
     var graduated = learning.applyRating(ReviewRating.GOOD, clock, scheduler);
-    assertThat(graduated.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(graduated.status()).isEqualTo(VocabularyStatus.LEARNING);
     assertThat(graduated.srsState()).isEqualTo(SrsState.REVIEW);
     assertThat(graduated.repetitions()).isEqualTo(1);
-    assertThat(graduated.nextReviewAt()).isEqualTo(nowUtc.plusDays(4));
-    assertThat(graduated.learnedAt()).isEqualTo(nowUtc);
+    assertThat(graduated.nextReviewAt()).isEqualTo(nowUtc.plusDays(1));
+    assertThat(graduated.learnedAt()).isNull();
 
-    // AGAIN on REVIEW -> lapses to RELEARNING/LEARNING, +10 min step, lapses = 1
+    // AGAIN on REVIEW -> lapses to RELEARNING, +10 min step, lapses = 1; status=LEARNING &
+    // learnedAt=null preserved!
     var lapsed = graduated.applyRating(ReviewRating.AGAIN, clock, scheduler);
     assertThat(lapsed.status()).isEqualTo(VocabularyStatus.LEARNING);
     assertThat(lapsed.srsState()).isEqualTo(SrsState.RELEARNING);
     assertThat(lapsed.lapses()).isEqualTo(1);
     assertThat(lapsed.nextReviewAt()).isEqualTo(nowUtc.plusSeconds(600L));
     assertThat(lapsed.learnedAt()).isNull();
+  }
+
+  @Test
+  void testLearningGoodPreservesLearningStatusAndLearnedAt() {
+    var user = new User(UUID.randomUUID(), "User", "user@example.com");
+    var word = new Word(UUID.randomUUID(), "comes", "en");
+    var nowUtc = LocalDateTime.of(2026, 9, 20, 12, 0, 0);
+    var clock = Clock.fixed(nowUtc.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+    var scheduler = new VocabularyReviewSchedulingPolicy(new FsrsScheduler());
+
+    var card =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            nowUtc.minusDays(2),
+            null,
+            600L,
+            1,
+            nowUtc.minusMinutes(10),
+            nowUtc,
+            SrsState.LEARNING,
+            0.4872,
+            7.6214,
+            1,
+            0);
+
+    var reviewed = card.applyRating(ReviewRating.GOOD, clock, scheduler);
+
+    assertThat(reviewed.status()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(reviewed.learnedAt()).isNull();
+    assertThat(reviewed.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(reviewed.nextReviewAt()).isEqualTo(nowUtc.plusDays(1));
+  }
+
+  @Test
+  void testLearningMatureGoodPreservesLearningStatusAndLearnedAtWithDynamicInterval() {
+    var user = new User(UUID.randomUUID(), "User", "user@example.com");
+    var word = new Word(UUID.randomUUID(), "travel", "en");
+    var nowUtc = LocalDateTime.of(2026, 9, 20, 12, 0, 0);
+    var clock = Clock.fixed(nowUtc.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+    var scheduler = new VocabularyReviewSchedulingPolicy(new FsrsScheduler());
+
+    var matureLearningCard =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            nowUtc.minusDays(10),
+            null,
+            86400L * 5,
+            5,
+            nowUtc.minusDays(5),
+            nowUtc,
+            SrsState.REVIEW,
+            10.0,
+            4.0,
+            5,
+            0);
+
+    var reviewed = matureLearningCard.applyRating(ReviewRating.GOOD, clock, scheduler);
+
+    assertThat(reviewed.status()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(reviewed.learnedAt()).isNull();
+    assertThat(reviewed.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(reviewed.nextReviewAt()).isAfter(nowUtc.plusDays(1));
+  }
+
+  @Test
+  void testLearningAgainPreservesLearningStatusAndLearnedAt() {
+    var user = new User(UUID.randomUUID(), "User", "user@example.com");
+    var word = new Word(UUID.randomUUID(), "place", "en");
+    var nowUtc = LocalDateTime.of(2026, 9, 20, 12, 0, 0);
+    var clock = Clock.fixed(nowUtc.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+    var scheduler = new VocabularyReviewSchedulingPolicy(new FsrsScheduler());
+
+    var card =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            nowUtc.minusDays(1),
+            null,
+            0L,
+            0,
+            null,
+            nowUtc,
+            SrsState.LEARNING,
+            0.4872,
+            7.6214,
+            0,
+            0);
+
+    var reviewed = card.applyRating(ReviewRating.AGAIN, clock, scheduler);
+
+    assertThat(reviewed.status()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(reviewed.learnedAt()).isNull();
+    assertThat(reviewed.srsState()).isEqualTo(SrsState.LEARNING);
+    assertThat(reviewed.nextReviewAt()).isEqualTo(nowUtc.plusMinutes(10));
+  }
+
+  @Test
+  void testKnownGoodPreservesKnownStatusAndLearnedAt() {
+    var user = new User(UUID.randomUUID(), "User", "user@example.com");
+    var word = new Word(UUID.randomUUID(), "apple", "en");
+    var nowUtc = LocalDateTime.of(2026, 9, 20, 12, 0, 0);
+    var clock = Clock.fixed(nowUtc.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+    var scheduler = new VocabularyReviewSchedulingPolicy(new FsrsScheduler());
+    var learnedTimestamp = nowUtc.minusDays(15);
+
+    var knownCard =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.KNOWN,
+            nowUtc.minusDays(20),
+            learnedTimestamp,
+            86400L * 4,
+            4,
+            nowUtc.minusDays(4),
+            nowUtc,
+            SrsState.REVIEW,
+            8.0,
+            4.5,
+            4,
+            0);
+
+    var reviewed = knownCard.applyRating(ReviewRating.GOOD, clock, scheduler);
+
+    assertThat(reviewed.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(reviewed.learnedAt()).isEqualTo(learnedTimestamp);
+    assertThat(reviewed.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(reviewed.nextReviewAt()).isAfter(nowUtc.plusDays(1));
+  }
+
+  @Test
+  void testKnownAgainPreservesKnownStatusAndLearnedAt() {
+    var user = new User(UUID.randomUUID(), "User", "user@example.com");
+    var word = new Word(UUID.randomUUID(), "apple", "en");
+    var nowUtc = LocalDateTime.of(2026, 9, 20, 12, 0, 0);
+    var clock = Clock.fixed(nowUtc.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+    var scheduler = new VocabularyReviewSchedulingPolicy(new FsrsScheduler());
+    var learnedTimestamp = nowUtc.minusDays(15);
+
+    var knownCard =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.KNOWN,
+            nowUtc.minusDays(20),
+            learnedTimestamp,
+            86400L * 4,
+            4,
+            nowUtc.minusDays(4),
+            nowUtc,
+            SrsState.REVIEW,
+            8.0,
+            4.5,
+            4,
+            0);
+
+    var reviewed = knownCard.applyRating(ReviewRating.AGAIN, clock, scheduler);
+
+    assertThat(reviewed.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(reviewed.learnedAt()).isEqualTo(learnedTimestamp);
+    assertThat(reviewed.srsState()).isEqualTo(SrsState.RELEARNING);
+    assertThat(reviewed.nextReviewAt()).isEqualTo(nowUtc.plusMinutes(10));
+    assertThat(reviewed.lapses()).isEqualTo(1);
+  }
+
+  @Test
+  void testReaderLearningToKnownPreservesSrsMemory() {
+    var user = new User(UUID.randomUUID(), "User", "user@example.com");
+    var word = new Word(UUID.randomUUID(), "comes", "en");
+    var nowUtc = LocalDateTime.of(2026, 9, 20, 12, 0, 0);
+    var clock = Clock.fixed(nowUtc.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+
+    var learningCard =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            nowUtc.minusDays(5),
+            null,
+            86400L * 2,
+            2,
+            nowUtc.minusDays(1),
+            nowUtc.plusDays(1),
+            SrsState.REVIEW,
+            6.5,
+            4.2,
+            3,
+            1);
+
+    var updated = learningCard.changeStatus(VocabularyStatus.KNOWN, clock);
+
+    assertThat(updated.status()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(updated.learnedAt()).isEqualTo(nowUtc);
+    // All SRS engine parameters are strictly preserved
+    assertThat(updated.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(updated.stability()).isEqualTo(6.5);
+    assertThat(updated.difficulty()).isEqualTo(4.2);
+    assertThat(updated.repetitions()).isEqualTo(3);
+    assertThat(updated.lapses()).isEqualTo(1);
+    assertThat(updated.lastReviewedAt()).isEqualTo(nowUtc.minusDays(1));
+    assertThat(updated.nextReviewAt()).isEqualTo(nowUtc.plusDays(1));
+  }
+
+  @Test
+  void testReaderKnownToLearningPreservesSrsMemory() {
+    var user = new User(UUID.randomUUID(), "User", "user@example.com");
+    var word = new Word(UUID.randomUUID(), "comes", "en");
+    var nowUtc = LocalDateTime.of(2026, 9, 20, 12, 0, 0);
+    var clock = Clock.fixed(nowUtc.toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+
+    var knownCard =
+        new UserVocabulary(
+            UUID.randomUUID(),
+            user,
+            word,
+            VocabularyStatus.KNOWN,
+            nowUtc.minusDays(10),
+            nowUtc.minusDays(5),
+            86400L * 3,
+            3,
+            nowUtc.minusDays(2),
+            nowUtc.plusDays(2),
+            SrsState.REVIEW,
+            9.0,
+            3.8,
+            4,
+            0);
+
+    var updated = knownCard.changeStatus(VocabularyStatus.LEARNING, clock);
+
+    assertThat(updated.status()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(updated.learnedAt()).isNull();
+    // All SRS engine parameters are strictly preserved
+    assertThat(updated.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(updated.stability()).isEqualTo(9.0);
+    assertThat(updated.difficulty()).isEqualTo(3.8);
+    assertThat(updated.repetitions()).isEqualTo(4);
+    assertThat(updated.lapses()).isEqualTo(0);
+    assertThat(updated.lastReviewedAt()).isEqualTo(nowUtc.minusDays(2));
+    assertThat(updated.nextReviewAt()).isEqualTo(nowUtc.plusDays(2));
   }
 }

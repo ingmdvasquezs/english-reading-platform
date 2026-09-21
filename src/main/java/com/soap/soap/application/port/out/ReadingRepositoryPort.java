@@ -11,6 +11,7 @@ import com.soap.soap.domain.model.Reading;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface ReadingRepositoryPort {
@@ -80,6 +81,8 @@ public interface ReadingRepositoryPort {
 
   Map<String, Map<DiscoveryTopic, Long>> countPublishedPlatformReadingsByCountryCodesAndTopics(
       List<String> countryCodes);
+
+  Set<UUID> findPublishedPlatformReadingIdsByCountryCodes(List<String> countryCodes);
 
   Optional<Reading> findPlatformReadingByAdaptationKey(
       String adaptationGroupKey, String language, EditorialLevel editorialLevel);

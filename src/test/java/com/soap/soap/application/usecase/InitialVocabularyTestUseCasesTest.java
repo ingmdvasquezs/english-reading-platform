@@ -203,11 +203,11 @@ class InitialVocabularyTestUseCasesTest {
     assertThat(helloEntry.status()).isEqualTo(VocabularyStatus.KNOWN);
     // reviewStage is passed through unchanged (legacy V1 field, NOT used for SRS V2 scheduling).
     assertThat(helloEntry.reviewStage()).isEqualTo(4);
-    // SRS V2: nextReviewAt is derived from stability, NOT from Leitner stage 4 → +30d.
-    // existingStage4 has stability = defaultStabilityForStatus(LEARNING) = 0.4872 (legacy
-    // constructor). changeStatus(KNOWN) preserves stability → round(0.4872) = 0 → max(1) = +1 day.
-    assertThat(helloEntry.nextReviewAt())
-        .isEqualTo(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC).plusDays(1));
+    // FASE 14.3.7.1 Decoupling: changeStatus(KNOWN) sets status = KNOWN, learnedAt = nowUtc,
+    // while strictly preserving srsState, stability, difficulty, repetitions, lapses, and
+    // nextReviewAt intact.
+    assertThat(helloEntry.nextReviewAt()).isEqualTo(existingStage4.nextReviewAt());
+    assertThat(helloEntry.srsState()).isEqualTo(existingStage4.srsState());
     assertThat(helloEntry.lastReviewedAt()).isEqualTo(LocalDateTime.now(clock).minusDays(2));
   }
 

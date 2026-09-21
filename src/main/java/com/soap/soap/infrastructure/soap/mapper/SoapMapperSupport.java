@@ -39,4 +39,10 @@ abstract class SoapMapperSupport {
         ? null
         : datatypeFactory.newXMLGregorianCalendar(XML_LOCAL_DATE_TIME.format(value));
   }
+
+  protected XMLGregorianCalendar toUtcXmlDateTime(LocalDateTime value) {
+    return value == null
+        ? null
+        : datatypeFactory.newXMLGregorianCalendar(XML_LOCAL_DATE_TIME.format(value) + "Z");
+  }
 }

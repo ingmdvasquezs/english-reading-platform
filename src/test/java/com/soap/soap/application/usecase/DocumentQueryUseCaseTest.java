@@ -94,6 +94,34 @@ class DocumentQueryUseCaseTest {
   }
 
   @Test
+  void unitNeverExposesTechnicalIdentifiersAsDisplayTitles() {
+    var ownerId = UUID.randomUUID();
+    var documentId = UUID.randomUUID();
+    var sectionId = UUID.randomUUID();
+    var unitId = UUID.randomUUID();
+    when(currentUser.requireUserId()).thenReturn(ownerId);
+    when(documents.findDocumentById(documentId))
+        .thenReturn(Optional.of(document(documentId, ownerId)));
+    when(documents.findUnitById(documentId, unitId))
+        .thenReturn(Optional.of(unit(unitId, documentId, sectionId)));
+    when(documents.findSections(documentId))
+        .thenReturn(
+            List.of(
+                new com.soap.soap.domain.model.DocumentSection(
+                    sectionId, documentId, 5, "id-idp140489363296560", "OEBPS/ch01s02.xhtml")));
+    when(documents.countUnits(documentId)).thenReturn(5L);
+    when(documents.countUnitsBySection(documentId, sectionId)).thenReturn(5L);
+    when(progress.findByUserIdAndDocumentId(ownerId, documentId)).thenReturn(Optional.empty());
+
+    var result = useCase().unit(documentId, unitId);
+
+    assertThat(result.sectionTitle()).isNull();
+    assertThat(result.sectionOrdinal()).isEqualTo(5);
+    assertThat(result.sectionUnitOrdinal()).isEqualTo(1);
+    assertThat(result.sectionUnitCount()).isEqualTo(5);
+  }
+
+  @Test
   void foreignOwnerCannotReachFirstUnitQuery() {
     var userId = UUID.randomUUID();
     var documentId = UUID.randomUUID();

@@ -11,9 +11,21 @@ public record VocabularyReviewItem(
     String language,
     VocabularyStatus status,
     SrsState srsState,
-    List<ReviewRatingOption> ratingOptions) {
+    List<ReviewRatingOption> ratingOptions,
+    Long pendingQueueSequence,
+    Integer baseOrder) {
+
+  public VocabularyReviewItem(
+      UUID wordId,
+      String word,
+      String language,
+      VocabularyStatus status,
+      SrsState srsState,
+      List<ReviewRatingOption> ratingOptions) {
+    this(wordId, word, language, status, srsState, ratingOptions, null, null);
+  }
 
   public VocabularyReviewItem(UUID wordId, String word, String language, VocabularyStatus status) {
-    this(wordId, word, language, status, SrsState.NEW, List.of());
+    this(wordId, word, language, status, SrsState.NEW, List.of(), null, null);
   }
 }

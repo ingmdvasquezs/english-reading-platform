@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.soap.soap.application.model.ReviewRatingOption;
 import com.soap.soap.application.model.VocabularyReviewItem;
 import com.soap.soap.application.model.VocabularyReviewPreparation;
+import com.soap.soap.application.model.VocabularyReviewRecordResult;
 import com.soap.soap.application.port.in.PrepareVocabularyReviewPort;
 import com.soap.soap.application.port.in.RecordVocabularyReviewPort;
 import com.soap.soap.domain.model.ReviewRating;
@@ -54,14 +55,16 @@ class VocabularyReviewEndpointTest {
     var ratingOptions =
         List.of(
             new ReviewRatingOption(ReviewRating.AGAIN, LocalDateTime.now().plusMinutes(10), 600L),
-            new ReviewRatingOption(ReviewRating.HARD, LocalDateTime.now().plusHours(12), 43200L),
-            new ReviewRatingOption(ReviewRating.GOOD, LocalDateTime.now().plusDays(4), 4 * 86400L),
-            new ReviewRatingOption(
-                ReviewRating.EASY, LocalDateTime.now().plusDays(14), 14 * 86400L));
+            new ReviewRatingOption(ReviewRating.GOOD, LocalDateTime.now().plusDays(1), 86400L));
     var preparation =
         new VocabularyReviewPreparation(
             5L,
             12L,
+            15,
+            0,
+            15,
+            1,
+            false,
             List.of(
                 new VocabularyReviewItem(
                     wordId,
@@ -77,6 +80,11 @@ class VocabularyReviewEndpointTest {
 
     assertThat(response.getDueCount()).isEqualTo(5L);
     assertThat(response.getTotalReviewableCount()).isEqualTo(12L);
+    assertThat(response.getDailyLimit()).isEqualTo(15);
+    assertThat(response.getDailyBaseCompleted()).isEqualTo(0);
+    assertThat(response.getDailyBaseRemaining()).isEqualTo(15);
+    assertThat(response.getPendingLearningCount()).isEqualTo(1);
+    assertThat(response.isDailyComplete()).isFalse();
     assertThat(response.getEntries()).hasSize(1);
     var item = response.getEntries().getFirst();
     assertThat(item.getWordId()).isEqualTo(wordId.toString());
@@ -84,7 +92,7 @@ class VocabularyReviewEndpointTest {
     assertThat(item.getLanguage()).isEqualTo("en");
     assertThat(item.getStatus()).isEqualTo(VocabularyStatusType.LEARNING);
     assertThat(item.getSrsState()).isEqualTo(SrsStateType.LEARNING);
-    assertThat(item.getRatingOptions()).hasSize(4);
+    assertThat(item.getRatingOptions()).hasSize(2);
 
     verify(preparePort).prepareReview(15);
   }
@@ -118,7 +126,13 @@ class VocabularyReviewEndpointTest {
             2,
             0);
 
-    when(recordPort.recordReview(wordId, ReviewRating.GOOD)).thenReturn(updated);
+    var ratingOptions =
+        List.of(
+            new ReviewRatingOption(ReviewRating.AGAIN, now.plusMinutes(10), 600L),
+            new ReviewRatingOption(ReviewRating.GOOD, now.plusDays(4), 345600L));
+
+    var recordResult = new VocabularyReviewRecordResult(updated, ratingOptions);
+    when(recordPort.recordReview(wordId, ReviewRating.GOOD)).thenReturn(recordResult);
 
     var response = endpoint.recordVocabularyReview(request);
 
@@ -128,6 +142,10 @@ class VocabularyReviewEndpointTest {
     assertThat(response.getEntry().getSrsState()).isEqualTo(SrsStateType.REVIEW);
     assertThat(response.getEntry().getStability()).isEqualTo(BigDecimal.valueOf(3.7145));
     assertThat(response.getEntry().getDifficulty()).isEqualTo(BigDecimal.valueOf(5.1618));
+    assertThat(response.getEntry().getRatingOptions()).hasSize(2);
+    assertThat(response.getEntry().getRatingOptions().get(0).getRating())
+        .isEqualTo(ReviewRatingType.AGAIN);
+    assertThat(response.getEntry().getRatingOptions().get(0).getIntervalSeconds()).isEqualTo(600L);
 
     verify(recordPort).recordReview(wordId, ReviewRating.GOOD);
   }
@@ -161,7 +179,8 @@ class VocabularyReviewEndpointTest {
             2,
             0);
 
-    when(recordPort.recordReview(wordId, ReviewRating.GOOD)).thenReturn(updated);
+    when(recordPort.recordReview(wordId, ReviewRating.GOOD))
+        .thenReturn(new VocabularyReviewRecordResult(updated, List.of()));
 
     var response = endpoint.recordVocabularyReview(request);
 

@@ -132,7 +132,7 @@ class PdfImportIntegrationTest {
     assertThat(failedRow.get("cover_asset_key")).isNull();
     assertThat(failedRow.get("source_sha256")).isNotNull();
     assertThat(failedRow.get("deduplication_sha256")).isNull();
-    assertThat(failedRow.get("chunking_version")).isEqualTo(4);
+    assertThat(failedRow.get("chunking_version")).isEqualTo(DocumentChunker.VERSION);
 
     var accepted = accept.accept(source, "journey.pdf", "en", DocumentFormat.PDF);
     var ready = queries.get(accepted.documentId());

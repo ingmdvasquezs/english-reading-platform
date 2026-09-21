@@ -22,4 +22,8 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
       where u.id = :id and u.onboardingCompleted = false
       """)
   int markOnboardingCompleted(@Param("id") UUID id);
+
+  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+  @Query("select u from UserEntity u where u.id = :id")
+  Optional<UserEntity> findByIdForUpdate(@Param("id") UUID id);
 }

@@ -88,11 +88,11 @@ class FsrsSchedulerTest {
     assertThat(again.stability()).isEqualTo(0.4872);
     assertThat(again.difficulty()).isEqualTo(7.6214);
 
-    // HARD -> 12h, LEARNING
+    // HARD -> 15m, LEARNING
     SrsCalculationResult hard = scheduler.calculateNextState(initial, ReviewRating.HARD, nowUtc);
     assertThat(hard.srsState()).isEqualTo(SrsState.LEARNING);
     assertThat(hard.vocabularyStatus()).isEqualTo(VocabularyStatus.LEARNING);
-    assertThat(hard.intervalSeconds()).isEqualTo(43200L);
+    assertThat(hard.intervalSeconds()).isEqualTo(900L);
     assertThat(hard.stability()).isEqualTo(1.4003);
     assertThat(hard.difficulty()).isEqualTo(6.3916);
 
@@ -183,13 +183,13 @@ class FsrsSchedulerTest {
     assertThat(relearnAgain.stability()).isCloseTo(postLapseStability, within(1e-4)); // preserved
 
     // -----------------------------------------------------------------------
-    // C. RELEARNING + HARD → stays RELEARNING at +12h, stability preserved
+    // C. RELEARNING + HARD → stays RELEARNING at +15m, stability preserved
     // -----------------------------------------------------------------------
     var relearnHard =
         scheduler.calculateNextState(inRelearning, ReviewRating.HARD, nowUtc.plusMinutes(10));
     assertThat(relearnHard.srsState()).isEqualTo(SrsState.RELEARNING);
     assertThat(relearnHard.vocabularyStatus()).isEqualTo(VocabularyStatus.LEARNING);
-    assertThat(relearnHard.intervalSeconds()).isEqualTo(43200L); // +12 h
+    assertThat(relearnHard.intervalSeconds()).isEqualTo(900L); // +15 min (1.5x of 10m step)
     assertThat(relearnHard.stability()).isCloseTo(postLapseStability, within(1e-4)); // preserved
     assertThat(relearnHard.lapses()).isEqualTo(1); // unchanged
 
@@ -220,5 +220,265 @@ class FsrsSchedulerTest {
         .isEqualTo(2 * 86400L); // exactly +2 days (product policy)
     assertThat(relearnEasy.stability()).isCloseTo(postLapseStability, within(1e-4)); // NO *0.6
     assertThat(relearnEasy.lapses()).isEqualTo(1); // unchanged
+  }
+
+  // =========================================================================
+  // FASE 14.3.3: Anki-Like Same-Session Learning / Relearning Policy Tests
+  // =========================================================================
+
+  @Test
+  @DisplayName("14.3.3: LEARNING + AGAIN -> 10m + LEARNING")
+  void learningAgainSchedules10m() {
+    var learning =
+        new SrsItemParameters(
+            SrsState.LEARNING,
+            VocabularyStatus.LEARNING,
+            0.4872,
+            7.6214,
+            1,
+            0,
+            nowUtc.minusMinutes(10),
+            nowUtc);
+    var res = scheduler.calculateNextState(learning, ReviewRating.AGAIN, nowUtc);
+    assertThat(res.srsState()).isEqualTo(SrsState.LEARNING);
+    assertThat(res.vocabularyStatus()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(res.intervalSeconds()).isEqualTo(600L); // +10m
+  }
+
+  @Test
+  @DisplayName("14.3.3: LEARNING + HARD -> 15m + LEARNING")
+  void learningHardSchedules15m() {
+    var learning =
+        new SrsItemParameters(
+            SrsState.LEARNING,
+            VocabularyStatus.LEARNING,
+            0.4872,
+            7.6214,
+            1,
+            0,
+            nowUtc.minusMinutes(10),
+            nowUtc);
+    var res = scheduler.calculateNextState(learning, ReviewRating.HARD, nowUtc);
+    assertThat(res.srsState()).isEqualTo(SrsState.LEARNING);
+    assertThat(res.vocabularyStatus()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(res.intervalSeconds()).isEqualTo(900L); // +15m
+  }
+
+  @Test
+  @DisplayName("14.3.3: LEARNING + GOOD -> REVIEW/KNOWN")
+  void learningGoodGraduatesToReviewKnown() {
+    var learning =
+        new SrsItemParameters(
+            SrsState.LEARNING,
+            VocabularyStatus.LEARNING,
+            0.4872,
+            7.6214,
+            1,
+            0,
+            nowUtc.minusMinutes(10),
+            nowUtc);
+    var res = scheduler.calculateNextState(learning, ReviewRating.GOOD, nowUtc);
+    assertThat(res.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(res.vocabularyStatus()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(res.intervalSeconds()).isGreaterThanOrEqualTo(86400L);
+  }
+
+  @Test
+  @DisplayName("14.3.3: LEARNING + EASY -> REVIEW/KNOWN")
+  void learningEasyGraduatesToReviewKnown() {
+    var learning =
+        new SrsItemParameters(
+            SrsState.LEARNING,
+            VocabularyStatus.LEARNING,
+            0.4872,
+            7.6214,
+            1,
+            0,
+            nowUtc.minusMinutes(10),
+            nowUtc);
+    var res = scheduler.calculateNextState(learning, ReviewRating.EASY, nowUtc);
+    assertThat(res.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(res.vocabularyStatus()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(res.intervalSeconds()).isGreaterThan(86400L);
+  }
+
+  @Test
+  @DisplayName("14.3.3: RELEARNING + AGAIN -> 10m + RELEARNING")
+  void relearningAgainSchedules10m() {
+    var relearning =
+        new SrsItemParameters(
+            SrsState.RELEARNING,
+            VocabularyStatus.LEARNING,
+            6.1899,
+            5.0,
+            7,
+            1,
+            nowUtc.minusMinutes(10),
+            nowUtc);
+    var res = scheduler.calculateNextState(relearning, ReviewRating.AGAIN, nowUtc);
+    assertThat(res.srsState()).isEqualTo(SrsState.RELEARNING);
+    assertThat(res.vocabularyStatus()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(res.intervalSeconds()).isEqualTo(600L); // +10m
+    assertThat(res.lapses()).isEqualTo(1); // not re-incremented
+    assertThat(res.stability()).isCloseTo(6.1899, within(1e-4));
+  }
+
+  @Test
+  @DisplayName("14.3.3: RELEARNING + HARD -> 15m + RELEARNING")
+  void relearningHardSchedules15m() {
+    var relearning =
+        new SrsItemParameters(
+            SrsState.RELEARNING,
+            VocabularyStatus.LEARNING,
+            6.1899,
+            5.0,
+            7,
+            1,
+            nowUtc.minusMinutes(10),
+            nowUtc);
+    var res = scheduler.calculateNextState(relearning, ReviewRating.HARD, nowUtc);
+    assertThat(res.srsState()).isEqualTo(SrsState.RELEARNING);
+    assertThat(res.vocabularyStatus()).isEqualTo(VocabularyStatus.LEARNING);
+    assertThat(res.intervalSeconds()).isEqualTo(900L); // +15m
+    assertThat(res.lapses()).isEqualTo(1); // not re-incremented
+    assertThat(res.stability()).isCloseTo(6.1899, within(1e-4));
+  }
+
+  @Test
+  @DisplayName("14.3.3: RELEARNING + GOOD -> REVIEW/KNOWN (+1d)")
+  void relearningGoodGraduatesToReviewKnown() {
+    var relearning =
+        new SrsItemParameters(
+            SrsState.RELEARNING,
+            VocabularyStatus.LEARNING,
+            6.1899,
+            5.0,
+            7,
+            1,
+            nowUtc.minusMinutes(10),
+            nowUtc);
+    var res = scheduler.calculateNextState(relearning, ReviewRating.GOOD, nowUtc);
+    assertThat(res.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(res.vocabularyStatus()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(res.intervalSeconds()).isEqualTo(86400L); // exactly +1d
+    assertThat(res.stability()).isCloseTo(6.1899, within(1e-4));
+  }
+
+  @Test
+  @DisplayName("14.3.3: RELEARNING + EASY -> REVIEW/KNOWN (+2d)")
+  void relearningEasyGraduatesToReviewKnown() {
+    var relearning =
+        new SrsItemParameters(
+            SrsState.RELEARNING,
+            VocabularyStatus.LEARNING,
+            6.1899,
+            5.0,
+            7,
+            1,
+            nowUtc.minusMinutes(10),
+            nowUtc);
+    var res = scheduler.calculateNextState(relearning, ReviewRating.EASY, nowUtc);
+    assertThat(res.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(res.vocabularyStatus()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(res.intervalSeconds()).isEqualTo(2 * 86400L); // exactly +2d
+    assertThat(res.stability()).isCloseTo(6.1899, within(1e-4));
+  }
+
+  @Test
+  @DisplayName("14.3.3: AGAIN -> AGAIN -> GOOD (relearning loop)")
+  void againAgainGoodLoop() {
+    var mature =
+        new SrsItemParameters(
+            SrsState.REVIEW, VocabularyStatus.KNOWN, 60.0, 4.0, 5, 0, nowUtc.minusDays(60), nowUtc);
+    // 1. Mature lapse: AGAIN -> RELEARNING (+10m, lapses=1)
+    var step1 = scheduler.calculateNextState(mature, ReviewRating.AGAIN, nowUtc);
+    assertThat(step1.srsState()).isEqualTo(SrsState.RELEARNING);
+    assertThat(step1.lapses()).isEqualTo(1);
+    assertThat(step1.intervalSeconds()).isEqualTo(600L);
+
+    // 2. Intra-session repeat: AGAIN -> RELEARNING (+10m, lapses STILL 1)
+    var param2 =
+        new SrsItemParameters(
+            step1.srsState(),
+            step1.vocabularyStatus(),
+            step1.stability(),
+            step1.difficulty(),
+            step1.repetitions(),
+            step1.lapses(),
+            nowUtc,
+            nowUtc.plusSeconds(600L));
+    var step2 = scheduler.calculateNextState(param2, ReviewRating.AGAIN, nowUtc.plusMinutes(10));
+    assertThat(step2.srsState()).isEqualTo(SrsState.RELEARNING);
+    assertThat(step2.lapses()).isEqualTo(1);
+    assertThat(step2.intervalSeconds()).isEqualTo(600L);
+
+    // 3. Exit loop: GOOD -> REVIEW / KNOWN (+1d)
+    var param3 =
+        new SrsItemParameters(
+            step2.srsState(),
+            step2.vocabularyStatus(),
+            step2.stability(),
+            step2.difficulty(),
+            step2.repetitions(),
+            step2.lapses(),
+            nowUtc.plusMinutes(10),
+            nowUtc.plusMinutes(20));
+    var step3 = scheduler.calculateNextState(param3, ReviewRating.GOOD, nowUtc.plusMinutes(20));
+    assertThat(step3.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(step3.vocabularyStatus()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(step3.intervalSeconds()).isEqualTo(86400L);
+    assertThat(step3.lapses()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("14.3.3: HARD -> HARD -> GOOD (relearning loop)")
+  void hardHardGoodLoop() {
+    var inRelearning =
+        new SrsItemParameters(
+            SrsState.RELEARNING,
+            VocabularyStatus.LEARNING,
+            6.1899,
+            5.0,
+            6,
+            1,
+            nowUtc.minusMinutes(10),
+            nowUtc);
+    // 1. Intra-session: HARD -> stays RELEARNING (+15m)
+    var step1 = scheduler.calculateNextState(inRelearning, ReviewRating.HARD, nowUtc);
+    assertThat(step1.srsState()).isEqualTo(SrsState.RELEARNING);
+    assertThat(step1.intervalSeconds()).isEqualTo(900L); // +15m
+    assertThat(step1.lapses()).isEqualTo(1);
+
+    // 2. Intra-session: HARD again -> stays RELEARNING (+15m)
+    var param2 =
+        new SrsItemParameters(
+            step1.srsState(),
+            step1.vocabularyStatus(),
+            step1.stability(),
+            step1.difficulty(),
+            step1.repetitions(),
+            step1.lapses(),
+            nowUtc,
+            nowUtc.plusSeconds(900L));
+    var step2 = scheduler.calculateNextState(param2, ReviewRating.HARD, nowUtc.plusMinutes(15));
+    assertThat(step2.srsState()).isEqualTo(SrsState.RELEARNING);
+    assertThat(step2.intervalSeconds()).isEqualTo(900L); // +15m
+    assertThat(step2.lapses()).isEqualTo(1);
+
+    // 3. Exit loop: GOOD -> graduates to REVIEW / KNOWN (+1d)
+    var param3 =
+        new SrsItemParameters(
+            step2.srsState(),
+            step2.vocabularyStatus(),
+            step2.stability(),
+            step2.difficulty(),
+            step2.repetitions(),
+            step2.lapses(),
+            nowUtc.plusMinutes(15),
+            nowUtc.plusMinutes(30));
+    var step3 = scheduler.calculateNextState(param3, ReviewRating.GOOD, nowUtc.plusMinutes(30));
+    assertThat(step3.srsState()).isEqualTo(SrsState.REVIEW);
+    assertThat(step3.vocabularyStatus()).isEqualTo(VocabularyStatus.KNOWN);
+    assertThat(step3.intervalSeconds()).isEqualTo(86400L);
   }
 }

@@ -2,6 +2,7 @@ package com.soap.soap.domain.model;
 
 import com.soap.soap.domain.exception.InvalidVocabularyStateException;
 import com.soap.soap.domain.service.FsrsScheduler;
+import com.soap.soap.domain.service.VocabularyReviewSchedulingPolicy;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -241,14 +242,30 @@ public record UserVocabulary(
       case KNOWN -> {
         var newLearnedAt =
             (status == VocabularyStatus.KNOWN && learnedAt != null) ? learnedAt : nowUtc;
-        // SRS V2: use existing stability if present; fall back to the canonical default for a
-        // word explicitly marked KNOWN (w[3] = 13.8206, the EASY initial stability).
+        if (srsState != null && srsState != SrsState.NEW && nextReviewAt != null) {
+          // Preserve existing SRS memory and scheduling when marking KNOWN from Reader!
+          yield new UserVocabulary(
+              id,
+              user,
+              word,
+              VocabularyStatus.KNOWN,
+              firstSeenAt,
+              newLearnedAt,
+              version,
+              reviewStage,
+              lastReviewedAt,
+              nextReviewAt,
+              srsState,
+              stability,
+              difficulty,
+              repetitions,
+              lapses);
+        }
+        // Fallback for initial promotion when no SRS schedule exists yet:
         var newStability = (stability > 0.0) ? stability : 13.8206;
         var newDifficulty = (difficulty > 1.0) ? difficulty : 3.9320;
-        // nextReviewAt is based purely on SRS stability, NOT on reviewStage.
         int days = Math.max(1, (int) Math.round(newStability));
         var nextReview = nowUtc.plusDays(days);
-        // reviewStage: passed through unchanged — legacy field, NOT read for V2 scheduling.
         yield new UserVocabulary(
             id,
             user,
@@ -257,7 +274,7 @@ public record UserVocabulary(
             firstSeenAt,
             newLearnedAt,
             version,
-            reviewStage, // unchanged — deprecated, not used for scheduling
+            reviewStage,
             lastReviewedAt,
             nextReview,
             SrsState.REVIEW,
@@ -266,8 +283,10 @@ public record UserVocabulary(
             Math.max(1, repetitions),
             lapses);
       }
-      case LEARNING ->
-          new UserVocabulary(
+      case LEARNING -> {
+        if (srsState != null && srsState != SrsState.NEW && nextReviewAt != null) {
+          // Preserve existing SRS memory and scheduling when marking LEARNING from Reader!
+          yield new UserVocabulary(
               id,
               user,
               word,
@@ -275,14 +294,33 @@ public record UserVocabulary(
               firstSeenAt,
               null,
               version,
-              0,
-              null,
-              nowUtc,
-              SrsState.LEARNING,
-              0.4872,
-              (difficulty > 0.0 ? difficulty : 7.6214),
+              reviewStage,
+              lastReviewedAt,
+              nextReviewAt,
+              srsState,
+              stability,
+              difficulty,
               repetitions,
               lapses);
+        }
+        // Fallback for initial learning setup when no SRS schedule exists yet:
+        yield new UserVocabulary(
+            id,
+            user,
+            word,
+            VocabularyStatus.LEARNING,
+            firstSeenAt,
+            null,
+            version,
+            0,
+            null,
+            nowUtc,
+            SrsState.LEARNING,
+            0.4872,
+            (difficulty > 0.0 ? difficulty : 7.6214),
+            repetitions,
+            lapses);
+      }
       case NEW ->
           new UserVocabulary(
               id,
@@ -332,27 +370,27 @@ public record UserVocabulary(
         nextReviewAt);
   }
 
-  public UserVocabulary applyRating(ReviewRating rating, Clock clock, FsrsScheduler scheduler) {
+  public UserVocabulary applyRating(
+      ReviewRating rating, Clock clock, VocabularyReviewSchedulingPolicy policy) {
     Objects.requireNonNull(rating, "Review rating must not be null");
     Objects.requireNonNull(clock, "Clock must not be null");
-    var calcEngine = (scheduler != null) ? scheduler : DEFAULT_SCHEDULER;
+    var policyEngine =
+        (policy != null) ? policy : new VocabularyReviewSchedulingPolicy(DEFAULT_SCHEDULER);
     var nowUtc = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
 
-    var calc = calcEngine.calculateNextState(toSrsParameters(), rating, nowUtc);
-    var newLearnedAt =
-        calc.vocabularyStatus() == VocabularyStatus.KNOWN
-            ? ((status == VocabularyStatus.KNOWN && learnedAt != null) ? learnedAt : nowUtc)
-            : null;
+    var calc = policyEngine.calculateNextState(toSrsParameters(), rating, nowUtc);
 
-    // SRS V2: reviewStage is NOT read or written during rating application.
-    // It is a deprecated V1 Leitner field; pass it through unchanged.
+    // FASE 14.3.7.1 Domain Invariant:
+    // Vocabulary Review must NEVER mutate VocabularyStatus or learnedAt!
+    // statusAfterReview = this.status
+    // learnedAtAfterReview = this.learnedAt
     return new UserVocabulary(
         id,
         user,
         word,
-        calc.vocabularyStatus(),
+        this.status, // NEVER mutated by review
         firstSeenAt,
-        newLearnedAt,
+        this.learnedAt, // NEVER mutated by review
         version,
         reviewStage, // unchanged — deprecated, SRS V2 does not use this for scheduling
         nowUtc,
@@ -362,6 +400,13 @@ public record UserVocabulary(
         calc.difficulty(),
         calc.repetitions(),
         calc.lapses());
+  }
+
+  public UserVocabulary applyRating(ReviewRating rating, Clock clock, FsrsScheduler scheduler) {
+    return applyRating(
+        rating,
+        clock,
+        new VocabularyReviewSchedulingPolicy(scheduler != null ? scheduler : DEFAULT_SCHEDULER));
   }
 
   public UserVocabulary applyReviewAssessment(ReviewAssessment assessment, Clock clock) {

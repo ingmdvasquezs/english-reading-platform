@@ -67,26 +67,26 @@ class ExploreV1RealRuntimeVerificationTest {
   }
 
   @Test
-  @DisplayName("2. browsePlatformReadings with no filters returns 15 readings")
+  @DisplayName("2. browsePlatformReadings with no filters returns 20 readings (15 CO + 5 MX)")
   void testBrowseNoFilters() {
     var page =
         browsePlatformReadingsPort.browsePlatformReadings(
-            new BrowsePlatformReadingsQuery(null, null, null, new PageRequest(0, 20)));
+            new BrowsePlatformReadingsQuery(null, null, null, new PageRequest(0, 25)));
 
-    assertThat(page.totalElements()).isEqualTo(15);
-    assertThat(page.content()).hasSize(15);
+    assertThat(page.totalElements()).isEqualTo(20);
+    assertThat(page.content()).hasSize(20);
     System.out.println("VERIFIED: browse no filters totalElements = " + page.totalElements());
   }
 
   @Test
-  @DisplayName("3. browsePlatformReadings with B1 returns 6 readings")
+  @DisplayName("3. browsePlatformReadings with B1 returns 11 readings (6 CO + 5 MX)")
   void testBrowseLevelB1() {
     var page =
         browsePlatformReadingsPort.browsePlatformReadings(
             new BrowsePlatformReadingsQuery(null, null, EditorialLevel.B1, new PageRequest(0, 20)));
 
-    assertThat(page.totalElements()).isEqualTo(6);
-    assertThat(page.content()).hasSize(6);
+    assertThat(page.totalElements()).isEqualTo(11);
+    assertThat(page.content()).hasSize(11);
     assertThat(page.content()).allMatch(r -> r.editorialLevel() == EditorialLevel.B1);
     System.out.println("VERIFIED: browse level B1 totalElements = " + page.totalElements());
   }
@@ -106,15 +106,15 @@ class ExploreV1RealRuntimeVerificationTest {
 
   @Test
   @DisplayName(
-      "5. browsePlatformReadings with category CULTURE_ARTS_AND_FICTION returns 15 readings")
+      "5. browsePlatformReadings with category CULTURE_ARTS_AND_FICTION returns 17 readings (15 CO + 2 MX)")
   void testBrowseCategory() {
     var page =
         browsePlatformReadingsPort.browsePlatformReadings(
             new BrowsePlatformReadingsQuery(
                 null, EditorialCategory.CULTURE_ARTS_AND_FICTION, null, new PageRequest(0, 20)));
 
-    assertThat(page.totalElements()).isEqualTo(15);
-    assertThat(page.content()).hasSize(15);
+    assertThat(page.totalElements()).isEqualTo(17);
+    assertThat(page.content()).hasSize(17);
     assertThat(page.content())
         .allMatch(r -> "Culture, Arts & Fiction".equalsIgnoreCase(r.category()));
     System.out.println(
@@ -123,7 +123,7 @@ class ExploreV1RealRuntimeVerificationTest {
   }
 
   @Test
-  @DisplayName("6. browsePlatformReadings with category + B1 returns 6 readings")
+  @DisplayName("6. browsePlatformReadings with category + B1 returns 8 readings (6 CO + 2 MX)")
   void testBrowseCategoryAndB1() {
     var page =
         browsePlatformReadingsPort.browsePlatformReadings(
@@ -133,8 +133,8 @@ class ExploreV1RealRuntimeVerificationTest {
                 EditorialLevel.B1,
                 new PageRequest(0, 20)));
 
-    assertThat(page.totalElements()).isEqualTo(6);
-    assertThat(page.content()).hasSize(6);
+    assertThat(page.totalElements()).isEqualTo(8);
+    assertThat(page.content()).hasSize(8);
     assertThat(page.content())
         .allMatch(
             r ->

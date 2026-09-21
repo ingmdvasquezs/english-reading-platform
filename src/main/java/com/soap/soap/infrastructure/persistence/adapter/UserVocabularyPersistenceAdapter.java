@@ -123,6 +123,17 @@ public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositor
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public Map<UUID, UserVocabulary> findByIds(Collection<UUID> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return Map.of();
+    }
+    return repository.findAllById(ids).stream()
+        .map(mapper::toDomain)
+        .collect(Collectors.toUnmodifiableMap(UserVocabulary::id, entry -> entry));
+  }
+
+  @Override
   @Transactional
   public UserVocabulary save(UserVocabulary vocabulary) {
     try {
@@ -165,6 +176,16 @@ public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositor
 
   @Override
   @Transactional(readOnly = true)
+  public java.util.List<UserVocabulary> findLearnAheadCandidates(
+      UUID userId, java.time.LocalDateTime now, java.time.LocalDateTime maxLearnAhead, int limit) {
+    var pageable = org.springframework.data.domain.PageRequest.of(0, limit);
+    return repository.findLearnAheadCandidates(userId, now, maxLearnAhead, pageable).stream()
+        .map(mapper::toDomain)
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public long countDueWords(UUID userId, java.time.LocalDateTime now) {
     return repository.countDueWords(userId, now);
   }
@@ -173,6 +194,12 @@ public class UserVocabularyPersistenceAdapter implements UserVocabularyRepositor
   @Transactional(readOnly = true)
   public long countTotalReviewableWords(UUID userId, java.time.LocalDateTime now) {
     return repository.countTotalReviewableWords(userId, now);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public long countPendingLearningWords(UUID userId) {
+    return repository.countPendingLearningWords(userId);
   }
 
   @Override

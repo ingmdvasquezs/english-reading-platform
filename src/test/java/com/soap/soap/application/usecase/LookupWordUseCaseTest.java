@@ -112,6 +112,97 @@ class LookupWordUseCaseTest {
         .isInstanceOf(WordNotFoundException.class);
   }
 
+  @Test
+  void normalGoodTranslationDoesNotInvokeFallback() {
+    when(currentUser.requireUserId()).thenReturn(UUID.randomUUID());
+    when(dictionary.lookup("journey", "en"))
+        .thenReturn(
+            new DictionaryEntry(
+                "journey", "/ˈdʒɜːr.ni/", null, List.of(new WordMeaning("noun", List.of()))));
+    when(translation.translateBatch(List.of("journey"), "en", "es")).thenReturn(List.of("Viaje"));
+
+    var result = useCase().lookupWord("journey");
+
+    assertThat(result.translation()).isEqualTo("Viaje");
+    verify(translation, org.mockito.Mockito.never())
+        .lookupLexical(
+            org.mockito.Mockito.any(), org.mockito.Mockito.any(), org.mockito.Mockito.any());
+  }
+
+  @Test
+  void suspiciousSameAsSourceInvokesFallbackAndResolvesLexicalCandidate() {
+    when(currentUser.requireUserId()).thenReturn(UUID.randomUUID());
+    var def =
+        new WordDefinition(
+            "very happy and cheerful feeling", "Let's eat, drink, and be merry !", null);
+    var meanings = List.of(new WordMeaning("adjective", List.of(def)));
+    when(dictionary.lookup("merry", "en"))
+        .thenReturn(new DictionaryEntry("merry", "/ˈmɛr.i/", null, meanings));
+    when(translation.translateBatch(
+            List.of("merry", "Let's eat, drink, and be merry !"), "en", "es"))
+        .thenReturn(List.of("Merry", "¡Vamos a comer, beber y alegrarnos!"));
+
+    var candidateFeliz =
+        new com.soap.soap.application.model.LexicalTranslationCandidate(
+            "feliz", "NOUN", 0.61, List.of("happy", "merry", "glad"));
+    var candidateAlegre =
+        new com.soap.soap.application.model.LexicalTranslationCandidate(
+            "alegre", "NOUN", 0.39, List.of("cheerful", "glad", "merry"));
+    when(translation.lookupLexical("merry", "en", "es"))
+        .thenReturn(List.of(candidateFeliz, candidateAlegre));
+
+    var result = useCase().lookupWord("merry");
+
+    // "alegre" matches stem "alegr" in exampleTranslation "¡Vamos a comer, beber y alegrarnos!"
+    assertThat(result.translation()).isEqualTo("alegre");
+  }
+
+  @Test
+  void suspiciousCaseAndPunctuationNormalizationTriggersFallback() {
+    when(currentUser.requireUserId()).thenReturn(UUID.randomUUID());
+    when(dictionary.lookup("merry", "en"))
+        .thenReturn(new DictionaryEntry("merry", "/ˈmɛr.i/", null, List.of()));
+    when(translation.translateBatch(List.of("merry"), "en", "es"))
+        .thenReturn(List.of("  MERRY!  "));
+    var candidate =
+        new com.soap.soap.application.model.LexicalTranslationCandidate(
+            "alegre", "ADJ", 0.8, List.of("cheerful", "merry"));
+    when(translation.lookupLexical("merry", "en", "es")).thenReturn(List.of(candidate));
+
+    var result = useCase().lookupWord("merry");
+
+    assertThat(result.translation()).isEqualTo("alegre");
+  }
+
+  @Test
+  void fallbackFailureReturnsEmptyTranslationNeverSourceWord() {
+    when(currentUser.requireUserId()).thenReturn(UUID.randomUUID());
+    when(dictionary.lookup("merry", "en"))
+        .thenReturn(new DictionaryEntry("merry", "/ˈmɛr.i/", null, List.of()));
+    when(translation.translateBatch(List.of("merry"), "en", "es")).thenReturn(List.of("Merry"));
+    when(translation.lookupLexical("merry", "en", "es")).thenReturn(List.of());
+
+    var result = useCase().lookupWord("merry");
+
+    assertThat(result.translation()).isEmpty();
+  }
+
+  @Test
+  void legitimateIdenticalTermConfirmedByLexicalLookupIsPreserved() {
+    when(currentUser.requireUserId()).thenReturn(UUID.randomUUID());
+    when(dictionary.lookup("hotel", "en"))
+        .thenReturn(new DictionaryEntry("hotel", "/hoʊˈtɛl/", null, List.of()));
+    when(translation.translateBatch(List.of("hotel"), "en", "es")).thenReturn(List.of("Hotel"));
+    var candidate =
+        new com.soap.soap.application.model.LexicalTranslationCandidate(
+            "hotel", "NOUN", 1.0, List.of("hotel"));
+    when(translation.lookupLexical("hotel", "en", "es")).thenReturn(List.of(candidate));
+
+    var result = useCase().lookupWord("hotel");
+
+    assertThat(result.translation()).isEqualTo("hotel");
+  }
+
   private LookupWordUseCase useCase() {
     return new LookupWordUseCase(
         dictionary, translation, new TextWordProcessor(), currentUser, InputLimits.defaults());

@@ -65,7 +65,7 @@ class EpubImportIntegrationTest {
     var imported = useCase.importEpub(new ImportEpubCommand(source, "original.epub", null));
 
     assertThat(imported.importStatus()).isEqualTo(DocumentImportStatus.READY);
-    assertThat(imported.chunkingVersion()).isEqualTo(4);
+    assertThat(imported.chunkingVersion()).isEqualTo(DocumentChunker.VERSION);
     assertThat(imported.language()).isEqualTo("en-US");
     assertThat(imported.sourceSha256()).hasSize(64);
     assertThat(Files.size(directory.resolve("assets").resolve(imported.sourceAssetKey())))

@@ -49,7 +49,7 @@ class LatinAmericaHomeDiscoveryRealRuntimeVerificationTest {
 
   @Test
   @DisplayName(
-      "1. getOverview('latin-america') returns region, CO with 15 readings, 1 topic, 2 hero images")
+      "1. getOverview('latin-america') returns region with CO (15 readings) and MX (5 readings)")
   void testLatinAmericaOverview() {
     var result = getDiscoveryRegionOverviewPort.getOverview("latin-america");
     var region = result.region();
@@ -59,9 +59,10 @@ class LatinAmericaHomeDiscoveryRealRuntimeVerificationTest {
     assertThat(region.displayName()).isEqualTo("Latinoamérica");
 
     var countries = result.countries();
-    assertThat(countries).hasSize(1);
+    assertThat(countries).hasSize(2);
 
-    var colombia = countries.getFirst();
+    // 1. Colombia (displayOrder = 1)
+    var colombia = countries.get(0);
     assertThat(colombia.countryCode()).isEqualTo("CO");
     assertThat(colombia.displayName()).isEqualTo("Colombia");
     assertThat(colombia.readingCount()).isEqualTo(15);
@@ -74,13 +75,24 @@ class LatinAmericaHomeDiscoveryRealRuntimeVerificationTest {
     assertThat(topic.displayName()).isEqualTo("Mitos y leyendas");
     assertThat(topic.readingCount()).isEqualTo(15);
 
+    // 2. Mexico (displayOrder = 2)
+    var mexico = countries.get(1);
+    assertThat(mexico.countryCode()).isEqualTo("MX");
+    assertThat(mexico.displayName()).isEqualTo("México");
+    assertThat(mexico.readingCount()).isEqualTo(5);
+    assertThat(mexico.heroImages()).hasSize(2);
+    assertThat(mexico.topics()).hasSize(5);
+
     System.out.println(
         "VERIFIED: Region "
             + region.displayName()
             + " has "
             + countries.size()
-            + " active country (CO) with readingCount = "
-            + colombia.readingCount());
+            + " active countries: CO ("
+            + colombia.readingCount()
+            + "), MX ("
+            + mexico.readingCount()
+            + ")");
   }
 
   @Test
@@ -104,7 +116,32 @@ class LatinAmericaHomeDiscoveryRealRuntimeVerificationTest {
   }
 
   @Test
-  @DisplayName("3. Print real Latin America discovery readings table")
+  @DisplayName("3. browsePlatformReadings with countryCode MX returns 5 published readings")
+  void testBrowseMexicoReadings() {
+    var page =
+        browsePlatformReadingsPort.browsePlatformReadings(
+            new BrowsePlatformReadingsQuery(null, null, null, "MX", null, new PageRequest(0, 20)));
+
+    assertThat(page.totalElements()).isEqualTo(5);
+    assertThat(page.content()).hasSize(5);
+    assertThat(page.content()).allMatch(r -> "MX".equals(r.countryCode()));
+    assertThat(page.content()).allMatch(r -> r.vocabularyFitPercentage() != null);
+
+    // Verify 5 distinct topics
+    var topics = page.content().stream().map(r -> r.discoveryTopic()).toList();
+    assertThat(topics)
+        .containsExactlyInAnyOrder(
+            DiscoveryTopic.MYTHS_AND_LEGENDS,
+            DiscoveryTopic.HISTORY_AND_MEMORY,
+            DiscoveryTopic.CULTURE_AND_TRADITIONS,
+            DiscoveryTopic.REAL_STORIES,
+            DiscoveryTopic.NATURE_AND_PLACES);
+
+    System.out.println("VERIFIED: browse MX totalElements = " + page.totalElements());
+  }
+
+  @Test
+  @DisplayName("4. Print real Latin America discovery readings table")
   void testPrintReadingsTable() {
     var page =
         browsePlatformReadingsPort.browsePlatformReadings(

@@ -11,12 +11,23 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class DocumentChunker {
-  public static final int VERSION = 4;
+  public static final int VERSION = 5;
+
   static final int TARGET_WORDS = 160;
   static final int MINIMUM_WORDS = 100;
   static final int MAXIMUM_WORDS = 220;
   static final int HARD_WORDS = 260;
   static final int HARD_BYTES = 80 * 1024;
+
+  static final double DENSITY_THRESHOLD_WORDS_PER_BLOCK = 15.0;
+  static final int DENSE_MIN_BLOCKS_TO_CLASSIFY = 6;
+  static final int DENSE_TARGET_WORDS = 110;
+  static final int DENSE_MINIMUM_WORDS = 60;
+  static final int DENSE_SOFT_MAX_WORDS = 150;
+  static final int DENSE_MAX_BLOCKS = 20;
+  static final int DENSE_HARD_MAX_BLOCKS = 25;
+  static final int PROSE_HARD_MAX_BLOCKS = 50;
+
   private final int targetWords;
   private final int minimumWords;
   private final int maximumWords;
@@ -48,39 +59,108 @@ public class DocumentChunker {
             .toList();
     var chunks = new ArrayList<DocumentChunk>();
     var current = new ArrayList<String>();
+    var denseMode = false;
+
     for (var block : blocks) {
       var candidate = new ArrayList<>(current);
       candidate.add(block);
-      if (!current.isEmpty() && exceedsSoft(candidate)) {
+      int candidateWords = words(candidate);
+      int candidateBlocks = candidate.size();
+
+      if (isDense(candidateWords, candidateBlocks)) {
+        denseMode = true;
+      }
+
+      if (!current.isEmpty() && exceedsSoft(candidate, denseMode)) {
         var context = trailingContext(current);
         var contentSize = current.size() - context.size();
         if (contentSize > 0) {
           add(chunks, current.subList(0, contentSize));
           current = new ArrayList<>(context);
-        } else if (exceedsHard(candidate)) {
+          denseMode = isDense(words(current), current.size());
+        } else if (exceedsHard(candidate, denseMode)) {
           add(chunks, current);
           current = new ArrayList<>();
+          denseMode = false;
         }
       }
       current.add(block);
-      if (words(current) >= targetWords && !isContext(block)) {
+
+      int currentWords = words(current);
+      int currentBlocks = current.size();
+      if (isDense(currentWords, currentBlocks)) {
+        denseMode = true;
+      }
+
+      if (reachesTarget(currentWords, currentBlocks, denseMode, block)) {
         add(chunks, current);
         current = new ArrayList<>();
+        denseMode = false;
       }
     }
+
     if (!current.isEmpty()) {
-      if (!chunks.isEmpty() && words(current) < minimumWords) {
+      int trailingWords = words(current);
+      int trailingBlocks = current.size();
+      boolean currentIsDense = denseMode || isDense(trailingWords, trailingBlocks);
+      int effectiveMinWords = currentIsDense ? DENSE_MINIMUM_WORDS : minimumWords;
+
+      if (!chunks.isEmpty() && trailingWords < effectiveMinWords) {
         var prior = chunks.removeLast();
-        var merged = new ArrayList<>(List.of(prior.content()));
-        merged.addAll(current);
-        if (!exceedsSoft(merged)) add(chunks, merged);
-        else {
+        var priorBlocks = List.of(prior.content().split("\n\n", -1));
+        var mergedBlocks = new ArrayList<>(priorBlocks);
+        mergedBlocks.addAll(current);
+        boolean mergedDense = isDense(words(mergedBlocks), mergedBlocks.size());
+
+        if (!exceedsSoft(mergedBlocks, mergedDense) && !exceedsHard(mergedBlocks, mergedDense)) {
+          add(chunks, mergedBlocks);
+        } else {
           chunks.add(prior);
           add(chunks, current);
         }
-      } else add(chunks, current);
+      } else {
+        add(chunks, current);
+      }
     }
     return List.copyOf(chunks);
+  }
+
+  private boolean reachesTarget(
+      int currentWords, int currentBlocks, boolean denseMode, String lastBlock) {
+    if (denseMode) {
+      if (currentBlocks >= DENSE_HARD_MAX_BLOCKS) {
+        return true;
+      }
+      return (currentWords >= DENSE_TARGET_WORDS || currentBlocks >= DENSE_MAX_BLOCKS)
+          && currentWords >= DENSE_MINIMUM_WORDS
+          && !isContext(lastBlock);
+    }
+    return currentWords >= targetWords && !isContext(lastBlock);
+  }
+
+  private boolean isDense(int words, int blocks) {
+    return blocks >= DENSE_MIN_BLOCKS_TO_CLASSIFY
+        && ((double) words / blocks) < DENSITY_THRESHOLD_WORDS_PER_BLOCK;
+  }
+
+  private boolean exceedsSoft(List<String> blocks, boolean dense) {
+    if (bytes(blocks) > HARD_BYTES) return true;
+    int w = words(blocks);
+    int b = blocks.size();
+    if (dense) {
+      if (w > DENSE_SOFT_MAX_WORDS) return true;
+      if (b > DENSE_HARD_MAX_BLOCKS) return true;
+      return b > DENSE_MAX_BLOCKS && w >= DENSE_MINIMUM_WORDS;
+    }
+    return w > maximumWords || b > PROSE_HARD_MAX_BLOCKS;
+  }
+
+  private boolean exceedsHard(List<String> blocks, boolean dense) {
+    if (bytes(blocks) > HARD_BYTES) return true;
+    if (words(blocks) > hardWords) return true;
+    int b = blocks.size();
+    if (b <= 1) return false;
+    return dense ? b > DENSE_HARD_MAX_BLOCKS : b > PROSE_HARD_MAX_BLOCKS;
   }
 
   public int wordCount(String value) {
@@ -91,7 +171,7 @@ public class DocumentChunker {
   }
 
   private List<String> splitOversized(String block, Locale locale) {
-    if (!exceedsHard(List.of(block))) return List.of(block);
+    if (!exceedsHard(List.of(block), false)) return List.of(block);
     var iterator = BreakIterator.getSentenceInstance(locale);
     iterator.setText(block);
     var sentences = new ArrayList<String>();
@@ -136,14 +216,6 @@ public class DocumentChunker {
       current.append(word);
     }
     if (!current.isEmpty()) output.add(current.toString());
-  }
-
-  private boolean exceedsSoft(List<String> blocks) {
-    return words(blocks) > maximumWords || bytes(blocks) > HARD_BYTES;
-  }
-
-  private boolean exceedsHard(List<String> blocks) {
-    return words(blocks) > hardWords || bytes(blocks) > HARD_BYTES;
   }
 
   private boolean exceedsHard(CharSequence value) {

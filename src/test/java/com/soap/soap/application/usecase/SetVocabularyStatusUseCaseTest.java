@@ -183,11 +183,11 @@ class SetVocabularyStatusUseCaseTest {
         useCase.setVocabularyStatus(
             new SetVocabularyStatusCommand("learning", "en", VocabularyStatus.KNOWN));
     assertThat(updatedStage4.status()).isEqualTo(VocabularyStatus.KNOWN);
-    assertThat(updatedStage4.srsState()).isEqualTo(com.soap.soap.domain.model.SrsState.REVIEW);
+    assertThat(updatedStage4.srsState()).isEqualTo(existingStage4.srsState());
     // reviewStage is passed through unchanged — legacy field, NOT used for scheduling.
     assertThat(updatedStage4.reviewStage()).isEqualTo(4);
-    // SRS V2: stability = 0.4872 (LEARNING default) → round → 1 day. NOT Leitner +30d.
-    assertThat(updatedStage4.nextReviewAt()).isEqualTo(nowUtc.plusDays(1));
+    // FASE 14.3.7.1 Decoupling: changeStatus(KNOWN) preserves active SRS schedule
+    assertThat(updatedStage4.nextReviewAt()).isEqualTo(existingStage4.nextReviewAt());
     assertThat(updatedStage4.lastReviewedAt()).isEqualTo(nowUtc.minusDays(5));
   }
 }

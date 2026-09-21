@@ -775,6 +775,8 @@
             <xs:element name="status" type="tns:vocabularyStatusType"/>
             <xs:element name="srsState" type="tns:srsStateType" minOccurs="0"/>
             <xs:element name="ratingOptions" type="tns:ratingOptionType" minOccurs="0" maxOccurs="4"/>
+            <xs:element name="pendingQueueSequence" type="xs:long" minOccurs="0"/>
+            <xs:element name="baseOrder" type="xs:int" minOccurs="0"/>
         </xs:sequence>
     </xs:complexType>
 
@@ -787,6 +789,9 @@
             <xs:element name="intervalSeconds" type="xs:long" minOccurs="0"/>
             <xs:element name="stability" type="xs:decimal" minOccurs="0"/>
             <xs:element name="difficulty" type="xs:decimal" minOccurs="0"/>
+            <xs:element name="ratingOptions" type="tns:ratingOptionType" minOccurs="0" maxOccurs="4"/>
+            <xs:element name="pendingQueueSequence" type="xs:long" minOccurs="0"/>
+            <xs:element name="baseOrder" type="xs:int" minOccurs="0"/>
         </xs:sequence>
     </xs:complexType>
 
@@ -799,7 +804,13 @@
         <xs:complexType><xs:sequence>
             <xs:element name="dueCount" type="xs:long"/>
             <xs:element name="totalReviewableCount" type="xs:long"/>
+            <xs:element name="dailyLimit" type="xs:int" minOccurs="0" default="15"/>
+            <xs:element name="dailyBaseCompleted" type="xs:int" minOccurs="0"/>
+            <xs:element name="dailyBaseRemaining" type="xs:int" minOccurs="0"/>
+            <xs:element name="pendingLearningCount" type="xs:int" minOccurs="0"/>
+            <xs:element name="dailyComplete" type="xs:boolean" minOccurs="0"/>
             <xs:element name="entries" type="tns:reviewItemType" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="learnAheadEntries" type="tns:reviewItemType" minOccurs="0" maxOccurs="unbounded"/>
         </xs:sequence></xs:complexType>
     </xs:element>
 

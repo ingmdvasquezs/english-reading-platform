@@ -9,6 +9,7 @@ import com.soap.soap.application.model.ParsedDocumentCover;
 import com.soap.soap.application.model.ParsedDocumentSection;
 import com.soap.soap.application.port.out.DocumentParserPort;
 import com.soap.soap.domain.model.DocumentFormat;
+import com.soap.soap.domain.service.DocumentSectionTitleSanitizer;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -236,7 +237,12 @@ public class EpubDocumentParserAdapter implements DocumentParserPort {
     }
     var heading = document.selectFirst("h1,h2,h3,h4,h5,h6");
     var headTitle = document.selectFirst("head > title");
-    var title = heading == null ? textOrNull(headTitle) : textOrNull(heading);
+    var headingCandidate =
+        heading != null ? DocumentSectionTitleSanitizer.sanitize(textOrNull(heading)) : null;
+    var title =
+        headingCandidate != null
+            ? headingCandidate
+            : DocumentSectionTitleSanitizer.sanitize(textOrNull(headTitle));
     return new ParsedXhtml(title, result);
   }
 
