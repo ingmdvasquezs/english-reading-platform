@@ -27,6 +27,13 @@ class AsYouLikeItV5ReimportValidationTest {
               "jdbc:postgresql://localhost:5432/english_reading",
               "english_user",
               "english_password");
+      try (var rs = conn.getMetaData().getTables(null, null, "imported_documents", null)) {
+        if (!rs.next()) {
+          org.junit.jupiter.api.Assumptions.abort(
+              "Table imported_documents not present in local database");
+          return;
+        }
+      }
     } catch (Exception e) {
       org.junit.jupiter.api.Assumptions.abort(
           "Local validation database not available at localhost:5432: " + e.getMessage());
