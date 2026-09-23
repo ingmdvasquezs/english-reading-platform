@@ -50,5 +50,8 @@ public interface ImportedDocumentRepositoryPort {
 
   void deleteDocument(UUID documentId);
 
+  void replaceDocumentStructure(
+      UUID documentId, List<DocumentSection> sections, List<DocumentUnit> units);
+
   Set<String> findReferencedAssetKeys();
 }

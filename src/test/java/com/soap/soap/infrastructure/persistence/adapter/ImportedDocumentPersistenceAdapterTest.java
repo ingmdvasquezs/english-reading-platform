@@ -13,6 +13,7 @@ import com.soap.soap.infrastructure.persistence.entity.ImportedDocumentEntity;
 import com.soap.soap.infrastructure.persistence.mapper.DocumentSectionEntityMapper;
 import com.soap.soap.infrastructure.persistence.mapper.DocumentUnitEntityMapper;
 import com.soap.soap.infrastructure.persistence.mapper.ImportedDocumentEntityMapper;
+import com.soap.soap.infrastructure.persistence.repository.JpaDocumentProgressRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaDocumentSectionRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaDocumentUnitRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaImportedDocumentRepository;
@@ -34,6 +35,7 @@ class ImportedDocumentPersistenceAdapterTest {
   @Mock private JpaImportedDocumentRepository documents;
   @Mock private JpaDocumentSectionRepository sections;
   @Mock private JpaDocumentUnitRepository units;
+  @Mock private JpaDocumentProgressRepository progress;
 
   private ImportedDocumentEntityMapper documentMapper;
   private DocumentSectionEntityMapper sectionMapper;
@@ -47,7 +49,7 @@ class ImportedDocumentPersistenceAdapterTest {
     unitMapper = Mappers.getMapper(DocumentUnitEntityMapper.class);
     adapter =
         new ImportedDocumentPersistenceAdapter(
-            documents, sections, units, documentMapper, sectionMapper, unitMapper);
+            documents, sections, units, progress, documentMapper, sectionMapper, unitMapper);
   }
 
   @Test

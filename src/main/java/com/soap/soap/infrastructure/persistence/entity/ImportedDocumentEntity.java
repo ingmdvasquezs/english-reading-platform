@@ -6,10 +6,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.Getter;
@@ -17,16 +18,28 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.springframework.data.domain.Persistable;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
 @Table(name = "imported_documents")
-public class ImportedDocumentEntity {
-  @Id
-  @GeneratedValue(strategy = GenerationType.UUID)
-  private UUID id;
+public class ImportedDocumentEntity implements Persistable<UUID> {
+  @Id private UUID id;
+
+  @Transient private boolean isNew = true;
+
+  @Override
+  public boolean isNew() {
+    return isNew;
+  }
+
+  @PostLoad
+  @PostPersist
+  void markNotNew() {
+    this.isNew = false;
+  }
 
   @Column(name = "user_id", nullable = false)
   private UUID ownerId;
