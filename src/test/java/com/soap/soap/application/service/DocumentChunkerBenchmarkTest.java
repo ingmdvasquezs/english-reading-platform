@@ -21,12 +21,20 @@ class DocumentChunkerBenchmarkTest {
 
   @Test
   void benchmarkV4VsV5AcrossTheatreAndProse() throws Exception {
-    try (var conn =
-        DriverManager.getConnection(
-            "jdbc:postgresql://localhost:5432/english_reading",
-            "english_user",
-            "english_password")) {
+    java.sql.Connection conn;
+    try {
+      conn =
+          DriverManager.getConnection(
+              "jdbc:postgresql://localhost:5432/english_reading",
+              "english_user",
+              "english_password");
+    } catch (Exception e) {
+      org.junit.jupiter.api.Assumptions.abort(
+          "Local validation database not available at localhost:5432: " + e.getMessage());
+      return;
+    }
 
+    try (conn) {
       var asYouLikeItId = UUID.fromString("a459fdf7-6c76-40d2-821b-0ad159bc420a");
       var soulsId = UUID.fromString("84d564ed-ff08-4245-b00f-bc01dae22f92");
       var bellJarId = UUID.fromString("1fc973e1-7218-451e-8f43-2649fdd9013d");
@@ -34,6 +42,12 @@ class DocumentChunkerBenchmarkTest {
       var theatreSections = loadDocumentSections(conn, asYouLikeItId);
       var soulsSections = loadDocumentSections(conn, soulsId);
       var bellJarSections = loadDocumentSections(conn, bellJarId);
+
+      if (theatreSections.isEmpty() || soulsSections.isEmpty() || bellJarSections.isEmpty()) {
+        org.junit.jupiter.api.Assumptions.abort(
+            "Benchmark test documents not found in local database");
+        return;
+      }
 
       var theatreV4 = runChunker(v4::chunk, theatreSections);
       var theatreV5 = runChunker(v5::chunk, theatreSections);
