@@ -21,4 +21,6 @@ public interface JpaDocumentUnitRepository extends JpaRepository<DocumentUnitEnt
   long countByDocumentId(UUID documentId);
 
   long countByDocumentIdAndSectionId(UUID documentId, UUID sectionId);
+
+  void deleteByDocumentId(UUID documentId);
 }

@@ -12,6 +12,7 @@ import com.soap.soap.domain.model.ImportedDocument;
 import com.soap.soap.infrastructure.persistence.mapper.DocumentSectionEntityMapper;
 import com.soap.soap.infrastructure.persistence.mapper.DocumentUnitEntityMapper;
 import com.soap.soap.infrastructure.persistence.mapper.ImportedDocumentEntityMapper;
+import com.soap.soap.infrastructure.persistence.repository.JpaDocumentProgressRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaDocumentSectionRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaDocumentUnitRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaImportedDocumentRepository;
@@ -30,6 +31,7 @@ public class ImportedDocumentPersistenceAdapter implements ImportedDocumentRepos
   private final JpaImportedDocumentRepository documents;
   private final JpaDocumentSectionRepository sections;
   private final JpaDocumentUnitRepository units;
+  private final JpaDocumentProgressRepository progress;
   private final ImportedDocumentEntityMapper documentMapper;
   private final DocumentSectionEntityMapper sectionMapper;
   private final DocumentUnitEntityMapper unitMapper;
@@ -39,9 +41,18 @@ public class ImportedDocumentPersistenceAdapter implements ImportedDocumentRepos
   public ImportedDocument saveDocument(ImportedDocument document) {
     try {
       var entity = documentMapper.toEntity(document);
+      boolean isNew;
+      if (document.id() == null) {
+        entity.setId(UUID.randomUUID());
+        isNew = true;
+      } else {
+        isNew = !documents.existsById(document.id());
+      }
+      entity.setNew(isNew);
+
       if (document.importStatus() == DocumentImportStatus.FAILED) {
         entity.setDeduplicationSha256(null);
-      } else if (document.id() == null) {
+      } else if (isNew) {
         entity.setDeduplicationSha256(document.sourceSha256());
       } else {
         documents
@@ -100,9 +111,40 @@ public class ImportedDocumentPersistenceAdapter implements ImportedDocumentRepos
   @Override
   @Transactional
   public List<DocumentSection> saveSections(List<DocumentSection> values) {
-    return sections.saveAll(values.stream().map(sectionMapper::toEntity).toList()).stream()
-        .map(sectionMapper::toDomain)
-        .toList();
+    if (values == null || values.isEmpty()) {
+      return List.of();
+    }
+    java.util.Set<UUID> ids =
+        values.stream()
+            .map(DocumentSection::id)
+            .filter(java.util.Objects::nonNull)
+            .collect(java.util.stream.Collectors.toSet());
+    java.util.Set<UUID> existingIds =
+        ids.isEmpty()
+            ? java.util.Set.of()
+            : new java.util.HashSet<>(
+                sections.findAllById(ids).stream()
+                    .map(
+                        com.soap.soap.infrastructure.persistence.entity.DocumentSectionEntity
+                            ::getId)
+                    .toList());
+
+    var entities =
+        values.stream()
+            .map(
+                section -> {
+                  var entity = sectionMapper.toEntity(section);
+                  if (entity.getId() == null) {
+                    entity.setId(UUID.randomUUID());
+                    entity.setNew(true);
+                  } else {
+                    entity.setNew(!existingIds.contains(entity.getId()));
+                  }
+                  return entity;
+                })
+            .toList();
+
+    return sections.saveAll(entities).stream().map(sectionMapper::toDomain).toList();
   }
 
   @Override
@@ -131,9 +173,38 @@ public class ImportedDocumentPersistenceAdapter implements ImportedDocumentRepos
   @Override
   @Transactional
   public List<DocumentUnit> saveUnits(List<DocumentUnit> values) {
-    return units.saveAll(values.stream().map(unitMapper::toEntity).toList()).stream()
-        .map(unitMapper::toDomain)
-        .toList();
+    if (values == null || values.isEmpty()) {
+      return List.of();
+    }
+    java.util.Set<UUID> ids =
+        values.stream()
+            .map(DocumentUnit::id)
+            .filter(java.util.Objects::nonNull)
+            .collect(java.util.stream.Collectors.toSet());
+    java.util.Set<UUID> existingIds =
+        ids.isEmpty()
+            ? java.util.Set.of()
+            : new java.util.HashSet<>(
+                units.findAllById(ids).stream()
+                    .map(com.soap.soap.infrastructure.persistence.entity.DocumentUnitEntity::getId)
+                    .toList());
+
+    var entities =
+        values.stream()
+            .map(
+                unit -> {
+                  var entity = unitMapper.toEntity(unit);
+                  if (entity.getId() == null) {
+                    entity.setId(UUID.randomUUID());
+                    entity.setNew(true);
+                  } else {
+                    entity.setNew(!existingIds.contains(entity.getId()));
+                  }
+                  return entity;
+                })
+            .toList();
+
+    return units.saveAll(entities).stream().map(unitMapper::toDomain).toList();
   }
 
   @Override
@@ -196,6 +267,27 @@ public class ImportedDocumentPersistenceAdapter implements ImportedDocumentRepos
   @Transactional
   public void deleteDocument(UUID documentId) {
     documents.deleteById(documentId);
+  }
+
+  @Override
+  @Transactional
+  public void replaceDocumentStructure(
+      UUID documentId, List<DocumentSection> newSections, List<DocumentUnit> newUnits) {
+    if (progress.existsByDocumentId(documentId)) {
+      throw new IllegalStateException(
+          "Cannot replace document structure: unexpected reading progress exists for document "
+              + documentId);
+    }
+    units.deleteByDocumentId(documentId);
+    sections.deleteByDocumentId(documentId);
+    units.flush();
+    sections.flush();
+    if (newSections != null && !newSections.isEmpty()) {
+      saveSections(newSections);
+    }
+    if (newUnits != null && !newUnits.isEmpty()) {
+      saveUnits(newUnits);
+    }
   }
 
   @Override
