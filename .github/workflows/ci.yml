@@ -11,6 +11,29 @@ jobs:
     name: Build & Verify (including Spotless)
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: english_reading
+          POSTGRES_USER: english_user
+          POSTGRES_PASSWORD: english_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U english_user -d english_reading"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/english_reading
+      DB_USERNAME: english_user
+      DB_PASSWORD: english_password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/english_reading
+      SPRING_DATASOURCE_USERNAME: english_user
+      SPRING_DATASOURCE_PASSWORD: english_password
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
