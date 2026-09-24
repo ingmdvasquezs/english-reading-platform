@@ -42,6 +42,10 @@ public class ImportJobEntity {
   @Column(name = "source_asset_key", nullable = false, length = 500)
   private String sourceAssetKey;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "storage_provider", nullable = false, length = 20)
+  private com.soap.soap.domain.model.StorageProvider storageProvider;
+
   @Column(name = "language_override", length = 50)
   private String languageOverride;
 

@@ -28,6 +28,62 @@ public class RestExceptionHandler {
         "This document has already been imported or is currently being processed.");
   }
 
+  @ExceptionHandler(com.soap.soap.application.exception.UploadNotCompletedException.class)
+  ResponseEntity<ApiError> uploadNotCompleted(
+      com.soap.soap.application.exception.UploadNotCompletedException exception) {
+    return error(
+        HttpStatus.CONFLICT,
+        "UPLOAD_NOT_COMPLETED",
+        "The object has not been uploaded to storage yet.");
+  }
+
+  @ExceptionHandler(com.soap.soap.application.exception.UploadIntegrityMismatchException.class)
+  ResponseEntity<ApiError> integrityMismatch(
+      com.soap.soap.application.exception.UploadIntegrityMismatchException exception) {
+    return error(
+        HttpStatus.UNPROCESSABLE_ENTITY, "UPLOAD_INTEGRITY_MISMATCH", exception.getMessage());
+  }
+
+  @ExceptionHandler(com.soap.soap.application.exception.TransientStorageException.class)
+  ResponseEntity<ApiError> transientStorage(
+      com.soap.soap.application.exception.TransientStorageException exception) {
+    return error(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "STORAGE_TRANSIENT_ERROR",
+        "Storage service is temporarily unavailable. Please retry.");
+  }
+
+  @ExceptionHandler(com.soap.soap.application.exception.StorageChecksumUnavailableException.class)
+  ResponseEntity<ApiError> checksumUnavailable(
+      com.soap.soap.application.exception.StorageChecksumUnavailableException exception) {
+    return error(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "STORAGE_CHECKSUM_UNAVAILABLE",
+        "Storage checksum is temporarily unavailable. Please retry confirmation.");
+  }
+
+  @ExceptionHandler(com.soap.soap.application.exception.UploadNotFoundException.class)
+  ResponseEntity<ApiError> uploadNotFound(
+      com.soap.soap.application.exception.UploadNotFoundException exception) {
+    return error(
+        HttpStatus.NOT_FOUND, "UPLOAD_NOT_FOUND", "The requested upload intent was not found.");
+  }
+
+  @ExceptionHandler(com.soap.soap.application.exception.UploadExpiredException.class)
+  ResponseEntity<ApiError> uploadExpired(
+      com.soap.soap.application.exception.UploadExpiredException exception) {
+    return error(HttpStatus.BAD_REQUEST, "UPLOAD_EXPIRED", "The upload intent has expired.");
+  }
+
+  @ExceptionHandler(com.soap.soap.application.exception.UploadAbortedException.class)
+  ResponseEntity<ApiError> uploadAborted(
+      com.soap.soap.application.exception.UploadAbortedException exception) {
+    return error(
+        HttpStatus.CONFLICT,
+        "UPLOAD_ABORTED",
+        "The upload intent was aborted due to integrity mismatch.");
+  }
+
   @ExceptionHandler({DocumentNotFoundException.class, DocumentUnitNotFoundException.class})
   ResponseEntity<ApiError> notFound(RuntimeException exception) {
     return error(

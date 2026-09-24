@@ -70,6 +70,10 @@ public class ImportedDocumentEntity implements Persistable<UUID> {
   @Column(name = "source_asset_key", length = 500)
   private String sourceAssetKey;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "source_storage_provider", nullable = false, length = 20)
+  private com.soap.soap.domain.model.StorageProvider sourceStorageProvider;
+
   @Column(name = "original_filename", length = 500)
   private String originalFilename;
 

@@ -15,6 +15,7 @@ import com.soap.soap.application.service.DocumentLanguagePolicy;
 import com.soap.soap.domain.model.DocumentFormat;
 import com.soap.soap.domain.model.DocumentImportStatus;
 import com.soap.soap.domain.model.ImportedDocument;
+import com.soap.soap.domain.model.StorageProvider;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
@@ -93,9 +94,11 @@ public class AcceptDocumentImportUseCase {
                   format,
                   null,
                   null,
+                  StorageProvider.FILESYSTEM,
                   safeName,
                   sourceSha256,
                   DocumentImportStatus.PROCESSING,
+                  null,
                   DocumentChunker.VERSION,
                   now,
                   now));
@@ -196,6 +199,7 @@ public class AcceptDocumentImportUseCase {
             document.format(),
             null,
             null,
+            StorageProvider.FILESYSTEM,
             document.originalFilename(),
             document.sourceSha256(),
             DocumentImportStatus.FAILED,
@@ -215,9 +219,11 @@ public class AcceptDocumentImportUseCase {
         value.format(),
         null,
         sourceKey,
+        StorageProvider.FILESYSTEM,
         value.originalFilename(),
         value.sourceSha256(),
         value.importStatus(),
+        null,
         value.chunkingVersion(),
         value.createdAt(),
         LocalDateTime.now(clock));

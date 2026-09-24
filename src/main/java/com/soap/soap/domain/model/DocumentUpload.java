@@ -14,6 +14,7 @@ public record DocumentUpload(
     long expectedSizeBytes,
     String expectedChecksumSha256,
     String storageKey,
+    StorageProvider storageProvider,
     DocumentUploadStatus status,
     LocalDateTime expiresAt,
     LocalDateTime confirmedAt,
@@ -32,6 +33,7 @@ public record DocumentUpload(
       throw new IllegalArgumentException("expectedSizeBytes must not be negative");
     }
     Objects.requireNonNull(storageKey, "storageKey must not be null");
+    Objects.requireNonNull(storageProvider, "storageProvider must not be null");
     Objects.requireNonNull(status, "status must not be null");
     Objects.requireNonNull(expiresAt, "expiresAt must not be null");
     Objects.requireNonNull(createdAt, "createdAt must not be null");
@@ -39,6 +41,43 @@ public record DocumentUpload(
     if (updatedAt.isBefore(createdAt)) {
       throw new IllegalArgumentException("updatedAt must not precede createdAt");
     }
+  }
+
+  public DocumentUpload(
+      UUID id,
+      UUID documentId,
+      UUID userId,
+      String originalFilename,
+      DocumentFormat format,
+      String contentType,
+      long expectedSizeBytes,
+      String expectedChecksumSha256,
+      String storageKey,
+      DocumentUploadStatus status,
+      LocalDateTime expiresAt,
+      LocalDateTime confirmedAt,
+      UUID confirmedJobId,
+      LocalDateTime createdAt,
+      LocalDateTime updatedAt,
+      long version) {
+    this(
+        id,
+        documentId,
+        userId,
+        originalFilename,
+        format,
+        contentType,
+        expectedSizeBytes,
+        expectedChecksumSha256,
+        storageKey,
+        StorageProvider.S3,
+        status,
+        expiresAt,
+        confirmedAt,
+        confirmedJobId,
+        createdAt,
+        updatedAt,
+        version);
   }
 
   public boolean isExpired(LocalDateTime now) {

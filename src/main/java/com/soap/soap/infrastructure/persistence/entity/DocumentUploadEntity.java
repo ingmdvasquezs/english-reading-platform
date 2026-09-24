@@ -50,6 +50,10 @@ public class DocumentUploadEntity {
   private String storageKey;
 
   @Enumerated(EnumType.STRING)
+  @Column(name = "storage_provider", nullable = false, length = 20)
+  private com.soap.soap.domain.model.StorageProvider storageProvider;
+
+  @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private DocumentUploadStatus status;
 

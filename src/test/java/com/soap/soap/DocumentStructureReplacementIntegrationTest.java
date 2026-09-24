@@ -543,10 +543,10 @@ class DocumentStructureReplacementIntegrationTest {
   }
 
   @Test
-  @DisplayName("T41: Architecture is pure local without AWS SDK classes on classpath")
+  @DisplayName("T41: Phase 17.2 has S3 SDK on classpath but zero SQS dependencies")
   void verifyZeroAwsDependencies() {
-    assertThatThrownBy(() -> Class.forName("software.amazon.awssdk.services.s3.S3Client"))
-        .isInstanceOf(ClassNotFoundException.class);
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> Class.forName("software.amazon.awssdk.services.s3.S3Client"));
     assertThatThrownBy(() -> Class.forName("software.amazon.awssdk.services.sqs.SqsClient"))
         .isInstanceOf(ClassNotFoundException.class);
   }

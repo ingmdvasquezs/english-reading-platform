@@ -12,6 +12,7 @@ public record ImportJob(
     int attemptCount,
     int maxAttempts,
     String sourceAssetKey,
+    StorageProvider storageProvider,
     String languageOverride,
     String workerId,
     UUID leaseToken,
@@ -31,6 +32,7 @@ public record ImportJob(
     Objects.requireNonNull(userId, "userId must not be null");
     Objects.requireNonNull(status, "status must not be null");
     Objects.requireNonNull(sourceAssetKey, "sourceAssetKey must not be null");
+    Objects.requireNonNull(storageProvider, "storageProvider must not be null");
     if (attemptCount < 0) {
       throw new IllegalArgumentException("attemptCount must not be negative");
     }
@@ -42,6 +44,51 @@ public record ImportJob(
     if (updatedAt.isBefore(createdAt)) {
       throw new IllegalArgumentException("updatedAt must not precede createdAt");
     }
+  }
+
+  public ImportJob(
+      UUID id,
+      UUID documentId,
+      UUID userId,
+      ImportJobStatus status,
+      int attemptCount,
+      int maxAttempts,
+      String sourceAssetKey,
+      String languageOverride,
+      String workerId,
+      UUID leaseToken,
+      LocalDateTime leaseUntil,
+      LocalDateTime nextAttemptAt,
+      LocalDateTime heartbeatAt,
+      LocalDateTime startedAt,
+      LocalDateTime finishedAt,
+      String lastErrorCode,
+      String lastErrorMessage,
+      LocalDateTime createdAt,
+      LocalDateTime updatedAt,
+      long version) {
+    this(
+        id,
+        documentId,
+        userId,
+        status,
+        attemptCount,
+        maxAttempts,
+        sourceAssetKey,
+        StorageProvider.FILESYSTEM,
+        languageOverride,
+        workerId,
+        leaseToken,
+        leaseUntil,
+        nextAttemptAt,
+        heartbeatAt,
+        startedAt,
+        finishedAt,
+        lastErrorCode,
+        lastErrorMessage,
+        createdAt,
+        updatedAt,
+        version);
   }
 
   public boolean isProcessing() {
