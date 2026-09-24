@@ -14,6 +14,7 @@ public record ImportedDocument(
     DocumentFormat format,
     String coverAssetKey,
     String sourceAssetKey,
+    StorageProvider sourceStorageProvider,
     String originalFilename,
     String sourceSha256,
     DocumentImportStatus importStatus,
@@ -33,6 +34,7 @@ public record ImportedDocument(
       throw new IllegalArgumentException("Document language must be a valid BCP 47 tag");
     }
     Objects.requireNonNull(format, "Document format must not be null");
+    Objects.requireNonNull(sourceStorageProvider, "sourceStorageProvider must not be null");
     sourceSha256 = requireText(sourceSha256, "Document source SHA-256");
     if (!SHA_256.matcher(sourceSha256).matches()) {
       throw new IllegalArgumentException(
@@ -72,6 +74,7 @@ public record ImportedDocument(
       String originalFilename,
       String sourceSha256,
       DocumentImportStatus importStatus,
+      String failureReason,
       int chunkingVersion,
       LocalDateTime createdAt,
       LocalDateTime updatedAt) {
@@ -84,6 +87,41 @@ public record ImportedDocument(
         format,
         coverAssetKey,
         sourceAssetKey,
+        StorageProvider.FILESYSTEM,
+        originalFilename,
+        sourceSha256,
+        importStatus,
+        failureReason,
+        chunkingVersion,
+        createdAt,
+        updatedAt);
+  }
+
+  public ImportedDocument(
+      UUID id,
+      UUID ownerId,
+      String title,
+      String author,
+      String language,
+      DocumentFormat format,
+      String coverAssetKey,
+      String sourceAssetKey,
+      String originalFilename,
+      String sourceSha256,
+      DocumentImportStatus importStatus,
+      int chunkingVersion,
+      LocalDateTime createdAt,
+      LocalDateTime updatedAt) {
+    this(
+        id,
+        ownerId,
+        title,
+        author,
+        language,
+        format,
+        coverAssetKey,
+        sourceAssetKey,
+        StorageProvider.FILESYSTEM,
         originalFilename,
         sourceSha256,
         importStatus,

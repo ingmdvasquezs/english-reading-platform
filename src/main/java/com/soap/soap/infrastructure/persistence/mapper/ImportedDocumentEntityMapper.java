@@ -11,5 +11,6 @@ public interface ImportedDocumentEntityMapper {
   ImportedDocument toDomain(ImportedDocumentEntity entity);
 
   @Mapping(target = "deduplicationSha256", ignore = true)
+  @Mapping(target = "new", ignore = true)
   ImportedDocumentEntity toEntity(ImportedDocument domain);
 }

@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface JpaDocumentProgressRepository extends JpaRepository<DocumentProgressEntity, UUID> {
   Optional<DocumentProgressEntity> findByUserIdAndDocumentId(UUID userId, UUID documentId);
+
+  boolean existsByDocumentId(UUID documentId);
 }

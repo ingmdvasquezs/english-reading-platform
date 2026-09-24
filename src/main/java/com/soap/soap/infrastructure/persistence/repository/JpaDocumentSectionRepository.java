@@ -30,6 +30,8 @@ public interface JpaDocumentSectionRepository extends JpaRepository<DocumentSect
 
   long countByDocumentId(UUID documentId);
 
+  void deleteByDocumentId(UUID documentId);
+
   interface SectionNavigationView {
     UUID getId();
 

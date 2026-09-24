@@ -15,28 +15,41 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(properties = "security.jwt.secret=test-only-secret-with-at-least-32-bytes")
+@Testcontainers
 @ActiveProfiles("local")
 class LatinAmericaHomeDiscoveryRealRuntimeVerificationTest {
 
+  @Container @ServiceConnection
+  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
+
   @Autowired private GetDiscoveryRegionOverviewPort getDiscoveryRegionOverviewPort;
   @Autowired private BrowsePlatformReadingsPort browsePlatformReadingsPort;
+  @Autowired private EditorialTestFixtureHelper fixtureHelper;
 
-  // Use andres@gmail.com from dev DB
-  private final UUID andresUserId = UUID.fromString("9413b655-f4ec-40c6-85f7-85508999cd2f");
+  private final UUID testUserId = EditorialTestFixtureHelper.TEST_USER_ID;
 
   @BeforeEach
+  void setUp() {
+    fixtureHelper.seedCatalogIfNeeded();
+    authenticate();
+  }
+
   void authenticate() {
     var jwt =
         Jwt.withTokenValue("mock-token")
             .header("alg", "none")
-            .subject(andresUserId.toString())
-            .claim("sub", andresUserId.toString())
+            .subject(testUserId.toString())
+            .claim("sub", testUserId.toString())
             .build();
     var authentication = new UsernamePasswordAuthenticationToken(jwt, null, List.of());
     SecurityContextHolder.getContext().setAuthentication(authentication);
