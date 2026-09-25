@@ -163,7 +163,8 @@ public class DocumentRestController {
 
   private DocumentFormat validateUpload(MultipartFile file) throws IOException {
     if (file.isEmpty()) throw new IllegalArgumentException("Document file is required");
-    var filename = java.util.Objects.requireNonNullElse(file.getOriginalFilename(), "");
+    var originalFilename = file.getOriginalFilename();
+    var filename = originalFilename != null ? originalFilename : "";
     var lowerName = filename.toLowerCase(java.util.Locale.ROOT);
     var format =
         lowerName.endsWith(".epub")

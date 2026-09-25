@@ -105,7 +105,8 @@ public class SoapObservationInterceptor extends EndpointInterceptorAdapter {
   private String faultCategory(MessageContext context) {
     if (context.getResponse() instanceof SoapMessage soapMessage
         && soapMessage.getSoapBody().hasFault()) {
-      var faultCode = soapMessage.getSoapBody().getFault().getFaultCode();
+      var fault = soapMessage.getSoapBody().getFault();
+      var faultCode = fault != null ? fault.getFaultCode() : null;
       return faultCode != null && "Client".equalsIgnoreCase(faultCode.getLocalPart())
           ? "client"
           : "internal";

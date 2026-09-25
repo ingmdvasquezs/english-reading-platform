@@ -112,4 +112,36 @@ class DocumentSectionTitleSanitizerTest {
   void stripsWhitespaceFromValidHumanTitle() {
     assertThat(DocumentSectionTitleSanitizer.sanitize("  Scene II  \n")).isEqualTo("Scene II");
   }
+
+  @Test
+  void handlesAbnormallyLongTechnicalStringsWithoutPathologicalBacktracking() {
+    String longSuffix = "a".repeat(100_000);
+
+    // Long technical prefix
+    assertThat(DocumentSectionTitleSanitizer.sanitize("id-" + longSuffix)).isNull();
+    assertThat(DocumentSectionTitleSanitizer.sanitize("calibre_id_" + longSuffix)).isNull();
+
+    // Long technical path
+    assertThat(DocumentSectionTitleSanitizer.sanitize(longSuffix + "/section")).isNull();
+    assertThat(DocumentSectionTitleSanitizer.sanitize(longSuffix + "\\section")).isNull();
+
+    // Long technical extension
+    assertThat(DocumentSectionTitleSanitizer.sanitize(longSuffix + ".xhtml")).isNull();
+    assertThat(DocumentSectionTitleSanitizer.sanitize(longSuffix + ".html")).isNull();
+
+    // Long anchor
+    assertThat(DocumentSectionTitleSanitizer.sanitize("#" + longSuffix)).isNull();
+    assertThat(DocumentSectionTitleSanitizer.sanitize("anchor-" + longSuffix)).isNull();
+
+    // Long generator id
+    assertThat(DocumentSectionTitleSanitizer.sanitize("bk01" + longSuffix)).isNull();
+  }
+
+  @Test
+  void preservesVeryLongHumanEditorialHeadingsWithoutPathologicalBacktracking() {
+    String longValidHeading =
+        "Chapter IV - The Great Journey Across the Realm " + "word ".repeat(5_000);
+    assertThat(DocumentSectionTitleSanitizer.sanitize(longValidHeading))
+        .isEqualTo(longValidHeading.strip());
+  }
 }

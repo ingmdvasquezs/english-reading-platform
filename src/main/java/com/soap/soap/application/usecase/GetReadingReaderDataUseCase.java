@@ -44,7 +44,8 @@ public class GetReadingReaderDataUseCase implements GetReadingReaderDataPort {
         && reading.editorialStatus() == EditorialStatus.ARCHIVED) {
       var existingProgress = progress.findByUserIdAndReadingId(userId, reading.id());
       accessPolicy.requireAccessible(reading, userId, existingProgress.isPresent());
-      readingProgress = existingProgress.get();
+      readingProgress =
+          existingProgress.orElseThrow(() -> new ReadingNotFoundException(reading.id()));
     } else {
       accessPolicy.requireAccessible(reading, userId);
       readingProgress = progress.startIfAbsent(userId, reading.id(), LocalDateTime.now(clock));

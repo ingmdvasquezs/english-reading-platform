@@ -110,28 +110,26 @@ public class ConfirmVerifiedDocumentUploadUseCase {
     // 1. Create or ensure ImportedDocument in PROCESSING status
     try {
       StorageProvider effectiveProvider = provider;
-      importedDocuments
-          .findDocumentById(upload.documentId())
-          .orElseGet(
-              () ->
-                  importedDocuments.saveDocument(
-                      new ImportedDocument(
-                          upload.documentId(),
-                          upload.userId(),
-                          upload.originalFilename(),
-                          null,
-                          language,
-                          upload.format(),
-                          null,
-                          upload.storageKey(),
-                          effectiveProvider,
-                          upload.originalFilename(),
-                          sha256,
-                          DocumentImportStatus.PROCESSING,
-                          null,
-                          5,
-                          now,
-                          now)));
+      if (importedDocuments.findDocumentById(upload.documentId()).isEmpty()) {
+        importedDocuments.saveDocument(
+            new ImportedDocument(
+                upload.documentId(),
+                upload.userId(),
+                upload.originalFilename(),
+                null,
+                language,
+                upload.format(),
+                null,
+                upload.storageKey(),
+                effectiveProvider,
+                upload.originalFilename(),
+                sha256,
+                DocumentImportStatus.PROCESSING,
+                null,
+                5,
+                now,
+                now));
+      }
     } catch (DuplicateActiveDocumentSourceException exception) {
       var ex = new DocumentAlreadyImportedException(null, DocumentImportStatus.PROCESSING);
       ex.addSuppressed(exception);

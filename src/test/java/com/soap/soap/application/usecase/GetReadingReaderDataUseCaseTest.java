@@ -247,6 +247,58 @@ class GetReadingReaderDataUseCaseTest {
         .containsOnly(VocabularyStatus.LEARNING);
   }
 
+  @Test
+  void loadsArchivedPlatformReadingWhenUserHasExistingProgress() {
+    var readingId = UUID.randomUUID();
+    var reading =
+        new Reading(
+            readingId,
+            null,
+            "Archived Title",
+            "Archived content",
+            "en",
+            LocalDateTime.now(),
+            ReadingOrigin.PLATFORM,
+            EditorialLevel.B1,
+            "History",
+            com.soap.soap.domain.model.EditorialStatus.ARCHIVED);
+    when(currentUser.requireUserId()).thenReturn(userId);
+    when(readings.findById(readingId)).thenReturn(Optional.of(reading));
+    var startedAt = LocalDateTime.parse("2026-08-30T09:00:00");
+    var progressData = ReadingProgress.inProgress(userId, readingId, startedAt);
+    when(progress.findByUserIdAndReadingId(userId, readingId))
+        .thenReturn(Optional.of(progressData));
+
+    var data = useCase.getReadingReaderData(readingId);
+
+    assertThat(data.readingId()).isEqualTo(readingId);
+    assertThat(data.title()).isEqualTo("Archived Title");
+    assertThat(data.progressStatus()).isEqualTo(ReadingProgressStatus.IN_PROGRESS);
+  }
+
+  @Test
+  void rejectsArchivedPlatformReadingWhenUserHasNoExistingProgress() {
+    var readingId = UUID.randomUUID();
+    var reading =
+        new Reading(
+            readingId,
+            null,
+            "Archived Title",
+            "Archived content",
+            "en",
+            LocalDateTime.now(),
+            ReadingOrigin.PLATFORM,
+            EditorialLevel.B1,
+            "History",
+            com.soap.soap.domain.model.EditorialStatus.ARCHIVED);
+    when(currentUser.requireUserId()).thenReturn(userId);
+    when(readings.findById(readingId)).thenReturn(Optional.of(reading));
+    when(progress.findByUserIdAndReadingId(userId, readingId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> useCase.getReadingReaderData(readingId))
+        .isInstanceOf(ReadingNotFoundException.class);
+  }
+
   private Reading reading(UUID ownerId, String content) {
     return new Reading(
         UUID.randomUUID(),

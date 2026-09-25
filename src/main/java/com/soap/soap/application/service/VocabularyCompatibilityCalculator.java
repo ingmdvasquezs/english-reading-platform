@@ -44,7 +44,7 @@ public class VocabularyCompatibilityCalculator {
     var confidence =
         total == 0
             ? BigDecimal.ZERO.setScale(2)
-            : BigDecimal.valueOf(total - breakdown.unclassifiedWords())
+            : BigDecimal.valueOf((long) total - breakdown.unclassifiedWords())
                 .multiply(ONE_HUNDRED)
                 .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
     return new VocabularyCompatibility(breakdown, fit, confidence);

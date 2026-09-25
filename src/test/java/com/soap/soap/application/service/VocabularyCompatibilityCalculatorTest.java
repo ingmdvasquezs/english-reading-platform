@@ -50,6 +50,19 @@ class VocabularyCompatibilityCalculatorTest {
     assertThat(empty.classificationConfidencePercentage()).isEqualByComparingTo("0.00");
   }
 
+  @Test
+  void calculatesClassificationConfidencePercentageAccurately() {
+    // 3 classified, 1 unclassified -> 3/4 = 75.00%
+    var words = Set.of("w1", "w2", "w3", "w4");
+    var statuses =
+        Map.of(
+            "w1", VocabularyStatus.KNOWN,
+            "w2", VocabularyStatus.LEARNING,
+            "w3", VocabularyStatus.NEW);
+    var result = compatibility.calculate(words, statuses);
+    assertThat(result.classificationConfidencePercentage()).isEqualByComparingTo("75.00");
+  }
+
   private void assertFit(
       String expected, Set<String> words, Map<String, VocabularyStatus> statuses) {
     assertThat(compatibility.calculate(words, statuses).vocabularyFitPercentage())
