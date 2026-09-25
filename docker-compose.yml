@@ -16,5 +16,52 @@ services:
       timeout: 5s
       retries: 5
 
+  sonar-db:
+    image: postgres:17-alpine
+    container_name: sonarqube-postgres
+    environment:
+      POSTGRES_DB: sonarqube
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar_password
+    volumes:
+      - sonarqube_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  sonarqube:
+    image: sonarqube:26.9.0.129388-community
+    container_name: sonarqube
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar_password
+
+      # Solo para nuestro entorno LOCAL.
+      # Evita problemas con los requisitos de Elasticsearch
+      # mientras aprendemos y usamos Sonar en Docker Desktop.
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+
+    ports:
+      - "9000:9000"
+
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+
+    stop_grace_period: 1h
+
 volumes:
   english_reading_data:
+
+  sonarqube_postgres_data:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
