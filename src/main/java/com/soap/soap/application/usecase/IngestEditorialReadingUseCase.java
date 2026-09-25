@@ -18,6 +18,7 @@ import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.LanguageTag;
 import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingOrigin;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +36,7 @@ public class IngestEditorialReadingUseCase implements IngestEditorialReadingPort
   private final ReadingLexicalIndexer lexicalIndexer;
   private final LanguageAvailabilityPolicy languageAvailabilityPolicy;
   private final EditorialQuizValidator quizValidator;
+  private final Clock clock;
 
   @Override
   @Transactional
@@ -92,7 +94,7 @@ public class IngestEditorialReadingUseCase implements IngestEditorialReadingPort
             command.title().trim(),
             command.content(),
             languageTag,
-            targetCreatedAt != null ? targetCreatedAt : LocalDateTime.now(),
+            targetCreatedAt != null ? targetCreatedAt : LocalDateTime.now(clock),
             ReadingOrigin.PLATFORM, // origin MUST be PLATFORM
             command.editorialLevel(),
             command.category().trim(),
@@ -183,7 +185,7 @@ public class IngestEditorialReadingUseCase implements IngestEditorialReadingPort
 
   private List<ComprehensionQuestion> toDomainQuestions(
       UUID readingId, List<EditorialQuestionCommand> questionCommands) {
-    var now = LocalDateTime.now();
+    var now = LocalDateTime.now(clock);
     var questions = new ArrayList<ComprehensionQuestion>();
 
     for (var qc : questionCommands) {

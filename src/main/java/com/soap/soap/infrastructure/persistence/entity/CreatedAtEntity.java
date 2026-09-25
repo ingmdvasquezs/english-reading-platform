@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PrePersist;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,7 +19,7 @@ public abstract class CreatedAtEntity {
   @PrePersist
   void assignCreatedAt() {
     if (createdAt == null) {
-      createdAt = LocalDateTime.now();
+      createdAt = LocalDateTime.now(ZoneOffset.UTC);
     }
   }
 }

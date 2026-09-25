@@ -7,6 +7,7 @@ import com.soap.soap.domain.model.DocumentImportStatus;
 import com.soap.soap.domain.model.ImportJob;
 import com.soap.soap.domain.model.ImportJobStatus;
 import com.soap.soap.domain.model.ImportedDocument;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class CompleteDocumentImportUseCase {
 
   private final ImportJobRepositoryPort importJobs;
   private final ImportedDocumentRepositoryPort importedDocuments;
+  private final Clock clock;
 
   @Transactional
   public boolean completeImport(CompleteDocumentImportCommand command) {
@@ -32,7 +34,7 @@ public class CompleteDocumentImportUseCase {
                     new IllegalStateException(
                         "Cannot complete import: job not found: " + command.jobId()));
 
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
 
     if (job.status() != ImportJobStatus.PROCESSING) {
       throw new IllegalStateException(

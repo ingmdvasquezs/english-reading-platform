@@ -16,6 +16,7 @@ import com.soap.soap.domain.model.ComprehensionQuestion;
 import com.soap.soap.domain.model.EditorialStatus;
 import com.soap.soap.domain.model.LanguageTag;
 import com.soap.soap.domain.model.ReadingOrigin;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,7 @@ public class UpdatePublishedEditorialContentUseCase implements UpdatePublishedEd
   private final ReadingWordFrequencyRepositoryPort wordFrequencyRepository;
   private final ReadingLexicalIndexer lexicalIndexer;
   private final EditorialQuizValidator quizValidator;
+  private final Clock clock;
 
   @Override
   @Transactional
@@ -144,7 +146,7 @@ public class UpdatePublishedEditorialContentUseCase implements UpdatePublishedEd
 
   private List<ComprehensionQuestion> toDomainQuestions(
       UUID readingId, List<EditorialQuestionCommand> questionCommands) {
-    var now = LocalDateTime.now();
+    var now = LocalDateTime.now(clock);
     var questions = new ArrayList<ComprehensionQuestion>();
     for (var qc : questionCommands) {
       var questionId = UUID.randomUUID();

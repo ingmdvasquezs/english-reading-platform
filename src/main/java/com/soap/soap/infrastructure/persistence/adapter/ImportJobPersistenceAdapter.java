@@ -7,6 +7,7 @@ import com.soap.soap.domain.model.WorkerClaim;
 import com.soap.soap.domain.model.WorkerClaimResult;
 import com.soap.soap.infrastructure.persistence.mapper.ImportJobEntityMapper;
 import com.soap.soap.infrastructure.persistence.repository.JpaImportJobRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,6 +23,7 @@ public class ImportJobPersistenceAdapter implements ImportJobRepositoryPort {
 
   private final JpaImportJobRepository repository;
   private final ImportJobEntityMapper mapper;
+  private final Clock clock;
 
   @Override
   @Transactional
@@ -60,7 +62,7 @@ public class ImportJobPersistenceAdapter implements ImportJobRepositoryPort {
   @Override
   @Transactional
   public WorkerClaim claim(UUID jobId, String workerId, Duration leaseDuration) {
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     UUID leaseToken = UUID.randomUUID();
     LocalDateTime leaseUntil = now.plus(leaseDuration);
 
@@ -104,7 +106,7 @@ public class ImportJobPersistenceAdapter implements ImportJobRepositoryPort {
     if (leaseToken == null || workerId == null) {
       return false;
     }
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     LocalDateTime newLeaseUntil = now.plus(additionalDuration);
     return repository.renewLease(jobId, leaseToken, workerId, newLeaseUntil, now) > 0;
   }
@@ -121,7 +123,7 @@ public class ImportJobPersistenceAdapter implements ImportJobRepositoryPort {
     if (leaseToken == null || workerId == null) {
       return false;
     }
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     LocalDateTime nextAttemptAt = now.plus(backoff);
     return repository.releaseForRetry(
             jobId, leaseToken, workerId, nextAttemptAt, errorCode, errorMessage, now)
@@ -134,7 +136,7 @@ public class ImportJobPersistenceAdapter implements ImportJobRepositoryPort {
     if (leaseToken == null || workerId == null) {
       return false;
     }
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     return repository.completeJob(jobId, leaseToken, workerId, now) > 0;
   }
 
@@ -145,14 +147,14 @@ public class ImportJobPersistenceAdapter implements ImportJobRepositoryPort {
     if (leaseToken == null || workerId == null) {
       return false;
     }
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     return repository.failFinal(jobId, leaseToken, workerId, errorCode, errorMessage, now) > 0;
   }
 
   @Override
   @Transactional
   public boolean abort(UUID jobId) {
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     return repository.abortJob(jobId, now) > 0;
   }
 }

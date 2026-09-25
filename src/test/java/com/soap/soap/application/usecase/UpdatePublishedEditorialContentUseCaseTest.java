@@ -31,7 +31,10 @@ import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.RightsStatus;
 import com.soap.soap.domain.model.SourceKind;
 import com.soap.soap.domain.model.User;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,13 +56,20 @@ class UpdatePublishedEditorialContentUseCaseTest {
   @Mock private ReadingLexicalIndexer lexicalIndexer;
   @Mock private EditorialQuizValidator quizValidator;
 
+  private Clock clock;
   private UpdatePublishedEditorialContentUseCase useCase;
 
   @BeforeEach
   void setUp() {
+    clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
     useCase =
         new UpdatePublishedEditorialContentUseCase(
-            readings, comprehensionQuizzes, wordFrequencyRepository, lexicalIndexer, quizValidator);
+            readings,
+            comprehensionQuizzes,
+            wordFrequencyRepository,
+            lexicalIndexer,
+            quizValidator,
+            clock);
   }
 
   private Reading createPublishedPlatformReading(String content) {

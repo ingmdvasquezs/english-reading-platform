@@ -180,15 +180,16 @@ public class RecordVocabularyReviewUseCase implements RecordVocabularyReviewPort
     if (current.lastReviewedAt() != null && current.nextReviewAt() != null) {
       prevIntervalSeconds =
           Math.max(
-              0L, Duration.between(current.lastReviewedAt(), current.nextReviewAt()).toSeconds());
+              0L, durationBetweenUtc(current.lastReviewedAt(), current.nextReviewAt()).toSeconds());
     } else if (current.nextReviewAt() != null && current.firstSeenAt() != null) {
       prevIntervalSeconds =
-          Math.max(0L, Duration.between(current.firstSeenAt(), current.nextReviewAt()).toSeconds());
+          Math.max(
+              0L, durationBetweenUtc(current.firstSeenAt(), current.nextReviewAt()).toSeconds());
     }
 
     double elapsedDays = 0.0;
     if (current.lastReviewedAt() != null) {
-      long elapsedSeconds = Duration.between(current.lastReviewedAt(), nowUtc).toSeconds();
+      long elapsedSeconds = durationBetweenUtc(current.lastReviewedAt(), nowUtc).toSeconds();
       elapsedDays = Math.max(0.0, elapsedSeconds / 86400.0);
     }
     double scheduledDays = prevIntervalSeconds / 86400.0;
@@ -198,7 +199,8 @@ public class RecordVocabularyReviewUseCase implements RecordVocabularyReviewPort
 
     long newIntervalSeconds = 0L;
     if (saved.nextReviewAt() != null) {
-      newIntervalSeconds = Math.max(0L, Duration.between(nowUtc, saved.nextReviewAt()).toSeconds());
+      newIntervalSeconds =
+          Math.max(0L, durationBetweenUtc(nowUtc, saved.nextReviewAt()).toSeconds());
     }
 
     var historyEntry =
@@ -314,5 +316,9 @@ public class RecordVocabularyReviewUseCase implements RecordVocabularyReviewPort
           case REMEMBERED -> ReviewRating.GOOD;
         };
     return recordReview(wordId, rating);
+  }
+
+  private static Duration durationBetweenUtc(LocalDateTime start, LocalDateTime end) {
+    return Duration.between(start.atOffset(ZoneOffset.UTC), end.atOffset(ZoneOffset.UTC));
   }
 }

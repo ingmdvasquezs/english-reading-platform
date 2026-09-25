@@ -5,6 +5,7 @@ import com.soap.soap.application.port.out.ImportedDocumentRepositoryPort;
 import com.soap.soap.domain.model.DocumentImportStatus;
 import com.soap.soap.domain.model.ImportJob;
 import com.soap.soap.domain.model.ImportedDocument;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -18,6 +19,7 @@ public class FailDocumentImportUseCase {
 
   private final ImportJobRepositoryPort importJobs;
   private final ImportedDocumentRepositoryPort importedDocuments;
+  private final Clock clock;
 
   @Transactional
   public boolean failFinal(
@@ -40,7 +42,7 @@ public class FailDocumentImportUseCase {
         .findDocumentById(job.documentId())
         .ifPresent(
             doc -> {
-              LocalDateTime now = LocalDateTime.now();
+              LocalDateTime now = LocalDateTime.now(clock);
               String failureReason =
                   errorCode != null && !errorCode.isBlank() ? errorCode : "IMPORT_FAILURE";
               ImportedDocument failedDoc =

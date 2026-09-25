@@ -5,6 +5,7 @@ import com.soap.soap.domain.model.DocumentUpload;
 import com.soap.soap.domain.model.DocumentUploadStatus;
 import com.soap.soap.infrastructure.persistence.mapper.DocumentUploadEntityMapper;
 import com.soap.soap.infrastructure.persistence.repository.JpaDocumentUploadRepository;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,7 @@ public class DocumentUploadPersistenceAdapter implements DocumentUploadRepositor
 
   private final JpaDocumentUploadRepository repository;
   private final DocumentUploadEntityMapper mapper;
+  private final Clock clock;
 
   @Override
   @Transactional
@@ -59,7 +61,7 @@ public class DocumentUploadPersistenceAdapter implements DocumentUploadRepositor
       return false;
     }
     entity.setStatus(DocumentUploadStatus.ABORTED);
-    entity.setUpdatedAt(LocalDateTime.now());
+    entity.setUpdatedAt(LocalDateTime.now(clock));
     repository.saveAndFlush(entity);
     return true;
   }

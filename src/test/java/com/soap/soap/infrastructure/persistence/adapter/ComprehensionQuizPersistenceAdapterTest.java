@@ -17,7 +17,10 @@ import com.soap.soap.infrastructure.persistence.entity.ReadingEntity;
 import com.soap.soap.infrastructure.persistence.repository.JpaComprehensionQuestionRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaReadingRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaUserComprehensionAnswerRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +32,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +41,7 @@ class ComprehensionQuizPersistenceAdapterTest {
   @Mock private JpaComprehensionQuestionRepository questionRepository;
   @Mock private JpaReadingRepository readingRepository;
   @Mock private JpaUserComprehensionAnswerRepository answerRepository;
+  @Spy private Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
 
   @InjectMocks private ComprehensionQuizPersistenceAdapter adapter;
 

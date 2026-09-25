@@ -22,6 +22,7 @@ import com.soap.soap.domain.model.OutboxEvent;
 import com.soap.soap.domain.model.OutboxEventStatus;
 import com.soap.soap.domain.model.StorageProvider;
 import com.soap.soap.infrastructure.persistence.mapper.OutboxEventSerializer;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Objects;
@@ -45,6 +46,7 @@ public class ConfirmVerifiedDocumentUploadUseCase {
   private final OutboxEventRepositoryPort outboxEvents;
   private final OutboxEventSerializer outboxEventSerializer;
   private final PlatformTransactionManager transactionManager;
+  private final Clock clock;
 
   @Transactional
   public ConfirmVerifiedDocumentUploadResult confirm(ConfirmVerifiedDocumentUploadCommand command) {
@@ -73,7 +75,7 @@ public class ConfirmVerifiedDocumentUploadUseCase {
           DocumentImportStatus.PROCESSING);
     }
 
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     if (upload.isExpired(now)) {
       throw new UploadExpiredException(upload.id());
     }

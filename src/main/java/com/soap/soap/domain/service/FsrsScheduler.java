@@ -7,6 +7,7 @@ import com.soap.soap.domain.model.SrsState;
 import com.soap.soap.domain.model.VocabularyStatus;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
 
@@ -101,7 +102,11 @@ public class FsrsScheduler {
 
     double elapsedDays = 0.0;
     if (current.lastReviewedAt() != null) {
-      long elapsedSeconds = Duration.between(current.lastReviewedAt(), nowUtc).toSeconds();
+      long elapsedSeconds =
+          Duration.between(
+                  current.lastReviewedAt().atOffset(ZoneOffset.UTC),
+                  nowUtc.atOffset(ZoneOffset.UTC))
+              .toSeconds();
       elapsedDays = Math.max(0.0, elapsedSeconds / 86400.0);
     }
     double r = (current.stability() > 0.0) ? retrievability(elapsedDays, current.stability()) : 1.0;

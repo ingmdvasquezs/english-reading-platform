@@ -20,6 +20,7 @@ import com.soap.soap.infrastructure.soap.generated.VocabularyStatusType;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -160,7 +161,9 @@ public class VocabularyReviewSoapMapper extends VocabularySoapMapperSupport {
       entry.setIntervalSeconds(
           Math.max(
               0L,
-              Duration.between(vocabulary.lastReviewedAt(), vocabulary.nextReviewAt())
+              Duration.between(
+                      vocabulary.lastReviewedAt().atOffset(ZoneOffset.UTC),
+                      vocabulary.nextReviewAt().atOffset(ZoneOffset.UTC))
                   .toSeconds()));
     }
     entry.setStability(

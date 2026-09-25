@@ -63,6 +63,7 @@ class TransactionalUploadConfirmationIntegrationTest {
   @Autowired private UserRepositoryPort users;
   @Autowired private OutboxEventSerializer serializer;
   @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
+  @Autowired private java.time.Clock clock;
   @Autowired private JdbcTemplate jdbc;
 
   private User testUser;
@@ -76,7 +77,7 @@ class TransactionalUploadConfirmationIntegrationTest {
   }
 
   private DocumentUpload createPendingUpload(UUID uploadId, UUID docId) {
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     return documentUploads.save(
         new DocumentUpload(
             uploadId,
@@ -197,7 +198,8 @@ class TransactionalUploadConfirmationIntegrationTest {
             importJobs,
             failingOutbox,
             serializer,
-            transactionManager);
+            transactionManager,
+            clock);
 
     assertThatThrownBy(
             () ->
@@ -291,7 +293,7 @@ class TransactionalUploadConfirmationIntegrationTest {
     confirmUseCase.confirm(new ConfirmVerifiedDocumentUploadCommand(uploadId, testUser.id(), null));
 
     // Attempting to directly insert another PENDING or PROCESSING job for the same document fails
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     ImportJob duplicateActiveJob =
         new ImportJob(
             UUID.randomUUID(),
@@ -322,7 +324,7 @@ class TransactionalUploadConfirmationIntegrationTest {
   @Test
   @DisplayName("T31: Confirming expired or aborted upload throws appropriate exception")
   void rejectsExpiredOrAbortedUploadConfirmation() {
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     UUID uploadId = UUID.randomUUID();
     UUID docId = UUID.randomUUID();
 

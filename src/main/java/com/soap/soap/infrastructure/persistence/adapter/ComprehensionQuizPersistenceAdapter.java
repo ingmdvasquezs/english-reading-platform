@@ -12,6 +12,7 @@ import com.soap.soap.infrastructure.persistence.entity.ReadingEntity;
 import com.soap.soap.infrastructure.persistence.repository.JpaComprehensionQuestionRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaReadingRepository;
 import com.soap.soap.infrastructure.persistence.repository.JpaUserComprehensionAnswerRepository;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,6 +30,7 @@ public class ComprehensionQuizPersistenceAdapter implements ComprehensionQuizRep
   private final JpaComprehensionQuestionRepository questionRepository;
   private final JpaReadingRepository readingRepository;
   private final JpaUserComprehensionAnswerRepository answerRepository;
+  private final Clock clock;
 
   @Override
   @Transactional(readOnly = true)
@@ -232,7 +234,7 @@ public class ComprehensionQuizPersistenceAdapter implements ComprehensionQuizRep
     entity.setQuestionType(domain.questionType().name());
     entity.setPrompt(domain.prompt());
     entity.setExplanation(domain.explanation());
-    entity.setCreatedAt(domain.createdAt() != null ? domain.createdAt() : LocalDateTime.now());
+    entity.setCreatedAt(domain.createdAt() != null ? domain.createdAt() : LocalDateTime.now(clock));
 
     if (domain.options() != null) {
       for (var opt : domain.options()) {

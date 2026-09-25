@@ -4,6 +4,7 @@ import com.soap.soap.application.port.out.OutboxEventRepositoryPort;
 import com.soap.soap.domain.model.OutboxEvent;
 import com.soap.soap.infrastructure.persistence.mapper.OutboxEventEntityMapper;
 import com.soap.soap.infrastructure.persistence.repository.JpaOutboxEventRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,6 +20,7 @@ public class OutboxEventPersistenceAdapter implements OutboxEventRepositoryPort 
 
   private final JpaOutboxEventRepository repository;
   private final OutboxEventEntityMapper mapper;
+  private final Clock clock;
 
   @Override
   @Transactional
@@ -39,7 +41,7 @@ public class OutboxEventPersistenceAdapter implements OutboxEventRepositoryPort 
     if (batchSize <= 0 || lockDuration == null || dispatcherId == null) {
       return List.of();
     }
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     List<UUID> claimableIds = repository.findClaimableIds(now, batchSize);
     if (claimableIds.isEmpty()) {
       return List.of();
@@ -57,7 +59,7 @@ public class OutboxEventPersistenceAdapter implements OutboxEventRepositoryPort 
     if (eventId == null || dispatcherId == null) {
       return false;
     }
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     return repository.markPublished(eventId, dispatcherId, now) > 0;
   }
 
@@ -68,7 +70,7 @@ public class OutboxEventPersistenceAdapter implements OutboxEventRepositoryPort 
     if (eventId == null || dispatcherId == null) {
       return false;
     }
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(clock);
     LocalDateTime nextAttemptAt = retryBackoff != null ? now.plus(retryBackoff) : now;
     int retried = repository.markFailedRetry(eventId, dispatcherId, nextAttemptAt, error, now);
     if (retried > 0) {

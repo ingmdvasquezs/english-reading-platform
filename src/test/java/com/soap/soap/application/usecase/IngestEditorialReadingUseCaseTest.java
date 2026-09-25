@@ -30,7 +30,10 @@ import com.soap.soap.domain.model.Reading;
 import com.soap.soap.domain.model.ReadingOrigin;
 import com.soap.soap.domain.model.RightsStatus;
 import com.soap.soap.domain.model.SourceKind;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -52,15 +55,22 @@ class IngestEditorialReadingUseCaseTest {
 
   private LanguageAvailabilityPolicy availabilityPolicy;
   private EditorialQuizValidator quizValidator;
+  private Clock clock;
   private IngestEditorialReadingUseCase useCase;
 
   @BeforeEach
   void setUp() {
     availabilityPolicy = new LanguageAvailabilityPolicy(Set.of("en"), Set.of("en"));
     quizValidator = new EditorialQuizValidator();
+    clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
     useCase =
         new IngestEditorialReadingUseCase(
-            readings, comprehensionQuizzes, lexicalIndexer, availabilityPolicy, quizValidator);
+            readings,
+            comprehensionQuizzes,
+            lexicalIndexer,
+            availabilityPolicy,
+            quizValidator,
+            clock);
   }
 
   private IngestEditorialReadingCommand validCommand() {
