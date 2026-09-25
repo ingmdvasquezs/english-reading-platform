@@ -1,5 +1,6 @@
 package com.soap.soap.infrastructure.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -25,12 +26,14 @@ import com.soap.soap.domain.model.DocumentFormat;
 import com.soap.soap.domain.model.DocumentImportStatus;
 import com.soap.soap.domain.model.ImportedDocument;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -330,6 +333,126 @@ class DocumentRestControllerTest {
     mvc.perform(get("/api/v1/documents/{id}/compatibility", documentId))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_READY"));
+  }
+
+  @Test
+  void uploadStagesEpubInsidePrivateStagingDirectoryAndCleansUpOnSuccess(@TempDir Path tempDir)
+      throws Exception {
+    var customMvc =
+        MockMvcBuilders.standaloneSetup(
+                new DocumentRestController(
+                    imports,
+                    queries,
+                    progress,
+                    deletions,
+                    compatibility,
+                    currentUser,
+                    documents,
+                    storage,
+                    tempDir))
+            .setControllerAdvice(new RestExceptionHandler())
+            .build();
+
+    var id = UUID.randomUUID();
+    var pathCaptor = org.mockito.ArgumentCaptor.forClass(Path.class);
+    when(imports.accept(
+            pathCaptor.capture(), eq("custom-novel.epub"), eq(null), eq(DocumentFormat.EPUB)))
+        .thenReturn(new AcceptedDocumentImport(id, DocumentImportStatus.PROCESSING));
+
+    var file =
+        new MockMultipartFile(
+            "file", "custom-novel.epub", "application/epub+zip", new byte[] {'P', 'K', 3, 4});
+
+    customMvc
+        .perform(multipart("/api/v1/documents").file(file))
+        .andExpect(status().isAccepted())
+        .andExpect(jsonPath("$.documentId").value(id.toString()))
+        .andExpect(jsonPath("$.status").value("PROCESSING"));
+
+    var stagedPath = pathCaptor.getValue();
+    assertThat(stagedPath).isNotNull().hasParentRaw(tempDir.resolve("staging"));
+    assertThat(stagedPath.getFileName().toString())
+        .startsWith("document-upload-")
+        .endsWith(".epub")
+        .doesNotContain("custom-novel");
+    assertThat(Files.exists(stagedPath)).isFalse();
+  }
+
+  @Test
+  void uploadStagesPdfInsidePrivateStagingDirectoryAndCleansUpOnSuccess(@TempDir Path tempDir)
+      throws Exception {
+    var customMvc =
+        MockMvcBuilders.standaloneSetup(
+                new DocumentRestController(
+                    imports,
+                    queries,
+                    progress,
+                    deletions,
+                    compatibility,
+                    currentUser,
+                    documents,
+                    storage,
+                    tempDir))
+            .setControllerAdvice(new RestExceptionHandler())
+            .build();
+
+    var id = UUID.randomUUID();
+    var pathCaptor = org.mockito.ArgumentCaptor.forClass(Path.class);
+    when(imports.accept(pathCaptor.capture(), eq("article.pdf"), eq(null), eq(DocumentFormat.PDF)))
+        .thenReturn(new AcceptedDocumentImport(id, DocumentImportStatus.PROCESSING));
+
+    var file =
+        new MockMultipartFile("file", "article.pdf", "application/pdf", "%PDF-1.7\n".getBytes());
+
+    customMvc
+        .perform(multipart("/api/v1/documents").file(file))
+        .andExpect(status().isAccepted())
+        .andExpect(jsonPath("$.documentId").value(id.toString()))
+        .andExpect(jsonPath("$.status").value("PROCESSING"));
+
+    var stagedPath = pathCaptor.getValue();
+    assertThat(stagedPath).isNotNull().hasParentRaw(tempDir.resolve("staging"));
+    assertThat(stagedPath.getFileName().toString())
+        .startsWith("document-upload-")
+        .endsWith(".pdf")
+        .doesNotContain("article");
+    assertThat(Files.exists(stagedPath)).isFalse();
+  }
+
+  @Test
+  void uploadCleansUpStagedFileWhenImportThrowsException(@TempDir Path tempDir) throws Exception {
+    var customMvc =
+        MockMvcBuilders.standaloneSetup(
+                new DocumentRestController(
+                    imports,
+                    queries,
+                    progress,
+                    deletions,
+                    compatibility,
+                    currentUser,
+                    documents,
+                    storage,
+                    tempDir))
+            .setControllerAdvice(new RestExceptionHandler())
+            .build();
+
+    var pathCaptor = org.mockito.ArgumentCaptor.forClass(Path.class);
+    when(imports.accept(pathCaptor.capture(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("Failed during import"));
+
+    var file =
+        new MockMultipartFile(
+            "file", "failing.epub", "application/epub+zip", new byte[] {'P', 'K', 3, 4});
+
+    try {
+      customMvc.perform(multipart("/api/v1/documents").file(file));
+    } catch (Exception _) {
+      // Ignored: verify cleanup regardless of exception propagation or handler
+    }
+
+    var stagedPath = pathCaptor.getValue();
+    assertThat(stagedPath).isNotNull();
+    assertThat(Files.exists(stagedPath)).isFalse();
   }
 
   private ImportedDocument document(UUID id, UUID ownerId, String coverKey) {

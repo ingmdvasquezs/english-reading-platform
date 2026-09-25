@@ -18,7 +18,9 @@ import com.soap.soap.application.usecase.GetDocumentVocabularyCompatibilityUseCa
 import com.soap.soap.domain.model.DocumentFormat;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -46,6 +48,7 @@ public class DocumentRestController {
   private final CurrentUserPort currentUser;
   private final ImportedDocumentRepositoryPort documents;
   private final DocumentAssetStoragePort storage;
+  private final Path stagingDirectory;
 
   public DocumentRestController(
       AcceptDocumentImportUseCase imports,
@@ -56,6 +59,29 @@ public class DocumentRestController {
       CurrentUserPort currentUser,
       ImportedDocumentRepositoryPort documents,
       DocumentAssetStoragePort storage) {
+    this(
+        imports,
+        queries,
+        progress,
+        deletions,
+        compatibility,
+        currentUser,
+        documents,
+        storage,
+        Path.of(".private-assets"));
+  }
+
+  @Autowired
+  public DocumentRestController(
+      AcceptDocumentImportUseCase imports,
+      DocumentQueryUseCase queries,
+      DocumentProgressUseCase progress,
+      DeleteDocumentUseCase deletions,
+      GetDocumentVocabularyCompatibilityUseCase compatibility,
+      CurrentUserPort currentUser,
+      ImportedDocumentRepositoryPort documents,
+      DocumentAssetStoragePort storage,
+      Path documentStorageRoot) {
     this.imports = imports;
     this.queries = queries;
     this.progress = progress;
@@ -64,6 +90,7 @@ public class DocumentRestController {
     this.currentUser = currentUser;
     this.documents = documents;
     this.storage = storage;
+    this.stagingDirectory = documentStorageRoot.resolve("staging");
   }
 
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -72,8 +99,10 @@ public class DocumentRestController {
       @RequestParam(required = false) String languageOverride)
       throws IOException {
     var format = validateUpload(file);
+    Files.createDirectories(stagingDirectory);
     var staged =
-        Files.createTempFile("document-upload-", format == DocumentFormat.PDF ? ".pdf" : ".epub");
+        Files.createTempFile(
+            stagingDirectory, "document-upload-", format == DocumentFormat.PDF ? ".pdf" : ".epub");
     try (var input = file.getInputStream();
         var output = Files.newOutputStream(staged)) {
       input.transferTo(output);
