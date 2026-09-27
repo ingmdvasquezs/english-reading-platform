@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -37,6 +38,7 @@ public class DocumentChunker {
       Pattern.compile(
           "(?iu)^(?:act|book|chapter|part|scene|section)\\b.*|^\\[.*]|^[\\p{Lu}\\p{M} .'-]+$");
 
+  @Autowired
   public DocumentChunker() {
     this(TARGET_WORDS, MINIMUM_WORDS, MAXIMUM_WORDS, HARD_WORDS);
   }

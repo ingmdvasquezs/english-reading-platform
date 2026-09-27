@@ -179,6 +179,43 @@ class PdfDocumentParserAdapterTest {
                     .isEqualTo(DocumentImportException.Reason.SECURITY_LIMIT_EXCEEDED));
   }
 
+  @Test
+  void handlesLongPunctuationAndIdentifiesNonEditorialMetadata(@TempDir Path directory)
+      throws Exception {
+    var source = directory.resolve("punct.pdf");
+    var longPunct = "!@#$%-+".repeat(100);
+    try (var document = new PDDocument()) {
+      document.getDocumentInformation().setTitle(longPunct + "Real Title" + longPunct);
+      document.getDocumentInformation().setAuthor("!@#  anonymous  #@!");
+      addPage(document, "First page has enough readable content for test.");
+      document.save(source.toFile());
+    }
+
+    var parsed = new PdfDocumentParserAdapter(LIMITS).parse(source, DocumentFormat.PDF);
+    assertThat(parsed.title()).isEqualTo(longPunct + "Real Title" + longPunct);
+    // anonymous surrounded by punctuation must be identified as non-editorial metadata and
+    // nullified
+    assertThat(parsed.author()).isNull();
+  }
+
+  @Test
+  void handlesAdversarialGenericHeadingsWithoutBacktracking(@TempDir Path directory)
+      throws Exception {
+    var source = directory.resolve("adversarial.pdf");
+    try (var document = new PDDocument()) {
+      addPage(
+          document,
+          "a    brief    sample document",
+          "a " + "short ".repeat(50) + "story",
+          "An Honest Heading Of Note",
+          "Body content with sufficient letters to pass minimum text length.");
+      document.save(source.toFile());
+    }
+
+    var parsed = new PdfDocumentParserAdapter(LIMITS).parse(source, DocumentFormat.PDF);
+    assertThat(parsed.title()).isEqualTo("An Honest Heading Of Note");
+  }
+
   private void assertReason(Path source, DocumentImportException.Reason reason) {
     assertThatThrownBy(() -> new PdfDocumentParserAdapter(LIMITS).parse(source, DocumentFormat.PDF))
         .isInstanceOfSatisfying(

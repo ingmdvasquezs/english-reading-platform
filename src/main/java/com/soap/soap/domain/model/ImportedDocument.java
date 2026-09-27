@@ -23,7 +23,8 @@ public record ImportedDocument(
     LocalDateTime createdAt,
     LocalDateTime updatedAt) {
 
-  private static final Pattern LANGUAGE = Pattern.compile("^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$");
+  private static final Pattern LANGUAGE =
+      Pattern.compile("^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,24}$");
   private static final Pattern SHA_256 = Pattern.compile("^[a-f0-9]{64}$");
 
   public ImportedDocument {

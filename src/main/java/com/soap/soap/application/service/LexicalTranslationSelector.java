@@ -6,15 +6,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
 public class LexicalTranslationSelector {
-
-  private static final Pattern LEADING_TRAILING_PUNCTUATION =
-      Pattern.compile("^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$");
 
   private static final Set<String> STOPWORDS =
       Set.of(
@@ -80,12 +76,42 @@ public class LexicalTranslationSelector {
     return cleanSource.equalsIgnoreCase(cleanTrans);
   }
 
-  private String cleanWord(String s) {
+  String cleanWord(String s) {
     if (s == null) {
       return "";
     }
     var trimmed = s.trim();
-    return LEADING_TRAILING_PUNCTUATION.matcher(trimmed).replaceAll("").toLowerCase(Locale.ROOT);
+    return trimNonLetterOrNumber(trimmed).toLowerCase(Locale.ROOT);
+  }
+
+  private static String trimNonLetterOrNumber(String s) {
+    int start = 0;
+    int end = s.length();
+    while (start < end) {
+      int cp = s.codePointAt(start);
+      if (isLetterOrNumber(cp)) {
+        break;
+      }
+      start += Character.charCount(cp);
+    }
+    while (end > start) {
+      int cp = s.codePointBefore(end);
+      if (isLetterOrNumber(cp)) {
+        break;
+      }
+      end -= Character.charCount(cp);
+    }
+    return start >= end ? "" : s.substring(start, end);
+  }
+
+  private static boolean isLetterOrNumber(int codePoint) {
+    if (Character.isLetter(codePoint)) {
+      return true;
+    }
+    return switch (Character.getType(codePoint)) {
+      case Character.DECIMAL_DIGIT_NUMBER, Character.LETTER_NUMBER, Character.OTHER_NUMBER -> true;
+      default -> false;
+    };
   }
 
   public String selectBestCandidate(

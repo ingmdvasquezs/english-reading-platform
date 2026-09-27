@@ -127,4 +127,12 @@ class LanguageTagTest {
     assertThat(tag1.hashCode()).isEqualTo(tag2.hashCode());
     assertThat(tag1).isNotEqualTo(tag3);
   }
+
+  @Test
+  void acceptsMultiSubtagChainsWithinMaxLength() {
+    // 2-char primary + 8 2-char subtags = 2 + 8*3 = 26 chars <= 50
+    String multiSubtag = "en-US-u-ca-gregory-x-custom";
+    LanguageTag tag = LanguageTag.of(multiSubtag);
+    assertThat(tag.value()).isEqualTo("en-US-u-ca-gregory-x-custom");
+  }
 }

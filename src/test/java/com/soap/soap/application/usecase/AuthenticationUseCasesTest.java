@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import com.soap.soap.application.command.LoginCommand;
 import com.soap.soap.application.command.RegisterUserCommand;
 import com.soap.soap.application.exception.EmailAlreadyRegisteredException;
+import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.InvalidCredentialsException;
 import com.soap.soap.application.model.AccessToken;
 import com.soap.soap.application.model.InputLimits;
@@ -16,6 +17,7 @@ import com.soap.soap.application.port.out.TokenProviderPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
 import com.soap.soap.domain.model.User;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -117,5 +119,43 @@ class AuthenticationUseCasesTest {
             new LoginUseCase(users, passwords, tokens, InputLimits.defaults())
                 .login(new LoginCommand(email, password)))
         .isEqualTo(new LoginResult(token, true));
+  }
+
+  @Test
+  void acceptsValidEmailFormatsDuringRegistration() {
+    when(passwords.encode(any())).thenReturn("bcrypt-hash");
+    when(users.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    var useCase = new RegisterUserUseCase(users, passwords, InputLimits.defaults());
+
+    var emails =
+        java.util.List.of(
+            "simple@example.com", "user.name+tag@sub.example.co.uk", "first_last@company.io");
+
+    for (var email : emails) {
+      var result = useCase.registerUser(new RegisterUserCommand("User", email, "secret123"));
+      assertThat(result.email()).isEqualTo(email.toLowerCase(Locale.ROOT));
+    }
+  }
+
+  @Test
+  void rejectsInvalidEmailFormatsDuringRegistration() {
+    var useCase = new RegisterUserUseCase(users, passwords, InputLimits.defaults());
+
+    var invalidEmails =
+        java.util.List.of(
+            "no-at-sign",
+            "@domain.com",
+            "user@",
+            "user@domain",
+            "user@domain.",
+            "user@.domain.com",
+            "user with spaces@domain.com");
+
+    for (var email : invalidEmails) {
+      var command = new RegisterUserCommand("User", email, "secret123");
+      assertThatThrownBy(() -> useCase.registerUser(command))
+          .isInstanceOf(InvalidApplicationArgumentException.class)
+          .hasMessage("Email is invalid");
+    }
   }
 }

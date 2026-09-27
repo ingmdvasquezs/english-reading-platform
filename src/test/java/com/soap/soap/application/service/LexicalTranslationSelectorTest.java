@@ -75,4 +75,60 @@ class LexicalTranslationSelectorTest {
     assertThat(selector.selectBestCandidate("foobar", "noun", "nonsense", null, List.of()))
         .isEmpty();
   }
+
+  @Test
+  void characterizationOfLeadingTrailingPunctuation() {
+    // Initial punctuation
+    assertThat(selector.isSuspiciousTranslation("hello", "...hello")).isTrue();
+    // Trailing punctuation
+    assertThat(selector.isSuspiciousTranslation("hello", "hello???")).isTrue();
+    // Both ends punctuation
+    assertThat(selector.isSuspiciousTranslation("hello", "«¿hello?!»")).isTrue();
+    // Internal punctuation is preserved (not stripped from ends)
+    assertThat(selector.isSuspiciousTranslation("hello", "hel-lo")).isFalse();
+    // Word without punctuation
+    assertThat(selector.isSuspiciousTranslation("hello", "hello")).isTrue();
+    // Unicode letters with punctuation
+    assertThat(selector.isSuspiciousTranslation("canción", "¡canción!")).isTrue();
+    assertThat(selector.isSuspiciousTranslation("über", "«über»")).isTrue();
+  }
+
+  @Test
+  void characterizationOfCleanWordUnicodeSemantics() {
+    // A) Leading and trailing punctuation
+    assertThat(selector.cleanWord("!!!hello???")).isEqualTo("hello");
+
+    // B) Inverted punctuation and accents
+    assertThat(selector.cleanWord("¿¡canción!?")).isEqualTo("canción");
+
+    // C) Only punctuation
+    assertThat(selector.cleanWord("---??!***---")).isEmpty();
+    assertThat(selector.cleanWord("   ")).isEmpty();
+    assertThat(selector.cleanWord(null)).isEmpty();
+
+    // D) Unicode letters
+    assertThat(selector.cleanWord("«привет»")).isEqualTo("привет");
+    assertThat(selector.cleanWord("“über”")).isEqualTo("über");
+    assertThat(selector.cleanWord("«español»")).isEqualTo("español");
+
+    // E) Unicode numbers across all 3 relevant categories
+    // 1. DECIMAL_DIGIT_NUMBER (Nd) - standard [0-9] and Arabic-Indic digit (٤٢)
+    assertThat(selector.cleanWord("...123...")).isEqualTo("123");
+    assertThat(selector.cleanWord("«٤٢»")).isEqualTo("٤٢");
+    // 2. LETTER_NUMBER (Nl) - Roman numeral V (\u2164)
+    assertThat(selector.cleanWord("«\u2164»")).isEqualTo("\u2174");
+    // 3. OTHER_NUMBER (No) - Superscript 2 (\u00B2) and vulgar fraction 1/2 (\u00BD)
+    assertThat(selector.cleanWord("...\u00B2...")).isEqualTo("\u00B2");
+    assertThat(selector.cleanWord("«\u00BD»")).isEqualTo("\u00BD");
+
+    // F) Long text surrounded by repeated punctuation
+    var longPunctuation = "!@#$%^&*()_+-=[]{}|;':,./<>?".repeat(20);
+    assertThat(selector.cleanWord(longPunctuation + "substantialWord" + longPunctuation))
+        .isEqualTo("substantialword");
+
+    // G) Internal contractions and apostrophes are preserved
+    assertThat(selector.cleanWord("don't")).isEqualTo("don't");
+    assertThat(selector.cleanWord("it's")).isEqualTo("it's");
+    assertThat(selector.cleanWord("¡don't!")).isEqualTo("don't");
+  }
 }

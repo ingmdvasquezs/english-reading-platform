@@ -289,6 +289,7 @@ class EpubSpikeParserTest {
     assertThat(chunker.chunk(shortChapter, Locale.ENGLISH)).hasSize(1);
     assertThat(first).isEqualTo(second).hasSizeGreaterThan(1);
     assertThat(first)
+        .isNotEmpty()
         .allMatch(chunk -> chunk.wordCount() <= 1_200 && chunk.utf8Bytes() <= 80 * 1024);
     assertThat(chunker.chunk(giant, Locale.ENGLISH))
         .hasSizeGreaterThan(1)

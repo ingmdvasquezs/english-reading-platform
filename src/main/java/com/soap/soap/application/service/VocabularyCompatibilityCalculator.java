@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,6 +18,7 @@ public class VocabularyCompatibilityCalculator {
 
   private final VocabularyBreakdownCalculator breakdownCalculator;
 
+  @Autowired
   public VocabularyCompatibilityCalculator() {
     this(new VocabularyBreakdownCalculator());
   }

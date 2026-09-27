@@ -65,8 +65,9 @@ class DocumentChunkerTest {
 
     var chunks = chunker.chunk(List.of(giant), "en");
 
-    assertThat(chunks).hasSizeGreaterThan(1);
-    assertThat(chunks).allMatch(chunk -> chunk.wordCount() <= DocumentChunker.HARD_WORDS);
+    assertThat(chunks)
+        .hasSizeGreaterThan(1)
+        .allMatch(chunk -> chunk.wordCount() <= DocumentChunker.HARD_WORDS);
     assertThat(chunks.stream().map(chunk -> chunk.content()).collect(Collectors.joining(" ")))
         .isEqualTo(giant);
   }
@@ -76,7 +77,9 @@ class DocumentChunkerTest {
     var giant = words(700, "token");
     var chunks = chunker.chunk(List.of(giant), "en");
 
-    assertThat(chunks).allMatch(chunk -> chunk.wordCount() <= DocumentChunker.HARD_WORDS);
+    assertThat(chunks)
+        .isNotEmpty()
+        .allMatch(chunk -> chunk.wordCount() <= DocumentChunker.HARD_WORDS);
     assertThat(chunks.stream().map(chunk -> chunk.content()).collect(Collectors.joining(" ")))
         .isEqualTo(giant);
   }
@@ -122,7 +125,9 @@ class DocumentChunkerTest {
 
     assertThat(chunks.stream().map(chunk -> chunk.content()).collect(Collectors.joining("\n\n")))
         .isEqualTo(String.join("\n\n", first, second, third));
-    assertThat(chunks).allMatch(chunk -> chunk.wordCount() <= DocumentChunker.HARD_WORDS);
+    assertThat(chunks)
+        .isNotEmpty()
+        .allMatch(chunk -> chunk.wordCount() <= DocumentChunker.HARD_WORDS);
   }
 
   @Test
@@ -141,8 +146,8 @@ class DocumentChunkerTest {
     var first = chunker.chunk(List.of(words(800, "first")), "en");
     var second = chunker.chunk(List.of(words(800, "second")), "en");
 
-    assertThat(first).allMatch(chunk -> !chunk.content().contains("second"));
-    assertThat(second).allMatch(chunk -> !chunk.content().contains("first"));
+    assertThat(first).isNotEmpty().allMatch(chunk -> !chunk.content().contains("second"));
+    assertThat(second).isNotEmpty().allMatch(chunk -> !chunk.content().contains("first"));
   }
 
   @Test

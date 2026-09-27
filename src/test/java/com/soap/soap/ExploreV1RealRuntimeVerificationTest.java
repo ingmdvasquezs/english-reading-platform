@@ -99,8 +99,7 @@ class ExploreV1RealRuntimeVerificationTest {
             new BrowsePlatformReadingsQuery(null, null, EditorialLevel.B1, new PageRequest(0, 20)));
 
     assertThat(page.totalElements()).isEqualTo(11);
-    assertThat(page.content()).hasSize(11);
-    assertThat(page.content()).allMatch(r -> r.editorialLevel() == EditorialLevel.B1);
+    assertThat(page.content()).hasSize(11).allMatch(r -> r.editorialLevel() == EditorialLevel.B1);
     System.out.println("VERIFIED: browse level B1 totalElements = " + page.totalElements());
   }
 
@@ -112,8 +111,7 @@ class ExploreV1RealRuntimeVerificationTest {
             new BrowsePlatformReadingsQuery(null, null, EditorialLevel.B2, new PageRequest(0, 20)));
 
     assertThat(page.totalElements()).isEqualTo(9);
-    assertThat(page.content()).hasSize(9);
-    assertThat(page.content()).allMatch(r -> r.editorialLevel() == EditorialLevel.B2);
+    assertThat(page.content()).hasSize(9).allMatch(r -> r.editorialLevel() == EditorialLevel.B2);
     System.out.println("VERIFIED: browse level B2 totalElements = " + page.totalElements());
   }
 
@@ -127,8 +125,8 @@ class ExploreV1RealRuntimeVerificationTest {
                 null, EditorialCategory.CULTURE_ARTS_AND_FICTION, null, new PageRequest(0, 20)));
 
     assertThat(page.totalElements()).isEqualTo(17);
-    assertThat(page.content()).hasSize(17);
     assertThat(page.content())
+        .hasSize(17)
         .allMatch(r -> "Culture, Arts & Fiction".equalsIgnoreCase(r.category()));
     System.out.println(
         "VERIFIED: browse category Culture, Arts & Fiction totalElements = "
@@ -147,8 +145,8 @@ class ExploreV1RealRuntimeVerificationTest {
                 new PageRequest(0, 20)));
 
     assertThat(page.totalElements()).isEqualTo(8);
-    assertThat(page.content()).hasSize(8);
     assertThat(page.content())
+        .hasSize(8)
         .allMatch(
             r ->
                 "Culture, Arts & Fiction".equalsIgnoreCase(r.category())
@@ -181,8 +179,7 @@ class ExploreV1RealRuntimeVerificationTest {
                 "colombian-myths-legends", null, EditorialLevel.B2, new PageRequest(0, 20)));
 
     assertThat(page.totalElements()).isEqualTo(9);
-    assertThat(page.content()).hasSize(9);
-    assertThat(page.content()).allMatch(r -> r.editorialLevel() == EditorialLevel.B2);
+    assertThat(page.content()).hasSize(9).allMatch(r -> r.editorialLevel() == EditorialLevel.B2);
     System.out.println("VERIFIED: browse collection + B2 totalElements = " + page.totalElements());
   }
 
@@ -292,7 +289,8 @@ class ExploreV1RealRuntimeVerificationTest {
     // No duplicate reading IDs between page 0 and page 1
     var page0Ids = page0.content().stream().map(c -> c.readingId()).toList();
     var page1Ids = page1.content().stream().map(c -> c.readingId()).toList();
-    assertThat(page0Ids).doesNotContainAnyElementsOf(page1Ids);
+    assertThat(page0Ids).isNotEmpty().doesNotContainAnyElementsOf(page1Ids);
+    assertThat(page1Ids).isNotEmpty();
   }
 
   @Test

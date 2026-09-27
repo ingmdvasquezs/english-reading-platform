@@ -16,7 +16,7 @@ public record LanguageTag(String value) implements Serializable, Comparable<Lang
 
   public static final int MAX_LENGTH = 50;
   private static final Pattern BCP47_SYNTAX =
-      Pattern.compile("^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$");
+      Pattern.compile("^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,24}$");
 
   public LanguageTag {
     if (value == null || value.isBlank()) {

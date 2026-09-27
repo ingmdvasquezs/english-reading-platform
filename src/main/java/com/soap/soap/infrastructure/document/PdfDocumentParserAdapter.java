@@ -201,8 +201,7 @@ public class PdfDocumentParserAdapter implements DocumentParserPort {
   private String editorialMetadata(String value) {
     var clean = textOrNull(value);
     if (clean == null) return null;
-    var semantic =
-        clean.toLowerCase(Locale.ROOT).replaceAll("^[\\p{Punct}\\s]+|[\\p{Punct}\\s]+$", "");
+    var semantic = trimPunctuationAndWhitespace(clean.toLowerCase(Locale.ROOT));
     if (NON_EDITORIAL_METADATA.contains(semantic)
         || semantic.endsWith(".pdf")
         || semantic.endsWith(".doc")
@@ -223,7 +222,7 @@ public class PdfDocumentParserAdapter implements DocumentParserPort {
     var lower = line.toLowerCase(Locale.ROOT);
     if (lower.matches(".*\\bpage\\s+\\d+\\b.*")
         || lower.matches("^(chapter|part|section)\\b.*")
-        || lower.matches("^(a|an)\\s+(short|brief)\\b.*(sample|reading|document).*$")
+        || isGenericReadingHeader(lower)
         || line.matches(".*[.!?;:]$")) return false;
     var words = line.split("\\s+");
     if (words.length < 2 || words.length > 12) return false;
@@ -247,6 +246,72 @@ public class PdfDocumentParserAdapter implements DocumentParserPort {
     return locale.getLanguage().isBlank() || "und".equals(locale.toLanguageTag())
         ? null
         : locale.toLanguageTag();
+  }
+
+  private static String trimPunctuationAndWhitespace(String value) {
+    int start = 0;
+    int end = value.length();
+    while (start < end && isPunctuationOrWhitespace(value.charAt(start))) {
+      start++;
+    }
+    while (end > start && isPunctuationOrWhitespace(value.charAt(end - 1))) {
+      end--;
+    }
+    return value.substring(start, end);
+  }
+
+  private static boolean isPunctuationOrWhitespace(char ch) {
+    return Character.isWhitespace(ch)
+        || (ch >= '!' && ch <= '/')
+        || (ch >= ':' && ch <= '@')
+        || (ch >= '[' && ch <= '`')
+        || (ch >= '{' && ch <= '~');
+  }
+
+  private static boolean isGenericReadingHeader(String lower) {
+    int remainderOffset = skipArticlePrefix(lower);
+    if (remainderOffset < 0) {
+      return false;
+    }
+    var remainder = lower.substring(remainderOffset);
+    return startsWithShortOrBrief(remainder) && containsGenericMarker(remainder);
+  }
+
+  private static int skipArticlePrefix(String lower) {
+    int len = lower.length();
+    int i;
+    if (lower.startsWith("an")) {
+      i = 2;
+    } else if (lower.startsWith("a")) {
+      i = 1;
+    } else {
+      return -1;
+    }
+    if (i >= len || !Character.isWhitespace(lower.charAt(i))) {
+      return -1;
+    }
+    while (i < len && Character.isWhitespace(lower.charAt(i))) {
+      i++;
+    }
+    return i;
+  }
+
+  private static boolean startsWithShortOrBrief(String remainder) {
+    return startsWithWord(remainder, "short") || startsWithWord(remainder, "brief");
+  }
+
+  private static boolean startsWithWord(String s, String word) {
+    if (!s.startsWith(word)) {
+      return false;
+    }
+    int len = word.length();
+    return s.length() == len || !Character.isLetterOrDigit(s.charAt(len));
+  }
+
+  private static boolean containsGenericMarker(String remainder) {
+    return remainder.contains("sample")
+        || remainder.contains("reading")
+        || remainder.contains("document");
   }
 
   private DocumentImportException invalid(String message) {

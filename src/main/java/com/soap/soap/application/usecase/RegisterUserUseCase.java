@@ -26,7 +26,7 @@ public class RegisterUserUseCase implements RegisterUserPort {
     var email = requireText(command.email(), "Email").toLowerCase(Locale.ROOT);
     requireMaximum(name, limits.maxNameCharacters(), "Name");
     requireMaximum(email, limits.maxEmailCharacters(), "Email");
-    if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
+    if (!email.matches("^[^@\\s]++@[^@\\s\\.]++(?:\\.[^@\\s\\.]++)++$"))
       throw new InvalidApplicationArgumentException("Email is invalid");
     if (command.password() == null || command.password().length() < 8)
       throw new InvalidApplicationArgumentException("Password must contain at least 8 characters");
