@@ -140,8 +140,8 @@ El backend requiere únicamente los permisos para autorizar subidas, inspecciona
 
 #### Justificación de Acciones:
 1. `s3:PutObject`: Permite al backend generar URLs prefirmadas para que el cliente cargue objetos bajo el prefijo `documents/*`.
-2. `s3:GetObjectAttributes`: Permite consultar de forma eficiente el tamaño del objeto (`OBJECT_SIZE`) y su checksum SHA-256 (`CHECKSUM`).
-3. `s3:GetObject`: Requerido por AWS IAM para ejecutar `HeadObject` con `ChecksumMode.ENABLED` como fallback de inspección (la API de AWS no posee una acción `s3:HeadObject`, sino que mapea dicha operación al permiso `s3:GetObject`).
+2. `s3:GetObjectAttributes`: Permite consultar de forma eficiente el tamaño del objeto (`OBJECT_SIZE`) y su checksum SHA-256 (`CHECKSUM`). **Nota IAM:** AWS IAM exige tanto `s3:GetObject` como `s3:GetObjectAttributes` para invocar la operación `GetObjectAttributes`.
+3. `s3:GetObject`: Requerido por AWS IAM para ejecutar `HeadObject` con `ChecksumMode.ENABLED` como fallback de inspección (la API de AWS no posee una acción IAM `s3:HeadObject`, sino que mapea dicha operación al permiso `s3:GetObject`) y necesario en conjunto con `s3:GetObjectAttributes`.
 4. `s3:DeleteObject`: Permite eliminar de forma inmediata objetos huérfanos cuando se detecta una discrepancia de integridad durante la confirmación.
 
 *Restricciones:* No se concede acceso a nivel de bucket (`s3:ListBucket`), ni comodines globales (`s3:*`), ni permisos de mensajería (SQS).
@@ -362,3 +362,45 @@ READY (Disponible para lectura y progreso)
 }
 ```
 > **Nota de Seguridad:** No se otorgan permisos con comodines (`sqs:*`, `s3:*`). El worker no genera URLs prefirmadas para su propia lectura; utiliza su rol IAM para interactuar directamente con la API de S3 y SQS.
+
+---
+
+## 12. Endurecimiento de Runtime en Producción — Fase 17.5B
+
+### 12.1 Validación Fail-Fast de Configuración del Worker
+Para prevenir inconsistencias o degradación de runtime en despliegues distribuidos, `DocumentImportWorkerProperties` valida estrictamente sus parámetros en tiempo de arranque:
+- **`maxMessages == 1` Obligatorio:** Dado que el consumidor actual procesa mensajes de manera secuencial en un solo hilo (`newSingleThreadExecutor`), recibir lotes mayores a 1 provocaría que los mensajes subsiguientes en la cola consuman su `visibilityTimeout` mientras esperan turno. Si se configura `maxMessages > 1`, el arranque falla de inmediato (`IllegalArgumentException`).
+- **`waitTimeSeconds` (1 a 20s):** Obligatorio dentro de los límites válidos de SQS Long Polling.
+- **`visibilityTimeoutSeconds` (1 a 43200s):** Alineado a los límites soportados por Amazon SQS (hasta 12 horas).
+- **Invariante de Heartbeat:**
+  - `heartbeatInterval * 2 <= leaseDuration`
+  - `heartbeatInterval * 2 <= visibilityTimeoutSeconds`
+  Esto asegura un margen de seguridad suficiente para tolerar latencias transitorias de red antes de que expire el lease en PostgreSQL o la visibilidad en SQS.
+
+### 12.2 Trazabilidad con MDC y Correlación de Logs
+Durante el procesamiento de cada mensaje SQS, el consumidor inyecta las siguientes claves contextuales en el `MDC` de SLF4J:
+- `correlationId`: Asignado prioritariamente al `eventId` del mensaje (o en su defecto al `importJobId`). Conectado con el patrón de logging `[correlationId=%X{correlationId:-none}]`.
+- `eventId`: UUID del evento publicado desde el outbox transaccional.
+- `importJobId`: UUID del trabajo durable en `import_jobs`.
+
+Ambas claves se limpian de manera determinista en un bloque `finally` para evitar fugas contextuales en hilos reutilizados.
+
+### 12.3 Limpieza Segura de Archivos Temporales de Staging
+- Durante la inicialización del worker (`start()`), se invoca `cleanStaleStagingFiles()` sobre `${document.storage.root}/staging`.
+- Se eliminan de forma segura aquellos archivos regulares que:
+  1. Residan estrictamente dentro del subdirectorio `staging` (prevención de Path Traversal y enlaces simbólicos con `NOFOLLOW_LINKS`).
+  2. Hayan superado la edad de retención configurada en `stagingCleanupAge` (por defecto 24 horas).
+- Cualquier error de I/O en la eliminación se registra como advertencia (`WARN`) sin interrumpir el arranque del worker.
+
+### 12.4 Especificación de Limpieza de Cargas Expiradas y Decisión de Diferimiento
+- **Prohibición de S3 Lifecycle Rules en `documents/*`:**
+  - Los archivos finales de documentos activos residen permanentemente bajo la clave `documents/{userId}/{documentId}/source.epub|pdf`.
+  - Configurar una regla de ciclo de vida de S3 que elimine objetos basados en antigüedad sobre `documents/*` destruiría irreparablemente los documentos legítimos de los usuarios.
+- **Limpieza de Cargas Abandonadas (`document_uploads` en `PENDING` expiradas):**
+  - Un usuario puede solicitar una intención de carga (`POST /api/v1/documents/uploads`), subir el archivo a S3 y cerrar la pestaña sin invocar `/confirm`.
+  - El diseño seguro para purgar estos objetos requiere un trabajo programado que:
+    1. Reclame con lease registros en `document_uploads` donde `status = 'PENDING'` y `expires_at < :now`.
+    2. Transicione el estado a `EXPIRED` de forma atómica evitando carreras con `/confirm` en vuelo.
+    3. Elimine el objeto físico de S3 (`s3:DeleteObject`).
+    4. Registre la confirmación de borrado en una columna de auditoría (p. ej. `storage_deleted_at TIMESTAMP`) para permitir reintentos idempotentes ante fallos de red.
+  - **Decisión de Diferimiento:** Debido a la restricción estricta de **"NO crear migraciones"** en esta fase de endurecimiento de runtime, la introducción de columnas adicionales y nuevas tablas de control queda formalmente **diferida** para una fase posterior con migración de base de datos dedicada.

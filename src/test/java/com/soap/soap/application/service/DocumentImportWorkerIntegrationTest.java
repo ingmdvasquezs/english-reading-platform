@@ -107,7 +107,8 @@ class DocumentImportWorkerIntegrationTest {
             Duration.ofSeconds(1),
             Duration.ofSeconds(60),
             Duration.ofSeconds(20),
-            "integration-worker-1");
+            "integration-worker-1",
+            Duration.ofHours(24));
 
     processor =
         new DocumentImportProcessor(

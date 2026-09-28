@@ -317,8 +317,10 @@ public class DocumentImportProcessor {
       }
 
       long duration = System.currentTimeMillis() - startTime;
+      String eventId = org.slf4j.MDC.get("eventId");
       LOG.info(
-          "document_import_worker_completed eventId=null jobId={} documentId={} workerId={} attempt={} durationMs={}",
+          "document_import_worker_completed eventId={} jobId={} documentId={} workerId={} attempt={} durationMs={}",
+          eventId != null ? eventId : "null",
           job.id(),
           document.id(),
           workerId,

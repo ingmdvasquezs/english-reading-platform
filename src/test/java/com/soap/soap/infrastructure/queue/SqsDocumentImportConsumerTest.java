@@ -53,7 +53,8 @@ class SqsDocumentImportConsumerTest {
             Duration.ofSeconds(1),
             Duration.ofSeconds(60),
             Duration.ofSeconds(20),
-            "test-worker");
+            "test-worker",
+            Duration.ofHours(24));
     objectMapper = new ObjectMapper();
     consumer =
         new SqsDocumentImportConsumer(
@@ -130,28 +131,29 @@ class SqsDocumentImportConsumerTest {
   }
 
   @Test
-  @DisplayName("Case R: batch/poll max messages respected in ReceiveMessageRequest")
-  void caseR_batchPollMaxMessagesRespected() {
-    DocumentImportWorkerProperties batchProps =
+  @DisplayName("Case R: poll configuration parameters respected in ReceiveMessageRequest")
+  void caseR_pollConfigParametersRespected() {
+    DocumentImportWorkerProperties customProps =
         new DocumentImportWorkerProperties(
             true,
             false,
             15,
             45,
-            5,
+            1,
             Duration.ofMillis(100),
             Duration.ofSeconds(1),
             Duration.ofSeconds(60),
             Duration.ofSeconds(20),
-            "batch-worker");
-    SqsDocumentImportConsumer batchConsumer =
+            "custom-worker",
+            Duration.ofHours(24));
+    SqsDocumentImportConsumer customConsumer =
         new SqsDocumentImportConsumer(
-            sqsClient, queueProperties, batchProps, processor, objectMapper, null);
+            sqsClient, queueProperties, customProps, processor, objectMapper, null);
 
     when(sqsClient.receiveMessage(any(ReceiveMessageRequest.class)))
         .thenReturn(ReceiveMessageResponse.builder().messages(List.of()).build());
 
-    batchConsumer.pollOnce();
+    customConsumer.pollOnce();
 
     ArgumentCaptor<ReceiveMessageRequest> captor =
         ArgumentCaptor.forClass(ReceiveMessageRequest.class);
@@ -159,9 +161,141 @@ class SqsDocumentImportConsumerTest {
     ReceiveMessageRequest request = captor.getValue();
 
     assertThat(request.queueUrl()).isEqualTo(QUEUE_URL);
-    assertThat(request.maxNumberOfMessages()).isEqualTo(5);
+    assertThat(request.maxNumberOfMessages()).isEqualTo(1);
     assertThat(request.waitTimeSeconds()).isEqualTo(15);
     assertThat(request.visibilityTimeout()).isEqualTo(45);
+  }
+
+  @Test
+  @DisplayName(
+      "MDC correlationId, eventId, importJobId set during processing and cleared afterwards")
+  void mdcContextSetDuringProcessingAndClearedAfterwards() {
+    UUID eventId = UUID.randomUUID();
+    UUID jobId = UUID.randomUUID();
+    String body =
+        """
+        {
+          "schemaVersion": 1,
+          "eventId": "%s",
+          "eventType": "DOCUMENT_IMPORT_REQUESTED",
+          "importJobId": "%s"
+        }
+        """
+            .formatted(eventId, jobId);
+
+    Message message =
+        Message.builder().messageId("msg-mdc").receiptHandle("receipt-mdc").body(body).build();
+
+    when(processor.processImport(eq(jobId), eq("receipt-mdc")))
+        .thenAnswer(
+            invocation -> {
+              assertThat(org.slf4j.MDC.get("correlationId")).isEqualTo(eventId.toString());
+              assertThat(org.slf4j.MDC.get("eventId")).isEqualTo(eventId.toString());
+              assertThat(org.slf4j.MDC.get("importJobId")).isEqualTo(jobId.toString());
+              return new ImportExecutionOutcome(OutcomeType.COMPLETED, "Done", jobId);
+            });
+
+    ImportExecutionOutcome outcome = consumer.processSingleMessage(message);
+
+    assertThat(outcome).isNotNull();
+    assertThat(org.slf4j.MDC.get("correlationId")).isNull();
+    assertThat(org.slf4j.MDC.get("eventId")).isNull();
+    assertThat(org.slf4j.MDC.get("importJobId")).isNull();
+  }
+
+  @Test
+  @DisplayName("MDC context cleared even if processor throws exception")
+  void mdcContextClearedOnProcessorException() {
+    UUID eventId = UUID.randomUUID();
+    UUID jobId = UUID.randomUUID();
+    String body =
+        """
+        {
+          "schemaVersion": 1,
+          "eventId": "%s",
+          "eventType": "DOCUMENT_IMPORT_REQUESTED",
+          "importJobId": "%s"
+        }
+        """
+            .formatted(eventId, jobId);
+
+    Message message =
+        Message.builder().messageId("msg-err").receiptHandle("receipt-err").body(body).build();
+
+    when(processor.processImport(eq(jobId), eq("receipt-err")))
+        .thenAnswer(
+            invocation -> {
+              assertThat(org.slf4j.MDC.get("correlationId")).isEqualTo(eventId.toString());
+              throw new RuntimeException("Simulated processing crash");
+            });
+
+    org.junit.jupiter.api.Assertions.assertThrows(
+        RuntimeException.class, () -> consumer.processSingleMessage(message));
+
+    assertThat(org.slf4j.MDC.get("correlationId")).isNull();
+    assertThat(org.slf4j.MDC.get("eventId")).isNull();
+    assertThat(org.slf4j.MDC.get("importJobId")).isNull();
+  }
+
+  @Test
+  @DisplayName("MDC context not leaked on malformed message")
+  void mdcContextNotLeakedOnMalformedMessage() {
+    Message message =
+        Message.builder()
+            .messageId("msg-bad")
+            .receiptHandle("receipt-bad")
+            .body("bad json")
+            .build();
+
+    consumer.processSingleMessage(message);
+
+    assertThat(org.slf4j.MDC.get("correlationId")).isNull();
+    assertThat(org.slf4j.MDC.get("eventId")).isNull();
+    assertThat(org.slf4j.MDC.get("importJobId")).isNull();
+  }
+
+  @Test
+  @DisplayName("Stale staging files cleanup: deletes old files, keeps fresh files and directories")
+  void cleanStaleStagingFiles_deletesOldKeepsFreshAndDirectories(
+      @org.junit.jupiter.api.io.TempDir java.nio.file.Path tempRoot) throws java.io.IOException {
+    java.nio.file.Path staging = tempRoot.resolve("staging");
+    java.nio.file.Files.createDirectories(staging);
+
+    // Old file: 25 hours old
+    java.nio.file.Path oldFile = java.nio.file.Files.createTempFile(staging, "old-source-", ".tmp");
+    java.nio.file.attribute.FileTime oldTime =
+        java.nio.file.attribute.FileTime.from(
+            java.time.Instant.now().minus(java.time.Duration.ofHours(25)));
+    java.nio.file.Files.setLastModifiedTime(oldFile, oldTime);
+
+    // Fresh file: 1 hour old
+    java.nio.file.Path freshFile =
+        java.nio.file.Files.createTempFile(staging, "fresh-source-", ".tmp");
+    java.nio.file.attribute.FileTime freshTime =
+        java.nio.file.attribute.FileTime.from(
+            java.time.Instant.now().minus(java.time.Duration.ofHours(1)));
+    java.nio.file.Files.setLastModifiedTime(freshFile, freshTime);
+
+    // Subdirectory in staging
+    java.nio.file.Path subDir = staging.resolve("sub-dir");
+    java.nio.file.Files.createDirectories(subDir);
+
+    // Outside file in storage root but outside staging directory: 25 hours old
+    java.nio.file.Path outsideFile = tempRoot.resolve("outside-doc.pdf");
+    java.nio.file.Files.writeString(outsideFile, "outside document content");
+    java.nio.file.Files.setLastModifiedTime(outsideFile, oldTime);
+
+    SqsDocumentImportConsumer stagingConsumer =
+        new SqsDocumentImportConsumer(
+            sqsClient, queueProperties, workerProperties, processor, objectMapper, null, tempRoot);
+
+    int deleted = stagingConsumer.cleanStaleStagingFiles();
+
+    assertThat(deleted).isEqualTo(1);
+    assertThat(java.nio.file.Files.exists(oldFile)).isFalse();
+    assertThat(java.nio.file.Files.exists(freshFile)).isTrue();
+    assertThat(java.nio.file.Files.exists(subDir)).isTrue();
+    assertThat(java.nio.file.Files.exists(outsideFile)).isTrue();
   }
 
   @Test

@@ -102,7 +102,8 @@ class DocumentImportProcessorTest {
             Duration.ofSeconds(1),
             Duration.ofSeconds(60),
             Duration.ofSeconds(20),
-            WORKER_ID);
+            WORKER_ID,
+            Duration.ofHours(24));
 
     processor =
         new DocumentImportProcessor(

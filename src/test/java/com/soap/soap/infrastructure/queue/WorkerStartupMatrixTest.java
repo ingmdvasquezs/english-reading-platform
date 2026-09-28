@@ -118,4 +118,163 @@ class WorkerStartupMatrixTest {
               assertThat(context).hasSingleBean(SqsClient.class);
             });
   }
+
+  @Test
+  @DisplayName("Case X: maxMessages > 1 -> fails fast on startup")
+  void caseX_maxMessagesGreaterThanOne_failsFast() {
+    runner
+        .withPropertyValues(
+            "app.role=worker",
+            "app.document-import.queue.url=https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
+            "app.document-import.worker.max-messages=2")
+        .run(
+            context -> {
+              assertThat(context).hasFailed();
+              Throwable failure = context.getStartupFailure();
+              assertThat(failure).isNotNull();
+              assertThat(failure)
+                  .rootCause()
+                  .isInstanceOf(IllegalArgumentException.class)
+                  .hasMessageContaining("maxMessages must be 1 for sequential worker, got: 2");
+            });
+  }
+
+  @Test
+  @DisplayName("Case Y: waitTimeSeconds > 20 -> fails fast on startup")
+  void caseY_waitTimeSecondsGreaterThanTwenty_failsFast() {
+    runner
+        .withPropertyValues(
+            "app.role=worker",
+            "app.document-import.queue.url=https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
+            "app.document-import.worker.wait-time-seconds=21")
+        .run(
+            context -> {
+              assertThat(context).hasFailed();
+              Throwable failure = context.getStartupFailure();
+              assertThat(failure).isNotNull();
+              assertThat(failure)
+                  .rootCause()
+                  .isInstanceOf(IllegalArgumentException.class)
+                  .hasMessageContaining("waitTimeSeconds must be between 1 and 20, got: 21");
+            });
+  }
+
+  @Test
+  @DisplayName("Case Z: visibilityTimeoutSeconds > 43200 -> fails fast on startup")
+  void caseZ_visibilityTimeoutSecondsTooLarge_failsFast() {
+    runner
+        .withPropertyValues(
+            "app.role=worker",
+            "app.document-import.queue.url=https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
+            "app.document-import.worker.visibility-timeout-seconds=43201")
+        .run(
+            context -> {
+              assertThat(context).hasFailed();
+              Throwable failure = context.getStartupFailure();
+              assertThat(failure).isNotNull();
+              assertThat(failure)
+                  .rootCause()
+                  .isInstanceOf(IllegalArgumentException.class)
+                  .hasMessageContaining(
+                      "visibilityTimeoutSeconds must be between 1 and 43200, got: 43201");
+            });
+  }
+
+  @Test
+  @DisplayName("Case AA: heartbeatInterval * 2 > leaseDuration -> fails fast on startup")
+  void caseAA_heartbeatTooCloseToLeaseDuration_failsFast() {
+    runner
+        .withPropertyValues(
+            "app.role=worker",
+            "app.document-import.queue.url=https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
+            "app.document-import.worker.heartbeat-interval=35s",
+            "app.document-import.worker.lease-duration=60s")
+        .run(
+            context -> {
+              assertThat(context).hasFailed();
+              Throwable failure = context.getStartupFailure();
+              assertThat(failure).isNotNull();
+              assertThat(failure)
+                  .rootCause()
+                  .isInstanceOf(IllegalArgumentException.class)
+                  .hasMessageContaining("must be at most half of leaseDuration");
+            });
+  }
+
+  @Test
+  @DisplayName("Case AB: heartbeatInterval * 2 > visibilityTimeoutSeconds -> fails fast on startup")
+  void caseAB_heartbeatTooCloseToVisibilityTimeout_failsFast() {
+    runner
+        .withPropertyValues(
+            "app.role=worker",
+            "app.document-import.queue.url=https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
+            "app.document-import.worker.heartbeat-interval=35s",
+            "app.document-import.worker.lease-duration=100s",
+            "app.document-import.worker.visibility-timeout-seconds=60")
+        .run(
+            context -> {
+              assertThat(context).hasFailed();
+              Throwable failure = context.getStartupFailure();
+              assertThat(failure).isNotNull();
+              assertThat(failure)
+                  .rootCause()
+                  .isInstanceOf(IllegalArgumentException.class)
+                  .hasMessageContaining("must be at most half of visibilityTimeoutSeconds");
+            });
+  }
+
+  @Test
+  @DisplayName("DocumentImportWorkerProperties defaults assign expected production values")
+  void properties_defaultsAssignExpectedValues() {
+    DocumentImportWorkerProperties props =
+        new DocumentImportWorkerProperties(null, null, 0, 0, 0, null, null, null, null, null, null);
+
+    assertThat(props.isEnabled()).isTrue();
+    assertThat(props.isAutoStartup()).isTrue();
+    assertThat(props.waitTimeSeconds()).isEqualTo(20);
+    assertThat(props.visibilityTimeoutSeconds()).isEqualTo(60);
+    assertThat(props.maxMessages()).isEqualTo(1);
+    assertThat(props.pollDelay()).isEqualTo(java.time.Duration.ofSeconds(1));
+    assertThat(props.errorBackoff()).isEqualTo(java.time.Duration.ofSeconds(5));
+    assertThat(props.leaseDuration()).isEqualTo(java.time.Duration.ofSeconds(60));
+    assertThat(props.heartbeatInterval()).isEqualTo(java.time.Duration.ofSeconds(20));
+    assertThat(props.stagingCleanupAge()).isEqualTo(java.time.Duration.ofHours(24));
+    assertThat(props.workerId()).startsWith("worker-");
+  }
+
+  @Test
+  @DisplayName("DocumentImportWorkerProperties rejects invalid or non-positive durations")
+  void properties_rejectsInvalidDurations() {
+    org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new DocumentImportWorkerProperties(
+                true,
+                true,
+                20,
+                60,
+                1,
+                java.time.Duration.ofSeconds(-1),
+                java.time.Duration.ofSeconds(5),
+                java.time.Duration.ofSeconds(60),
+                java.time.Duration.ofSeconds(20),
+                "w1",
+                java.time.Duration.ofHours(24)));
+
+    org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new DocumentImportWorkerProperties(
+                true,
+                true,
+                20,
+                60,
+                1,
+                java.time.Duration.ofSeconds(1),
+                java.time.Duration.ZERO,
+                java.time.Duration.ofSeconds(60),
+                java.time.Duration.ofSeconds(20),
+                "w1",
+                java.time.Duration.ofHours(24)));
+  }
 }
