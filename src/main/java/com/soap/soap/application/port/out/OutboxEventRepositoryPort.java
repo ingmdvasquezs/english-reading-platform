@@ -16,4 +16,8 @@ public interface OutboxEventRepositoryPort {
   boolean markPublished(UUID eventId, String dispatcherId);
 
   boolean markFailedAttempt(UUID eventId, String dispatcherId, String error, Duration retryBackoff);
+
+  default boolean markFailedTerminal(UUID eventId, String dispatcherId, String error) {
+    return false;
+  }
 }

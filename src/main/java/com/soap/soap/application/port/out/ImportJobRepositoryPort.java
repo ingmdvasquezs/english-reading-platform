@@ -35,4 +35,8 @@ public interface ImportJobRepositoryPort {
       UUID jobId, UUID leaseToken, String workerId, String errorCode, String errorMessage);
 
   boolean abort(UUID jobId);
+
+  default boolean failPending(UUID jobId, String errorCode, String errorMessage) {
+    return false;
+  }
 }

@@ -100,8 +100,8 @@ class AsYouLikeItV5ReimportValidationTest {
       try (var ps =
           conn.prepareStatement(
               "INSERT INTO imported_documents (id, user_id, title, author, language, format, import_status, "
-                  + "source_sha256, deduplication_sha256, chunking_version, created_at, updated_at) "
-                  + "VALUES (?, ?, 'As You Like It (V5 Validation Copy)', ?, ?, ?, 'READY', ?, ?, 5, ?, ?)")) {
+                  + "source_sha256, deduplication_sha256, chunking_version, source_storage_provider, created_at, updated_at) "
+                  + "VALUES (?, ?, 'As You Like It (V5 Validation Copy)', ?, ?, ?, 'READY', ?, ?, 5, 'FILESYSTEM', ?, ?)")) {
         ps.setObject(1, newDocId);
         ps.setObject(2, userId);
         ps.setString(3, author);

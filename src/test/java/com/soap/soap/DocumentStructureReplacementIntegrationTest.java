@@ -543,11 +543,16 @@ class DocumentStructureReplacementIntegrationTest {
   }
 
   @Test
-  @DisplayName("T41: Phase 17.2 has S3 SDK on classpath but zero SQS dependencies")
+  @DisplayName(
+      "T41: Phase 17.3 has S3 and SQS SDK on classpath but zero Kafka or Spring Cloud AWS dependencies")
   void verifyZeroAwsDependencies() {
     org.junit.jupiter.api.Assertions.assertDoesNotThrow(
         () -> Class.forName("software.amazon.awssdk.services.s3.S3Client"));
-    assertThatThrownBy(() -> Class.forName("software.amazon.awssdk.services.sqs.SqsClient"))
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> Class.forName("software.amazon.awssdk.services.sqs.SqsClient"));
+    assertThatThrownBy(() -> Class.forName("org.apache.kafka.clients.producer.KafkaProducer"))
+        .isInstanceOf(ClassNotFoundException.class);
+    assertThatThrownBy(() -> Class.forName("io.awspring.cloud.sqs.operations.SqsTemplate"))
         .isInstanceOf(ClassNotFoundException.class);
   }
 }

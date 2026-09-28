@@ -76,4 +76,14 @@ public class OutboxEventPersistenceAdapter implements OutboxEventRepositoryPort 
     }
     return repository.markFailedFinal(eventId, dispatcherId, error, now) > 0;
   }
+
+  @Override
+  @Transactional
+  public boolean markFailedTerminal(UUID eventId, String dispatcherId, String error) {
+    if (eventId == null || dispatcherId == null) {
+      return false;
+    }
+    LocalDateTime now = LocalDateTime.now();
+    return repository.markFailedTerminal(eventId, dispatcherId, error, now) > 0;
+  }
 }

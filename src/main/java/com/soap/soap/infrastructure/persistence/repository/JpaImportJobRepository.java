@@ -156,4 +156,23 @@ public interface JpaImportJobRepository extends JpaRepository<ImportJobEntity, U
         AND j.status IN (com.soap.soap.domain.model.ImportJobStatus.PENDING, com.soap.soap.domain.model.ImportJobStatus.PROCESSING)
       """)
   int abortJob(@Param("jobId") UUID jobId, @Param("now") LocalDateTime now);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      UPDATE ImportJobEntity j
+      SET j.status = com.soap.soap.domain.model.ImportJobStatus.FAILED,
+          j.finishedAt = :now,
+          j.lastErrorCode = :errorCode,
+          j.lastErrorMessage = :errorMessage,
+          j.updatedAt = :now,
+          j.version = j.version + 1
+      WHERE j.id = :jobId
+        AND j.status = com.soap.soap.domain.model.ImportJobStatus.PENDING
+      """)
+  int failPendingJob(
+      @Param("jobId") UUID jobId,
+      @Param("errorCode") String errorCode,
+      @Param("errorMessage") String errorMessage,
+      @Param("now") LocalDateTime now);
 }

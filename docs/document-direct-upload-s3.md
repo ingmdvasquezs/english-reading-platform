@@ -152,3 +152,84 @@ El backend requiere únicamente los permisos para autorizar subidas, inspecciona
 Si en producción se adopta cifrado del lado del servidor utilizando AWS KMS con clave administrada por el cliente (SSE-KMS con Customer Managed Key):
 - Las llamadas de inspección (`HeadObject` o `GetObjectAttributes`) que acceden a metadatos de objetos cifrados con KMS pueden requerir permisos adicionales para invocar `kms:Decrypt` sobre la ARN de la clave.
 - Esta configuración es puramente opcional para entornos que elijan KMS y no forma parte de la política mínima base (la cual utiliza SSE-S3 AES-256 gestionado por S3 sin costo ni configuración KMS adicional).
+
+---
+
+## 10. Despachador Outbox a Amazon SQS — Fase 17.3
+
+### 10.1 Pipeline de Despacho Asíncrono
+```
+Confirm Upload
+      ↓
+PostgreSQL Transaction (Atómica)
+   • document_uploads (CONFIRMED)
+   • imported_documents (PROCESSING)
+   • import_jobs (PENDING)
+   • outbox_events (PENDING)
+      ↓
+Outbox Dispatcher (Scheduled / dispatchOnce)
+   1. Claim Batch (FOR UPDATE SKIP LOCKED) → Estado SENDING con lock leasing
+   2. Commit Claim Transaction
+   3. SQS SendMessage (Llamada de red AWS SQS Standard fuera de transacción DB)
+   4. Mark Published / Failed Transaction (Condicionada por lease vigente / fencing)
+      ↓
+Amazon SQS Standard
+      ↓
+[STOP: Worker consumidor diferido a Fase 17.4]
+```
+
+### 10.2 Contrato del Mensaje en Cola (Envelope Minimalista)
+El mensaje enviado a SQS Standard es un JSON determinista, versionado y liviano que contiene únicamente la identidad necesaria para que el futuro Worker recupere el estado durable desde PostgreSQL:
+```json
+{
+  "schemaVersion": 1,
+  "eventId": "11111111-1111-1111-1111-111111111111",
+  "eventType": "DOCUMENT_IMPORT_REQUESTED",
+  "importJobId": "22222222-2222-2222-2222-222222222222"
+}
+```
+* **No incluye:** Tokens, credenciales, URLs prefirmadas, metadatos pesados ni el contenido del documento.
+
+### 10.3 Garantías de Entrega: AT-LEAST-ONCE e Idempotencia
+- **Semántica At-Least-Once:** SQS Standard junto al Transactional Outbox garantizan entrega *al menos una vez*. Si el despachador publica exitosamente a SQS pero el proceso se interrumpe antes de ejecutar `markPublished`, el lease del outbox expirará y otro despachador reclamará y republicará el mensaje.
+- **Idempotencia Obligatoria del Worker:** El futuro Worker consumidor (Fase 17.4) **debe ser estrictamente idempotente**, utilizando `eventId` o `importJobId` junto con el estado del `import_job` en PostgreSQL para ignorar entregas duplicadas.
+
+### 10.4 Fencing y Control de Concurrencia
+- La coordinación entre múltiples instancias de despachador es durable en PostgreSQL mediante `FOR UPDATE SKIP LOCKED`.
+- Cada reclamo asigna un `locked_by` (identificador del despachador) y un `locked_until` (duración del lease).
+- Las operaciones de cierre (`markPublished`, `markFailedAttempt`) verifican obligatoriamente que el lease continúe vigente (`locked_by = :dispatcherId AND locked_until >= :now`). Un despachador cuyo lease haya expirado no puede alterar el estado de un evento recuperado por otra instancia.
+
+### 10.5 Separación por Rol de Proceso (`APP_ROLE`)
+- `APP_ROLE=api` (o `all`): Ejecuta el API REST/SOAP y el `ScheduledOutboxDispatcher`.
+- `APP_ROLE=worker`: Desactiva el scheduler del outbox dispatcher para evitar competencia accidental de recursos en procesos dedicados exclusivamente al procesamiento de fondo.
+
+### 10.6 Política IAM Mínima para el Despachador (Fase 17.3)
+El API/Despachador requiere únicamente permiso de envío sobre la cola SQS de importación:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowDocumentImportQueuePublishing",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:SendMessage"
+      ],
+      "Resource": "arn:aws:sqs:us-east-1:*:english-reading-document-imports"
+    }
+  ]
+}
+```
+
+### 10.7 Configuración Recomendada de SQS en AWS
+- **Tipo de Cola:** Standard Queue.
+- **Nombre sugerido:** `english-reading-document-imports`
+- **Dead-Letter Queue (DLQ):** `english-reading-document-imports-dlq`
+- **Redrive Policy:**
+  ```json
+  {
+    "deadLetterTargetArn": "arn:aws:sqs:us-east-1:*:english-reading-document-imports-dlq",
+    "maxReceiveCount": 5
+  }
+  ```
+- **Visibility Timeout:** 300 segundos (5 minutos), alineado al tiempo máximo de procesamiento por documento.

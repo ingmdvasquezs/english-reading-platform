@@ -91,6 +91,19 @@ recommendation:
 
 # Security hardening defaults. Override with environment-specific configuration when necessary.
 app:
+  role: ${APP_ROLE:api}
+  document-import:
+    queue:
+      url: ${DOCUMENT_IMPORT_QUEUE_URL:}
+      region: ${DOCUMENT_IMPORT_QUEUE_REGION:us-east-1}
+    outbox:
+      enabled: ${DOCUMENT_IMPORT_OUTBOX_ENABLED:false}
+      batch-size: ${DOCUMENT_IMPORT_OUTBOX_BATCH_SIZE:10}
+      lock-duration: ${DOCUMENT_IMPORT_OUTBOX_LOCK_DURATION:5m}
+      retry-backoff: ${DOCUMENT_IMPORT_OUTBOX_RETRY_BACKOFF:30s}
+      schedule:
+        fixed-delay: ${DOCUMENT_IMPORT_OUTBOX_FIXED_DELAY:2000}
+        initial-delay: ${DOCUMENT_IMPORT_OUTBOX_INITIAL_DELAY:5000}
   documents:
     storage-root: ${DOCUMENT_STORAGE_ROOT:.private-assets}
     max-source-bytes: ${DOCUMENT_MAX_SOURCE_BYTES:52428800}

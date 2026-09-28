@@ -112,4 +112,25 @@ public interface JpaOutboxEventRepository extends JpaRepository<OutboxEventEntit
       @Param("dispatcherId") String dispatcherId,
       @Param("error") String error,
       @Param("now") LocalDateTime now);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      UPDATE OutboxEventEntity e
+      SET e.status = com.soap.soap.domain.model.OutboxEventStatus.FAILED,
+          e.lockedBy = NULL,
+          e.lockedUntil = NULL,
+          e.lastError = :error,
+          e.updatedAt = :now,
+          e.version = e.version + 1
+      WHERE e.id = :eventId
+        AND e.lockedBy = :dispatcherId
+        AND e.status = com.soap.soap.domain.model.OutboxEventStatus.SENDING
+        AND e.lockedUntil >= :now
+      """)
+  int markFailedTerminal(
+      @Param("eventId") UUID eventId,
+      @Param("dispatcherId") String dispatcherId,
+      @Param("error") String error,
+      @Param("now") LocalDateTime now);
 }
