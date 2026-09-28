@@ -1,0 +1,17 @@
+# -----------------------------------------------------------------------------
+# Example Terraform variables for dev / staging environments
+# Copy this file to terraform.tfvars and customize for your deployment
+# NEVER commit personal access keys, secrets or credentials
+# -----------------------------------------------------------------------------
+
+aws_region               = "us-east-1"
+environment              = "dev"
+project_name             = "english-reading"
+document_bucket_name     = null # Set to an explicit, globally unique name if needed, e.g. "english-reading-dev-documents-12345"
+allowed_frontend_origins = ["http://localhost:4200"]
+
+# SQS Queue tuning (optional overrides)
+sqs_visibility_timeout_seconds     = 300
+sqs_main_message_retention_seconds = 345600
+sqs_dlq_message_retention_seconds  = 1209600
+sqs_max_receive_count              = 5
