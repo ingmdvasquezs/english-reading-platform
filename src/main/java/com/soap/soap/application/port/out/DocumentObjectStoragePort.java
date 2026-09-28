@@ -14,5 +14,7 @@ public interface DocumentObjectStoragePort {
 
   StoredObjectAttributes inspectObject(String storageKey);
 
+  void downloadObject(String storageKey, java.nio.file.Path destinationPath);
+
   void deleteObject(String storageKey);
 }

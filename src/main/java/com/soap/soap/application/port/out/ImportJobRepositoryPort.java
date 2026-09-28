@@ -36,6 +36,8 @@ public interface ImportJobRepositoryPort {
 
   boolean abort(UUID jobId);
 
+  boolean failExceededRetries(UUID jobId, String errorCode, String errorMessage);
+
   default boolean failPending(UUID jobId, String errorCode, String errorMessage) {
     return false;
   }

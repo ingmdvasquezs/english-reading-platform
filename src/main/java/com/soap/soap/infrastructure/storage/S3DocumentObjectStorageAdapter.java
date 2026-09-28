@@ -6,6 +6,7 @@ import com.soap.soap.application.port.out.DocumentObjectStoragePort;
 import com.soap.soap.domain.model.StoredObjectAttributes;
 import com.soap.soap.domain.model.UploadAuthorization;
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -24,6 +25,7 @@ import software.amazon.awssdk.services.s3.model.ChecksumMode;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectAttributesRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectAttributesResponse;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -194,6 +196,32 @@ public class S3DocumentObjectStorageAdapter implements DocumentObjectStoragePort
     } catch (SdkClientException clientEx) {
       throw new TransientStorageException(
           "Transient SDK client error inspecting object via HeadObject " + storageKey, clientEx);
+    }
+  }
+
+  @Override
+  public void downloadObject(String storageKey, Path destinationPath) {
+    Objects.requireNonNull(storageKey, "storageKey must not be null");
+    Objects.requireNonNull(destinationPath, "destinationPath must not be null");
+    String bucket = properties.s3().bucket();
+    if (bucket == null || bucket.isBlank()) {
+      bucket = "english-reading-documents";
+    }
+
+    try {
+      s3Client.getObject(
+          GetObjectRequest.builder().bucket(bucket).key(storageKey).build(), destinationPath);
+    } catch (NoSuchKeyException e) {
+      throw new StorageObjectNotFoundException(storageKey);
+    } catch (S3Exception e) {
+      if (e.statusCode() == 404) {
+        throw new StorageObjectNotFoundException(storageKey);
+      }
+      throw new TransientStorageException(
+          "Transient S3 error downloading object " + storageKey + ": " + e.getMessage(), e);
+    } catch (SdkClientException e) {
+      throw new TransientStorageException(
+          "Transient SDK client error downloading object " + storageKey + ": " + e.getMessage(), e);
     }
   }
 

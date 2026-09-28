@@ -233,3 +233,132 @@ El API/Despachador requiere únicamente permiso de envío sobre la cola SQS de i
   }
   ```
 - **Visibility Timeout:** 300 segundos (5 minutos), alineado al tiempo máximo de procesamiento por documento.
+
+---
+
+## 11. Consumidor Worker SQS y Ejecución Durable de Importaciones — Fase 17.4
+
+### 11.1 Flujo Completo End-to-End
+```
+Client (Web/App)
+    ↓  1. POST /uploads & PUT direct to S3
+Amazon S3 (Private Bucket)
+    ↓  2. POST /uploads/{id}/confirm
+PostgreSQL (Transacción atómica: document PROCESSING + import_job PENDING + outbox_event PENDING)
+    ↓  3. ScheduledOutboxDispatcher (FOR UPDATE SKIP LOCKED)
+SQS Standard (At-Least-Once Delivery)
+    ↓  4. SqsDocumentImportConsumer (Long Polling, waitTime=20s)
+Worker (DocumentImportProcessor)
+    ↓  5. Claim atómico en PostgreSQL con fencing (leaseToken, leaseUntil, attemptCount++)
+    ↓  6. Descarga privada desde S3 (GetObject) a staging temporal controlado por la aplicación
+    ↓  7. Parser existente (EpubDocumentParserAdapter / PdfDocumentParserAdapter)
+    ↓  8. Extensión periódica coordinada (Heartbeat DB renewLease + SQS ChangeMessageVisibility)
+    ↓  9. Resolución de idioma y validación con DocumentLanguagePolicy
+    ↓ 10. DocumentChunker V5 (VERSION=5, dense mode, 80 KiB limits — estrictamente sin modificar)
+    ↓ 11. Persistencia atómica (CompleteDocumentImportUseCase en TX: sections + units + READY doc + COMPLETED job)
+    ↓ 12. DeleteMessage en SQS Standard (únicamente tras el commit confirmado en DB)
+READY (Disponible para lectura y progreso)
+```
+
+### 11.2 Fencing y Concurrencia de Workers en Base de Datos
+- **Fuente de Verdad Única:** PostgreSQL gobierna el estado y la propiedad del procesamiento; SQS actúa únicamente como disparador de eventos desacoplado.
+- **Token de Lease Criptográfico:** Cada claim exitoso genera un `UUID leaseToken` nuevo e incrementa `attemptCount`.
+- **Condición de Fencing Estricta:** Las operaciones de persistencia (`completeImport`) y resolución final (`failFinal`) comprueban:
+  ```sql
+  status = 'PROCESSING' AND worker_id = :workerId AND lease_token = :leaseToken AND lease_until >= :now
+  ```
+  Un worker cuyo lease haya expirado o haya sido robado/reclamado por otra instancia no puede corromper la estructura del documento.
+
+### 11.3 Coordinación de Heartbeat y Extensión de Visibilidad SQS
+- **Mecanismo Coordinado:** Procesos largos de parsing o chunking ejecutan periódicamente (`DocumentImportHeartbeatCoordinator`):
+  1. Extensión del lease en DB (`importJobs.renewLease`).
+  2. Extensión del timeout de visibilidad en SQS (`sqs:ChangeMessageVisibility`).
+- **Pérdida de Lease:** Si la renovación en DB devuelve `false` (p. ej. lease robado tras interrupción prolongada), el worker marca `ownershipLost = true` y aborta inmediatamente antes de invocar la persistencia final, sin eliminar el mensaje de SQS.
+
+### 11.4 Política de Éxito y Orden de Eliminación (`Success-Before-Delete`)
+- **Regla Inmutable:** El mensaje de SQS se borra **exclusivamente después** del commit atómico en base de datos.
+- **Resiliencia ante Caídas (Crash Simulation):**
+  - Si el worker completa la transacción en DB marcando el job como `COMPLETED` pero se apaga o falla antes de invocar `deleteMessage`:
+  - SQS reentrega el mensaje tras el visibility timeout.
+  - La nueva entrega ejecuta `importJobs.claim`, el cual detecta inmediatamente `ALREADY_COMPLETED`.
+  - El worker reconoce la idempotencia: **no vuelve a parsear ni a insertar unidades**, e invoca inmediatamente `deleteMessage` en SQS.
+
+### 11.5 Matriz de Respuestas a Mensajes Duplicados
+| Estado del Job en DB | Resultado del Claim | Acción del Worker | Elimina de SQS |
+| :--- | :--- | :--- | :--- |
+| `PENDING` / Leased vencido | `ACQUIRED` | Procesa importación completa | Sí, tras commit `COMPLETED` |
+| `COMPLETED` | `ALREADY_COMPLETED` | No-op idempotente | **Sí**, inmediatamente |
+| `FAILED` (terminal) / `ABORTED` | `FINAL_FAILED` / `ABORTED` | No-op idempotente | **Sí**, inmediatamente |
+| `PROCESSING` por otro worker | `ACTIVE_BY_OTHER_WORKER` | No procesa; espera visibilidad | **No**, deja expirar timeout |
+| Máximo de intentos superado | `RETRY_LIMIT_EXCEEDED` | Marca `failFinal` en DB | **Sí**, tras marcar FAILED |
+| No encontrado en DB | `NOT_FOUND` | Log de advertencia; DLQ handling | **No**, delega a DLQ |
+
+### 11.6 Modelo de Fallos: Permanente vs Transitorio
+1. **Fallo de Dominio Permanente:** Formato inválido (`INVALID_EPUB`, `INVALID_PDF`), PDF con contraseña, PDF escaneado sin texto, idioma no soportado o archivo no encontrado en storage (`StorageObjectNotFoundException`).
+   - *Comportamiento:* Marca job y documento como `FAILED` con su código de error correspondiente, confirma la transacción en DB y elimina el mensaje de SQS.
+2. **Fallo Transitorio de Infraestructura:** Caída de red temporal de S3 (`TransientStorageException`), desconexión temporal de base de datos o timeout de red.
+   - *Comportamiento:* Si no se ha superado `maxAttempts`, libera el job para reintento con backoff (`releaseForRetry`) y **no borra** el mensaje de SQS.
+   - Si se supera `maxAttempts`, realiza transición terminal a `FAILED` y elimina el mensaje.
+
+### 11.7 Manejo de Mensajes Malformados y Poison Pills (DLQ Policy)
+- El worker valida estrictamente el envelope JSON:
+  - `schemaVersion == 1`
+  - `eventType == "DOCUMENT_IMPORT_REQUESTED"`
+  - `importJobId` con formato UUID válido.
+- Si un mensaje no cumple el contrato o contiene JSON inválido, el worker **no lo elimina**. Permite que el `visibilityTimeout` expire para que la política de redrive de AWS mueva el poison message a la Dead-Letter Queue (`maxReceiveCount = 5`).
+
+### 11.8 Aislamiento de Transacciones vs Operaciones Pesadas
+- **Fuera de Transacción DB:**
+  - Recepción de SQS (`receiveMessage`)
+  - Descarga de S3 a staging (`s3Client.getObject`)
+  - Parsing de EPUB/PDF
+  - Extracción y almacenamiento de portada en storage
+  - Chunking léxico con `DocumentChunker` V5
+- **Dentro de Transacción DB Atómica (`CompleteDocumentImportUseCase`):**
+  - Reemplazo de estructura de documento (`replaceDocumentStructure`)
+  - Actualización de documento a `READY`
+  - Transición de `import_job` a `COMPLETED`
+
+### 11.9 Limpieza de Archivos Temporales (Staging)
+- Las fuentes descargadas se almacenan temporalmente en `documentStorageRoot/staging` con nombres generados por el servidor (`Files.createTempFile`).
+- La limpieza en bloque `finally { Files.deleteIfExists(tempFile); }` está garantizada en todos los escenarios: éxito, error de parsing, fallo de persistencia o excepción no controlada.
+
+### 11.10 Roles de Proceso (`APP_ROLE`)
+- `APP_ROLE=api`:
+  - Activa el API web y el despachador de Outbox (`ScheduledOutboxDispatcher`).
+  - El consumidor worker (`SqsDocumentImportConsumer`) permanece completamente desactivado.
+  - No requiere cola configurada si el worker está inactivo y el outbox no la necesita.
+- `APP_ROLE=worker`:
+  - Desactiva el despachador de Outbox.
+  - Activa el consumidor worker SQS (`SqsDocumentImportConsumer`).
+  - Falla en el arranque (`fail-fast` con `IllegalStateException`) si `app.document-import.queue.url` no está configurada.
+- `APP_ROLE=all`:
+  - Ambos componentes activos en el mismo proceso (modo monolítico para desarrollo local).
+
+### 11.11 Permisos IAM Mínimos del Worker (Fase 17.4)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowDocumentImportQueueConsumption",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:ChangeMessageVisibility"
+      ],
+      "Resource": "arn:aws:sqs:us-east-1:*:english-reading-document-imports"
+    },
+    {
+      "Sid": "AllowDocumentPrivateSourceRead",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::english-reading-documents/documents/*"
+    }
+  ]
+}
+```
+> **Nota de Seguridad:** No se otorgan permisos con comodines (`sqs:*`, `s3:*`). El worker no genera URLs prefirmadas para su propia lectura; utiliza su rol IAM para interactuar directamente con la API de S3 y SQS.

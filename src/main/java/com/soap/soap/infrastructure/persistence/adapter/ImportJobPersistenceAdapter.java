@@ -165,4 +165,14 @@ public class ImportJobPersistenceAdapter implements ImportJobRepositoryPort {
     LocalDateTime now = LocalDateTime.now();
     return repository.failPendingJob(jobId, errorCode, errorMessage, now) > 0;
   }
+
+  @Override
+  @Transactional
+  public boolean failExceededRetries(UUID jobId, String errorCode, String errorMessage) {
+    if (jobId == null) {
+      return false;
+    }
+    LocalDateTime now = LocalDateTime.now();
+    return repository.failExceededRetries(jobId, errorCode, errorMessage, now) > 0;
+  }
 }
