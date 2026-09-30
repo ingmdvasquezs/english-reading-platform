@@ -40,3 +40,9 @@ logging:
   structured:
     format:
       console: logstash
+
+app:
+  document-storage:
+    s3:
+      bucket: ${DOCUMENT_STORAGE_S3_BUCKET}
+      region: ${DOCUMENT_STORAGE_S3_REGION:us-east-1}

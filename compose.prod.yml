@@ -1,0 +1,51 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-english-reading-backend}:${IMAGE_TAG:-latest}
+    container_name: english-reading-backend
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-.env.production}
+    environment:
+      - APP_ROLE=${APP_ROLE:-all}
+      - SPRING_PROFILES_ACTIVE=prod
+      - DOCUMENT_STORAGE_ROOT=/data/english-reading
+    volumes:
+      # Persistent storage on host for cover assets and staging directory
+      - ${HOST_DOCUMENT_STORAGE_ROOT:-/var/lib/english-reading}:/data/english-reading
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - app_network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: english-reading-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app_network
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  app_network:
+    driver: bridge

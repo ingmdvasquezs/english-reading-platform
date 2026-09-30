@@ -92,6 +92,11 @@ recommendation:
 # Security hardening defaults. Override with environment-specific configuration when necessary.
 app:
   role: ${APP_ROLE:api}
+  document-storage:
+    provider: ${DOCUMENT_STORAGE_PROVIDER:S3}
+    s3:
+      bucket: ${DOCUMENT_STORAGE_S3_BUCKET:}
+      region: ${DOCUMENT_STORAGE_S3_REGION:us-east-1}
   document-import:
     queue:
       url: ${DOCUMENT_IMPORT_QUEUE_URL:}

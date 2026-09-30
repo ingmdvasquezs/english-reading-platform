@@ -51,10 +51,17 @@ class ConfigurationProfilesTest {
         .isEqualTo("${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info}");
     assertThat(property("application-prod.yaml", "logging.structured.format.console"))
         .isEqualTo("logstash");
+    var s3Bucket = property("application-prod.yaml", "app.document-storage.s3.bucket");
+    assertThat(s3Bucket).isEqualTo("${DOCUMENT_STORAGE_S3_BUCKET}");
     assertThatThrownBy(
             () ->
                 new PropertyPlaceholderHelper("${", "}", ":", null, false)
                     .replacePlaceholders(databasePassword, new Properties()))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                new PropertyPlaceholderHelper("${", "}", ":", null, false)
+                    .replacePlaceholders(s3Bucket, new Properties()))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
