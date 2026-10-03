@@ -29,13 +29,13 @@ resource "aws_s3_bucket_ownership_controls" "documents" {
 }
 
 # -----------------------------------------------------------------------------
-# S3 Versioning: Suspended (Objects use server-owned immutable UUID keys)
+# S3 Versioning: Disabled (Objects use server-owned immutable UUID keys)
 # -----------------------------------------------------------------------------
 resource "aws_s3_bucket_versioning" "documents" {
   bucket = aws_s3_bucket.documents.id
 
   versioning_configuration {
-    status = "Suspended"
+    status = "Disabled"
   }
 }
 
