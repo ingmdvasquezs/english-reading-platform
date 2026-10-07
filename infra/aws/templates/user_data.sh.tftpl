@@ -1,0 +1,437 @@
+﻿#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# ==============================================================================
+# English Reading Platform - EC2 Bootstrap Script (Amazon Linux 2023 ARM64)
+# ==============================================================================
+exec > >(tee -a /var/log/user-data.log) 2>&1
+echo "=== Starting Bootstrap: $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
+
+# ------------------------------------------------------------------------------
+# 1. System Updates & Prerequisites
+# ------------------------------------------------------------------------------
+echo "--- Installing system packages & Docker ---"
+dnf update -y
+# Install system packages (do NOT start Docker before storage mount drop-in is configured)
+dnf install -y docker jq amazon-ssm-agent e2fsprogs
+
+systemctl enable --now amazon-ssm-agent
+usermod -aG docker ec2-user
+
+# Install Docker Compose Plugin v2
+DOCKER_CONFIG_DIR="/usr/libexec/docker/cli-plugins"
+mkdir -p "$DOCKER_CONFIG_DIR"
+COMPOSE_VERSION="v2.29.7"
+ARCH="aarch64"
+curl -SL "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-$${ARCH}" -o "$DOCKER_CONFIG_DIR/docker-compose"
+chmod +x "$DOCKER_CONFIG_DIR/docker-compose"
+
+
+# ------------------------------------------------------------------------------
+# 2. Persistent Storage (EBS /dev/xvdf) Mount & Directory Setup
+# ------------------------------------------------------------------------------
+echo "--- Configuring persistent EBS storage ---"
+TARGET_VOLUME_ID="${ebs_volume_id}"
+# Volume ID format in AWS is vol-0123456789abcdef0.
+# On Nitro instances, the device symlink uses vol0123456789abcdef0 (without hyphen):
+CLEAN_VOL_ID="$${TARGET_VOLUME_ID//-/}"
+TARGET_DEVICE=""
+MAX_WAIT_SECONDS=120
+POLL_INTERVAL=2
+ELAPSED=0
+
+echo "Waiting up to $${MAX_WAIT_SECONDS}s for specific EBS volume ($TARGET_VOLUME_ID) to attach..."
+while [ "$ELAPSED" -lt "$MAX_WAIT_SECONDS" ]; do
+  # 1. Check exact Nitro NVMe by-id symlink (matches vol<id> without hyphen)
+  for candidate in "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$CLEAN_VOL_ID" "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$TARGET_VOLUME_ID"; do
+    if [ -b "$candidate" ]; then
+      TARGET_DEVICE="$candidate"
+      break 2
+    fi
+  done
+
+  # 2. Check legacy /dev/xvdf symlink created by udev if pointing to target volume
+  if [ -b "/dev/xvdf" ]; then
+    TARGET_DEVICE="/dev/xvdf"
+    break
+  fi
+
+  # 3. Check nvme devices via nvme-cli/ebsnvme if present
+  for dev in /dev/nvme[1-9]n1; do
+    if [ -b "$dev" ]; then
+      DEV_SERIAL=$(udevadm info --query=property --name="$dev" 2>/dev/null | grep "ID_SERIAL_SHORT" | cut -d= -f2 || true)
+      if [ "$DEV_SERIAL" = "$CLEAN_VOL_ID" ] || [ "$DEV_SERIAL" = "$TARGET_VOLUME_ID" ]; then
+        TARGET_DEVICE="$dev"
+        break 2
+      fi
+    fi
+  done
+
+  sleep "$POLL_INTERVAL"
+  ELAPSED=$((ELAPSED + POLL_INTERVAL))
+done
+
+if [ -z "$TARGET_DEVICE" ] || [ ! -b "$TARGET_DEVICE" ]; then
+  echo "FATAL: Persistent EBS volume ($TARGET_VOLUME_ID) failed to attach within $${MAX_WAIT_SECONDS}s." >&2
+  echo "Aborting bootstrap to prevent fallback to ephemeral root storage." >&2
+  exit 1
+fi
+
+echo "Found exact persistent EBS block device: $TARGET_DEVICE for volume $TARGET_VOLUME_ID"
+
+MOUNT_POINT="/var/lib/english-reading"
+mkdir -p "$MOUNT_POINT"
+
+
+FS_TYPE=$(blkid -o value -s TYPE "$TARGET_DEVICE" || true)
+if [ -z "$FS_TYPE" ]; then
+  echo "Formatting fresh device $TARGET_DEVICE as ext4..."
+  mkfs -t ext4 "$TARGET_DEVICE"
+fi
+
+# Add persistent mount to /etc/fstab if not present
+if ! grep -qs "$MOUNT_POINT" /etc/fstab; then
+  UUID=$(blkid -s UUID -o value "$TARGET_DEVICE")
+  if [ -n "$UUID" ]; then
+    echo "UUID=$UUID $MOUNT_POINT ext4 defaults,nofail 0 2" >> /etc/fstab
+  else
+    echo "$TARGET_DEVICE $MOUNT_POINT ext4 defaults,nofail 0 2" >> /etc/fstab
+  fi
+fi
+
+mount -a
+
+# Verify persistent mount succeeded
+if ! mountpoint -q "$MOUNT_POINT"; then
+  echo "FATAL: Failed to mount persistent EBS volume at $MOUNT_POINT." >&2
+  exit 1
+fi
+
+echo "Persistent EBS storage successfully mounted at $MOUNT_POINT."
+
+# Ensure directories exist and permissions match the non-root container user (uid=999 app)
+mkdir -p "$MOUNT_POINT/documents"
+mkdir -p "$MOUNT_POINT/staging"
+chown -R 999:999 "$MOUNT_POINT"
+chmod -R 750 "$MOUNT_POINT"
+
+# Configure systemd drop-in so Docker cannot start on subsequent boots unless persistent storage is mounted
+echo "--- Configuring systemd mount dependency for Docker ---"
+DOCKER_DROPIN_DIR="/etc/systemd/system/docker.service.d"
+mkdir -p "$DOCKER_DROPIN_DIR"
+cat << 'EOF' > "$DOCKER_DROPIN_DIR/storage-mount.conf"
+[Unit]
+RequiresMountsFor=/var/lib/english-reading
+EOF
+
+systemctl daemon-reload
+systemctl enable --now docker
+docker compose version
+
+
+# ------------------------------------------------------------------------------
+# 3. Retrieve Secrets (AWS Secrets Manager + SSM Parameter Store)
+# ------------------------------------------------------------------------------
+echo "--- Retrieving Secrets with IAM propagation retries ---"
+SECRET_ARN="${rds_secret_arn}"
+AWS_REGION="${aws_region}"
+PROJECT="${project_name}"
+ENV="${environment}"
+SSM_PREFIX="/$${PROJECT}/$${ENV}"
+
+# Helper: run command with bounded exponential backoff
+run_with_retry() {
+  local max_attempts="$1"
+  local delay="$2"
+  shift 2
+  local attempt=1
+
+  while [ "$attempt" -le "$max_attempts" ]; do
+    if "$@"; then
+      return 0
+    fi
+    echo "Command failed (attempt $attempt/$max_attempts). Retrying in $${delay}s..." >&2
+    sleep "$delay"
+    delay=$((delay * 2))
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+# 3.1 RDS Master Secret from Secrets Manager (Mandatory)
+echo "Fetching RDS master secret..."
+DB_CREDENTIALS=""
+for i in $(seq 1 6); do
+  DB_CREDENTIALS=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --region "$AWS_REGION" --query SecretString --output text 2>/dev/null || true)
+  if [ -n "$DB_CREDENTIALS" ]; then
+    break
+  fi
+  echo "Secrets Manager GetSecretValue not ready yet (attempt $i/6). Waiting 5s for IAM propagation..."
+  sleep 5
+done
+
+if [ -z "$DB_CREDENTIALS" ]; then
+  echo "FATAL: Could not retrieve RDS secret '$SECRET_ARN' after 6 attempts." >&2
+  exit 1
+fi
+
+DB_USER=$(echo "$DB_CREDENTIALS" | jq -r .username)
+DB_PASS=$(echo "$DB_CREDENTIALS" | jq -r .password)
+
+# 3.2 JWT Secret from SSM Parameter Store (Mandatory)
+echo "Fetching mandatory JWT secret from SSM Parameter Store..."
+JWT_SECRET_VAL=""
+for i in $(seq 1 6); do
+  JWT_SECRET_VAL=$(aws ssm get-parameter \
+    --name "$${SSM_PREFIX}/jwt-secret" \
+    --with-decryption \
+    --region "$AWS_REGION" \
+    --query Parameter.Value \
+    --output text 2>/dev/null || true)
+  if [ -n "$JWT_SECRET_VAL" ]; then
+    break
+  fi
+  echo "SSM GetParameter for jwt-secret not ready yet (attempt $i/6). Waiting 5s for IAM propagation..."
+  sleep 5
+done
+
+if [ -z "$JWT_SECRET_VAL" ]; then
+  echo "FATAL: Mandatory SSM parameter '$${SSM_PREFIX}/jwt-secret' not found or could not be decrypted after 6 attempts." >&2
+  echo "Please verify this SecureString exists in AWS SSM Parameter Store." >&2
+  exit 1
+fi
+
+# 3.3 Optional External API Keys (Attempt retrieval with retries; continue empty if absent)
+echo "Fetching optional external API keys from SSM..."
+MERRIAM_KEY_VAL=""
+for i in $(seq 1 3); do
+  MERRIAM_KEY_VAL=$(aws ssm get-parameter \
+    --name "$${SSM_PREFIX}/merriam-webster-api-key" \
+    --with-decryption \
+    --region "$AWS_REGION" \
+    --query Parameter.Value \
+    --output text 2>/dev/null || true)
+  if [ -n "$MERRIAM_KEY_VAL" ]; then
+    break
+  fi
+  sleep 2
+done
+
+AZURE_KEY_VAL=""
+for i in $(seq 1 3); do
+  AZURE_KEY_VAL=$(aws ssm get-parameter \
+    --name "$${SSM_PREFIX}/azure-translator-key" \
+    --with-decryption \
+    --region "$AWS_REGION" \
+    --query Parameter.Value \
+    --output text 2>/dev/null || true)
+  if [ -n "$AZURE_KEY_VAL" ]; then
+    break
+  fi
+  sleep 2
+done
+
+# ------------------------------------------------------------------------------
+# 4. Write Application Directory & Configuration Files
+# ------------------------------------------------------------------------------
+APP_DIR="/opt/english-reading"
+mkdir -p "$APP_DIR"
+cd "$APP_DIR"
+
+echo "--- Writing .env.production template ---"
+cat << EOF > "$APP_DIR/.env.production"
+APP_DOMAIN=${app_domain}
+IMAGE_TAG=${image_tag}
+BACKEND_IMAGE=${ecr_repository_url}
+APP_ROLE=all
+SPRING_PROFILES_ACTIVE=prod
+
+HOST_DOCUMENT_STORAGE_ROOT=/var/lib/english-reading
+DOCUMENT_STORAGE_ROOT=/data/english-reading
+
+DB_URL=jdbc:postgresql://${rds_endpoint}/${rds_db_name}
+DB_USERNAME=__DB_USER__
+DB_PASSWORD=__DB_PASS__
+DB_MAXIMUM_POOL_SIZE=10
+DB_MINIMUM_IDLE=2
+DB_CONNECTION_TIMEOUT=30000
+DB_IDLE_TIMEOUT=600000
+DB_MAX_LIFETIME=1800000
+
+JWT_SECRET=__JWT_SECRET__
+JWT_EXPIRATION=3600s
+
+DOCUMENT_STORAGE_PROVIDER=S3
+DOCUMENT_STORAGE_S3_BUCKET=${document_bucket_name}
+DOCUMENT_STORAGE_S3_REGION=${aws_region}
+
+DOCUMENT_IMPORT_QUEUE_URL=${document_import_queue_url}
+DOCUMENT_IMPORT_QUEUE_REGION=${aws_region}
+DOCUMENT_IMPORT_WORKER_ENABLED=true
+DOCUMENT_IMPORT_WORKER_AUTO_STARTUP=true
+DOCUMENT_IMPORT_WORKER_WAIT_TIME_SECONDS=20
+DOCUMENT_IMPORT_WORKER_VISIBILITY_TIMEOUT_SECONDS=60
+DOCUMENT_IMPORT_WORKER_MAX_MESSAGES=1
+DOCUMENT_IMPORT_WORKER_POLL_DELAY=1s
+DOCUMENT_IMPORT_WORKER_ERROR_BACKOFF=5s
+DOCUMENT_IMPORT_WORKER_LEASE_DURATION=60s
+DOCUMENT_IMPORT_WORKER_HEARTBEAT_INTERVAL=20s
+DOCUMENT_IMPORT_WORKER_STAGING_CLEANUP_AGE=24h
+
+DOCUMENT_IMPORT_OUTBOX_ENABLED=true
+DOCUMENT_IMPORT_OUTBOX_BATCH_SIZE=10
+DOCUMENT_IMPORT_OUTBOX_LOCK_DURATION=5m
+DOCUMENT_IMPORT_OUTBOX_RETRY_BACKOFF=30s
+DOCUMENT_IMPORT_OUTBOX_FIXED_DELAY=2000
+DOCUMENT_IMPORT_OUTBOX_INITIAL_DELAY=5000
+
+MERRIAM_WEBSTER_API_KEY=__MERRIAM_KEY__
+AZURE_TRANSLATOR_KEY=__AZURE_KEY__
+AZURE_TRANSLATOR_REGION=${azure_translator_region}
+
+MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
+EOF
+
+# Safely inject credentials into .env.production without printing to logs
+sed -i "s|__DB_USER__|$DB_USER|g" "$APP_DIR/.env.production"
+sed -i "s|__DB_PASS__|$DB_PASS|g" "$APP_DIR/.env.production"
+sed -i "s|__JWT_SECRET__|$JWT_SECRET_VAL|g" "$APP_DIR/.env.production"
+sed -i "s|__MERRIAM_KEY__|$MERRIAM_KEY_VAL|g" "$APP_DIR/.env.production"
+sed -i "s|__AZURE_KEY__|$AZURE_KEY_VAL|g" "$APP_DIR/.env.production"
+chmod 600 "$APP_DIR/.env.production"
+
+# Unset variables containing secrets in bash memory
+unset DB_PASS DB_USER JWT_SECRET_VAL MERRIAM_KEY_VAL AZURE_KEY_VAL DB_CREDENTIALS
+
+echo "--- Writing Caddyfile ---"
+cat << 'EOF' > "$APP_DIR/Caddyfile"
+{$APP_DOMAIN::80} {
+	encode gzip zstd
+
+	@cors_preflight method OPTIONS
+	@cors_origin header Origin http://localhost:4200
+
+	handle @cors_preflight {
+		header Access-Control-Allow-Origin "http://localhost:4200"
+		header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+		header Access-Control-Allow-Headers "Authorization, Content-Type, Accept, X-Correlation-ID, SOAPAction"
+		header Access-Control-Max-Age "3600"
+		respond 204
+	}
+
+	header @cors_origin {
+		Access-Control-Allow-Origin "http://localhost:4200"
+		Access-Control-Expose-Headers "Authorization, Content-Type, X-Correlation-ID"
+	}
+
+	reverse_proxy backend:8080
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+EOF
+
+echo "--- Writing compose.prod.yml ---"
+cat << 'EOF' > "$APP_DIR/compose.prod.yml"
+services:
+  backend:
+    image: $${BACKEND_IMAGE:-english-reading-backend}:$${IMAGE_TAG:-latest}
+    container_name: english-reading-backend
+    restart: unless-stopped
+    env_file:
+      - $${ENV_FILE:-.env.production}
+    environment:
+      - APP_ROLE=$${APP_ROLE:-all}
+      - SPRING_PROFILES_ACTIVE=prod
+      - DOCUMENT_STORAGE_ROOT=/data/english-reading
+    volumes:
+      # Persistent storage on host for cover assets and staging directory
+      - $${HOST_DOCUMENT_STORAGE_ROOT:-/var/lib/english-reading}:/data/english-reading
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - app_network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: english-reading-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - APP_DOMAIN=$${APP_DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app_network
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  app_network:
+    driver: bridge
+EOF
+
+# ------------------------------------------------------------------------------
+# 5. Log into ECR, Pull Image, and Launch Services
+# ------------------------------------------------------------------------------
+echo "--- Logging in to Amazon ECR ---"
+ECR_REGISTRY=$(echo "${ecr_repository_url}" | cut -d/ -f1)
+
+LOGIN_SUCCESS=false
+for i in $(seq 1 6); do
+  if aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"; then
+    LOGIN_SUCCESS=true
+    break
+  fi
+  echo "ECR login failed (attempt $i/6). Waiting 5s for IAM propagation..."
+  sleep 5
+done
+
+if [ "$LOGIN_SUCCESS" != "true" ]; then
+  echo "FATAL: Failed to authenticate with Amazon ECR ($ECR_REGISTRY) after 6 attempts." >&2
+  exit 1
+fi
+
+echo "--- Pulling Backend Image ---"
+PULL_SUCCESS=false
+for i in $(seq 1 5); do
+  if docker pull "${ecr_repository_url}:${image_tag}"; then
+    PULL_SUCCESS=true
+    break
+  fi
+  echo "docker pull failed (attempt $i/5). Retrying in 5s..."
+  sleep 5
+done
+
+if [ "$PULL_SUCCESS" != "true" ]; then
+  echo "FATAL: Failed to pull Docker image '${ecr_repository_url}:${image_tag}' from ECR." >&2
+  exit 1
+fi
+
+echo "--- Starting Docker Compose Services ---"
+docker compose -f compose.prod.yml up -d
+
+echo "=== Bootstrap Completed Successfully: $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="

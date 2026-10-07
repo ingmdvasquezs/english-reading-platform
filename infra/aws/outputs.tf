@@ -62,3 +62,37 @@ output "ecr_repository_arn" {
   description = "ARN of the backend ECR repository."
   value       = aws_ecr_repository.backend.arn
 }
+
+# -----------------------------------------------------------------------------
+# Phase 17.5G2: EC2 & RDS Runtime Outputs
+# -----------------------------------------------------------------------------
+
+output "vpc_id" {
+  description = "ID of the dedicated VPC."
+  value       = aws_vpc.main.id
+}
+
+output "ec2_instance_id" {
+  description = "Instance ID of the backend EC2 host."
+  value       = aws_instance.backend.id
+}
+
+output "ec2_public_ip" {
+  description = "Public IPv4 address of the backend EC2 host."
+  value       = aws_instance.backend.public_ip
+}
+
+output "rds_endpoint" {
+  description = "Connection endpoint of the PostgreSQL RDS instance."
+  value       = aws_db_instance.postgres.endpoint
+}
+
+output "rds_port" {
+  description = "Port of the PostgreSQL RDS instance."
+  value       = aws_db_instance.postgres.port
+}
+
+output "ec2_runtime_role_name" {
+  description = "IAM role name assigned to the EC2 runtime instance profile."
+  value       = aws_iam_role.ec2_runtime.name
+}
