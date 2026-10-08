@@ -342,7 +342,7 @@ echo "--- Writing compose.prod.yml ---"
 cat << 'EOF' > "$APP_DIR/compose.prod.yml"
 services:
   backend:
-    image: $${BACKEND_IMAGE:-english-reading-backend}:$${IMAGE_TAG:-latest}
+    image: $${BACKEND_IMAGE}:$${IMAGE_TAG}
     container_name: english-reading-backend
     restart: unless-stopped
     env_file:
@@ -430,6 +430,6 @@ if [ "$PULL_SUCCESS" != "true" ]; then
 fi
 
 echo "--- Starting Docker Compose Services ---"
-docker compose -f compose.prod.yml up -d
+docker compose --env-file /opt/english-reading/.env.production -f /opt/english-reading/compose.prod.yml up -d
 
 echo "=== Bootstrap Completed Successfully: $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="

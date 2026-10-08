@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ${BACKEND_IMAGE:-english-reading-backend}:${IMAGE_TAG:-latest}
+    image: ${BACKEND_IMAGE}:${IMAGE_TAG}
     container_name: english-reading-backend
     restart: unless-stopped
     env_file:
@@ -29,9 +29,8 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     environment:
-      - APP_DOMAIN=${APP_DOMAIN:-localhost}
+      - APP_DOMAIN=${APP_DOMAIN:-:80}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
