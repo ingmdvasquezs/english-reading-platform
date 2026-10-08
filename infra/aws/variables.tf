@@ -112,14 +112,15 @@ variable "ebs_volume_size" {
 variable "rds_instance_class" {
   type        = string
   description = "RDS DB instance class."
-  default     = "db.t4g.small"
+  default     = "db.t3.micro"
 }
 
 variable "rds_engine_version" {
   type        = string
   description = "PostgreSQL engine version for Amazon RDS."
-  default     = "17.5"
+  default     = "17.11"
 }
+
 
 variable "rds_allocated_storage" {
   type        = number
@@ -127,13 +128,8 @@ variable "rds_allocated_storage" {
   default     = 20
 }
 
-variable "rds_max_allocated_storage" {
-  type        = number
-  description = "Maximum storage limit for RDS PostgreSQL autoscaling in GiB."
-  default     = 50
-}
-
 variable "rds_db_name" {
+
   type        = string
   description = "PostgreSQL database name."
   default     = "english_reading"

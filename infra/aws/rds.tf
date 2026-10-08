@@ -14,10 +14,10 @@ resource "aws_db_instance" "postgres" {
   # Zero plaintext master password in Terraform configuration or state
   manage_master_user_password = true
 
-  allocated_storage     = var.rds_allocated_storage
-  max_allocated_storage = var.rds_max_allocated_storage
-  storage_type          = "gp3"
-  storage_encrypted     = true
+  allocated_storage = var.rds_allocated_storage
+  storage_type      = "gp3"
+  storage_encrypted = true
+
 
   db_subnet_group_name   = aws_db_subnet_group.postgres.name
   vpc_security_group_ids = [aws_security_group.rds.id]
@@ -26,10 +26,11 @@ resource "aws_db_instance" "postgres" {
   multi_az            = false
   skip_final_snapshot = true # dev-tier deployment; enables clean destruction without blocking
 
-  backup_retention_period    = 7
+  backup_retention_period    = 1
   backup_window              = "03:00-04:00"
   maintenance_window         = "Sun:04:30-Sun:05:30"
   auto_minor_version_upgrade = true
+
 
   deletion_protection = false
 
