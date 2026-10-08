@@ -78,9 +78,10 @@ output "ec2_instance_id" {
 }
 
 output "ec2_public_ip" {
-  description = "Public IPv4 address of the backend EC2 host."
+  description = "Public IPv4 address of the backend EC2 host (diagnostics only, not an application entrypoint; use SSM port forwarding)."
   value       = aws_instance.backend.public_ip
 }
+
 
 output "rds_endpoint" {
   description = "Connection endpoint of the PostgreSQL RDS instance."

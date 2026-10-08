@@ -122,22 +122,14 @@ resource "aws_route_table_association" "private_db_b" {
 # -----------------------------------------------------------------------------
 
 # EC2 Security Group
-# Inbound: 80 (HTTP), 443 (HTTPS) from Internet
+# EC2 Security Group
+# Inbound: NONE. Private DEV access exclusively via AWS Systems Manager Port Forwarding.
 # Outbound: All traffic (to ECR, S3, SQS, Secrets Manager, RDS, OS updates)
-# SSH (port 22): Closed. SSM Session Manager used exclusively.
+# SSH (port 22), HTTP (port 80), HTTPS (port 443): Closed to public internet.
 resource "aws_security_group" "ec2" {
   name        = "${local.name_prefix}-ec2-sg"
-  description = "Security group for English Reading EC2 single runtime"
+  description = "Security group for English Reading EC2 single runtime (zero public ingress)"
   vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description = "HTTP from Internet"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
 
   egress {
     description = "Allow all outbound traffic"
@@ -151,6 +143,7 @@ resource "aws_security_group" "ec2" {
     Name = "${local.name_prefix}-ec2-sg"
   })
 }
+
 
 # RDS PostgreSQL Security Group
 # Inbound: 5432 strictly from EC2 Security Group
