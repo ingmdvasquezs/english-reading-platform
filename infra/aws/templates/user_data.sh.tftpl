@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -Eeuo pipefail
 
 # ==============================================================================
@@ -238,70 +238,68 @@ APP_DIR="/opt/english-reading"
 mkdir -p "$APP_DIR"
 cd "$APP_DIR"
 
-echo "--- Writing .env.production template ---"
-cat << EOF > "$APP_DIR/.env.production"
-APP_DOMAIN=${app_domain}
-IMAGE_TAG=${image_tag}
-BACKEND_IMAGE=${ecr_repository_url}
-APP_ROLE=all
-SPRING_PROFILES_ACTIVE=prod
+echo "--- Writing .env.production directly with secure umask and printf ---"
+(
+  umask 077
+  {
+    printf 'APP_DOMAIN=%s\n' "${app_domain}"
+    printf 'IMAGE_TAG=%s\n' "${image_tag}"
+    printf 'BACKEND_IMAGE=%s\n' "${ecr_repository_url}"
+    printf 'APP_ROLE=%s\n' "all"
+    printf 'SPRING_PROFILES_ACTIVE=%s\n' "prod"
+    printf '\n'
+    printf 'HOST_DOCUMENT_STORAGE_ROOT=%s\n' "/var/lib/english-reading"
+    printf 'DOCUMENT_STORAGE_ROOT=%s\n' "/data/english-reading"
+    printf '\n'
+    printf 'DB_URL=%s\n' "jdbc:postgresql://${rds_endpoint}/${rds_db_name}"
+    printf 'DB_USERNAME=%s\n' "$DB_USER"
+    printf 'DB_PASSWORD=%s\n' "$DB_PASS"
+    printf 'DB_MAXIMUM_POOL_SIZE=%s\n' "10"
+    printf 'DB_MINIMUM_IDLE=%s\n' "2"
+    printf 'DB_CONNECTION_TIMEOUT=%s\n' "30000"
+    printf 'DB_IDLE_TIMEOUT=%s\n' "600000"
+    printf 'DB_MAX_LIFETIME=%s\n' "1800000"
+    printf '\n'
+    printf 'JWT_SECRET=%s\n' "$JWT_SECRET_VAL"
+    printf 'JWT_EXPIRATION=%s\n' "3600s"
+    printf '\n'
+    printf 'DOCUMENT_STORAGE_PROVIDER=%s\n' "S3"
+    printf 'DOCUMENT_STORAGE_S3_BUCKET=%s\n' "${document_bucket_name}"
+    printf 'DOCUMENT_STORAGE_S3_REGION=%s\n' "${aws_region}"
+    printf '\n'
+    printf 'DOCUMENT_IMPORT_QUEUE_URL=%s\n' "${document_import_queue_url}"
+    printf 'DOCUMENT_IMPORT_QUEUE_REGION=%s\n' "${aws_region}"
+    printf 'DOCUMENT_IMPORT_WORKER_ENABLED=%s\n' "true"
+    printf 'DOCUMENT_IMPORT_WORKER_AUTO_STARTUP=%s\n' "true"
+    printf 'DOCUMENT_IMPORT_WORKER_WAIT_TIME_SECONDS=%s\n' "20"
+    printf 'DOCUMENT_IMPORT_WORKER_VISIBILITY_TIMEOUT_SECONDS=%s\n' "60"
+    printf 'DOCUMENT_IMPORT_WORKER_MAX_MESSAGES=%s\n' "1"
+    printf 'DOCUMENT_IMPORT_WORKER_POLL_DELAY=%s\n' "1s"
+    printf 'DOCUMENT_IMPORT_WORKER_ERROR_BACKOFF=%s\n' "5s"
+    printf 'DOCUMENT_IMPORT_WORKER_LEASE_DURATION=%s\n' "60s"
+    printf 'DOCUMENT_IMPORT_WORKER_HEARTBEAT_INTERVAL=%s\n' "20s"
+    printf 'DOCUMENT_IMPORT_WORKER_STAGING_CLEANUP_AGE=%s\n' "24h"
+    printf '\n'
+    printf 'DOCUMENT_IMPORT_OUTBOX_ENABLED=%s\n' "true"
+    printf 'DOCUMENT_IMPORT_OUTBOX_BATCH_SIZE=%s\n' "10"
+    printf 'DOCUMENT_IMPORT_OUTBOX_LOCK_DURATION=%s\n' "5m"
+    printf 'DOCUMENT_IMPORT_OUTBOX_RETRY_BACKOFF=%s\n' "30s"
+    printf 'DOCUMENT_IMPORT_OUTBOX_FIXED_DELAY=%s\n' "2000"
+    printf 'DOCUMENT_IMPORT_OUTBOX_INITIAL_DELAY=%s\n' "5000"
+    printf '\n'
+    printf 'MERRIAM_WEBSTER_API_KEY=%s\n' "$MERRIAM_KEY_VAL"
+    printf 'AZURE_TRANSLATOR_KEY=%s\n' "$AZURE_KEY_VAL"
+    printf 'AZURE_TRANSLATOR_REGION=%s\n' "${azure_translator_region}"
+    printf '\n'
+    printf 'MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=%s\n' "health,info"
+  } > "$APP_DIR/.env.production"
+)
 
-HOST_DOCUMENT_STORAGE_ROOT=/var/lib/english-reading
-DOCUMENT_STORAGE_ROOT=/data/english-reading
-
-DB_URL=jdbc:postgresql://${rds_endpoint}/${rds_db_name}
-DB_USERNAME=__DB_USER__
-DB_PASSWORD=__DB_PASS__
-DB_MAXIMUM_POOL_SIZE=10
-DB_MINIMUM_IDLE=2
-DB_CONNECTION_TIMEOUT=30000
-DB_IDLE_TIMEOUT=600000
-DB_MAX_LIFETIME=1800000
-
-JWT_SECRET=__JWT_SECRET__
-JWT_EXPIRATION=3600s
-
-DOCUMENT_STORAGE_PROVIDER=S3
-DOCUMENT_STORAGE_S3_BUCKET=${document_bucket_name}
-DOCUMENT_STORAGE_S3_REGION=${aws_region}
-
-DOCUMENT_IMPORT_QUEUE_URL=${document_import_queue_url}
-DOCUMENT_IMPORT_QUEUE_REGION=${aws_region}
-DOCUMENT_IMPORT_WORKER_ENABLED=true
-DOCUMENT_IMPORT_WORKER_AUTO_STARTUP=true
-DOCUMENT_IMPORT_WORKER_WAIT_TIME_SECONDS=20
-DOCUMENT_IMPORT_WORKER_VISIBILITY_TIMEOUT_SECONDS=60
-DOCUMENT_IMPORT_WORKER_MAX_MESSAGES=1
-DOCUMENT_IMPORT_WORKER_POLL_DELAY=1s
-DOCUMENT_IMPORT_WORKER_ERROR_BACKOFF=5s
-DOCUMENT_IMPORT_WORKER_LEASE_DURATION=60s
-DOCUMENT_IMPORT_WORKER_HEARTBEAT_INTERVAL=20s
-DOCUMENT_IMPORT_WORKER_STAGING_CLEANUP_AGE=24h
-
-DOCUMENT_IMPORT_OUTBOX_ENABLED=true
-DOCUMENT_IMPORT_OUTBOX_BATCH_SIZE=10
-DOCUMENT_IMPORT_OUTBOX_LOCK_DURATION=5m
-DOCUMENT_IMPORT_OUTBOX_RETRY_BACKOFF=30s
-DOCUMENT_IMPORT_OUTBOX_FIXED_DELAY=2000
-DOCUMENT_IMPORT_OUTBOX_INITIAL_DELAY=5000
-
-MERRIAM_WEBSTER_API_KEY=__MERRIAM_KEY__
-AZURE_TRANSLATOR_KEY=__AZURE_KEY__
-AZURE_TRANSLATOR_REGION=${azure_translator_region}
-
-MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
-EOF
-
-# Safely inject credentials into .env.production without printing to logs
-sed -i "s|__DB_USER__|$DB_USER|g" "$APP_DIR/.env.production"
-sed -i "s|__DB_PASS__|$DB_PASS|g" "$APP_DIR/.env.production"
-sed -i "s|__JWT_SECRET__|$JWT_SECRET_VAL|g" "$APP_DIR/.env.production"
-sed -i "s|__MERRIAM_KEY__|$MERRIAM_KEY_VAL|g" "$APP_DIR/.env.production"
-sed -i "s|__AZURE_KEY__|$AZURE_KEY_VAL|g" "$APP_DIR/.env.production"
 chmod 600 "$APP_DIR/.env.production"
 
 # Unset variables containing secrets in bash memory
 unset DB_PASS DB_USER JWT_SECRET_VAL MERRIAM_KEY_VAL AZURE_KEY_VAL DB_CREDENTIALS
+
 
 echo "--- Writing Caddyfile ---"
 cat << 'EOF' > "$APP_DIR/Caddyfile"
