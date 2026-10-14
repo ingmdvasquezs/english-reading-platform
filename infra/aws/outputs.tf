@@ -97,3 +97,32 @@ output "ec2_runtime_role_name" {
   description = "IAM role name assigned to the EC2 runtime instance profile."
   value       = aws_iam_role.ec2_runtime.name
 }
+
+# -----------------------------------------------------------------------------
+# Phase 17.5H: CloudFront & Public Test Environment Outputs
+# -----------------------------------------------------------------------------
+
+output "cloudfront_distribution_id" {
+  description = "ID of the CloudFront standard distribution."
+  value       = aws_cloudfront_distribution.main.id
+}
+
+output "cloudfront_domain_name" {
+  description = "Public HTTPS domain name of the CloudFront distribution."
+  value       = aws_cloudfront_distribution.main.domain_name
+}
+
+output "frontend_bucket_name" {
+  description = "Name of the private S3 bucket hosting Angular static assets."
+  value       = aws_s3_bucket.frontend.id
+}
+
+output "backend_eip_public_ip" {
+  description = "Stable Elastic IP assigned to backend EC2 host."
+  value       = aws_eip.backend.public_ip
+}
+
+output "backend_eip_public_dns" {
+  description = "Stable AWS public DNS hostname assigned to backend Elastic IP (used as CloudFront custom origin)."
+  value       = aws_eip.backend.public_dns
+}

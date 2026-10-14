@@ -121,15 +121,27 @@ resource "aws_route_table_association" "private_db_b" {
 # Security Groups
 # -----------------------------------------------------------------------------
 
+# AWS-managed prefix list for CloudFront origin-facing edge servers
+data "aws_ec2_managed_prefix_list" "cloudfront" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
 # EC2 Security Group
-# EC2 Security Group
-# Inbound: NONE. Private DEV access exclusively via AWS Systems Manager Port Forwarding.
-# Outbound: All traffic (to ECR, S3, SQS, Secrets Manager, RDS, OS updates)
-# SSH (port 22), HTTP (port 80), HTTPS (port 443): Closed to public internet.
+# Inbound: Port 80 strictly from AWS CloudFront origin-facing prefix list (weight: 55).
+# Outbound: All traffic (to ECR, S3, SQS, Secrets Manager, RDS, OS updates, external APIs)
+# SSH (port 22), Spring (port 8080): Closed to public internet. Administration via SSM.
 resource "aws_security_group" "ec2" {
   name        = "${local.name_prefix}-ec2-sg"
   description = "Security group for English Reading EC2 single runtime (zero public ingress)"
   vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description     = "HTTP from CloudFront origin-facing edge servers only"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront.id]
+  }
 
   egress {
     description = "Allow all outbound traffic"

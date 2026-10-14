@@ -211,7 +211,24 @@ resource "aws_instance" "backend" {
     aws_iam_role_policy_attachment.ssm_parameters_attachment
   ]
 
+  lifecycle {
+    ignore_changes = [ami]
+  }
+
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-backend"
+  })
+}
+
+# -----------------------------------------------------------------------------
+# Phase 17.5H: Stable Elastic IP for CloudFront Custom Origin
+# -----------------------------------------------------------------------------
+
+resource "aws_eip" "backend" {
+  domain   = "vpc"
+  instance = aws_instance.backend.id
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-backend-eip"
   })
 }
