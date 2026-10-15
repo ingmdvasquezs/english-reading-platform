@@ -218,7 +218,12 @@ public class DocumentImportProcessor {
 
     try {
       Files.createDirectories(stagingDir);
-      tempFile = Files.createTempFile(stagingDir, "worker-source-" + job.id() + "-", extension);
+      String candidateFilename = "worker-source-" + job.id() + "-" + UUID.randomUUID() + extension;
+      tempFile = stagingDir.resolve(candidateFilename).normalize();
+      if (!tempFile.startsWith(stagingDir)) {
+        throw new SecurityException("Invalid staging destination path: path traversal detected");
+      }
+      Files.deleteIfExists(tempFile);
 
       // 3. Download / copy source OUTSIDE DB transaction
       downloadSource(job, tempFile);

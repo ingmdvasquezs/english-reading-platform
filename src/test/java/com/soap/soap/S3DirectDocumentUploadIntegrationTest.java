@@ -434,4 +434,78 @@ class S3DirectDocumentUploadIntegrationTest {
       assertThat(intent.requiredHeaders()).containsEntry("If-None-Match", "*");
     }
   }
+
+  @Test
+  @DisplayName("S28: downloadObject succeeds with exact bytes when destination does not exist")
+  void s28_downloadObject_destinationDoesNotExist(
+      @org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+    byte[] payload =
+        "PK\u0003\u0004 EPUB Document Content For Worker".getBytes(StandardCharsets.UTF_8);
+    String key = "documents/" + testUser.id() + "/" + UUID.randomUUID() + "/source.epub";
+    s3Client.putObject(
+        software.amazon.awssdk.services.s3.model.PutObjectRequest.builder()
+            .bucket(BUCKET_NAME)
+            .key(key)
+            .build(),
+        software.amazon.awssdk.core.sync.RequestBody.fromBytes(payload));
+
+    java.nio.file.Path destination = tempDir.resolve("downloaded-source.epub");
+    assertThat(java.nio.file.Files.exists(destination)).isFalse();
+
+    s3Adapter.downloadObject(key, destination);
+
+    assertThat(java.nio.file.Files.exists(destination)).isTrue();
+    assertThat(java.nio.file.Files.readAllBytes(destination)).isEqualTo(payload);
+  }
+
+  @Test
+  @DisplayName("S29: downloadObject succeeds when destination pre-exists on disk (regression test)")
+  void s29_downloadObject_destinationPreExists_succeedsWithoutFileAlreadyExistsException(
+      @org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+    byte[] payload = "PK\u0003\u0004 Real EPUB Content From S3".getBytes(StandardCharsets.UTF_8);
+    String key = "documents/" + testUser.id() + "/" + UUID.randomUUID() + "/source.epub";
+    s3Client.putObject(
+        software.amazon.awssdk.services.s3.model.PutObjectRequest.builder()
+            .bucket(BUCKET_NAME)
+            .key(key)
+            .build(),
+        software.amazon.awssdk.core.sync.RequestBody.fromBytes(payload));
+
+    // Pre-create destination file on disk (simulating Files.createTempFile pre-creation)
+    java.nio.file.Path stagingDir = tempDir.resolve("staging");
+    java.nio.file.Files.createDirectories(stagingDir);
+    java.nio.file.Path preExistingFile =
+        java.nio.file.Files.createTempFile(stagingDir, "worker-source-", ".epub");
+    java.nio.file.Files.writeString(preExistingFile, "stale or empty pre-existing bytes");
+    assertThat(java.nio.file.Files.exists(preExistingFile)).isTrue();
+
+    // Must NOT throw TransientStorageException / FileAlreadyExistsException
+    s3Adapter.downloadObject(key, preExistingFile);
+
+    assertThat(java.nio.file.Files.exists(preExistingFile)).isTrue();
+    assertThat(java.nio.file.Files.readAllBytes(preExistingFile)).isEqualTo(payload);
+  }
+
+  @Test
+  @DisplayName("S30: downloadObject creates missing parent directories when downloading PDF")
+  void s30_downloadObject_createsMissingParentDirs_pdf(
+      @org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+    byte[] payload = "%PDF-1.4 sample pdf content".getBytes(StandardCharsets.UTF_8);
+    String key = "documents/" + testUser.id() + "/" + UUID.randomUUID() + "/source.pdf";
+    s3Client.putObject(
+        software.amazon.awssdk.services.s3.model.PutObjectRequest.builder()
+            .bucket(BUCKET_NAME)
+            .key(key)
+            .build(),
+        software.amazon.awssdk.core.sync.RequestBody.fromBytes(payload));
+
+    java.nio.file.Path deeplyNested =
+        tempDir.resolve("nested").resolve("staging").resolve("source.pdf");
+    assertThat(java.nio.file.Files.exists(deeplyNested.getParent())).isFalse();
+
+    s3Adapter.downloadObject(key, deeplyNested);
+
+    assertThat(java.nio.file.Files.exists(deeplyNested)).isTrue();
+    assertThat(java.nio.file.Files.readAllBytes(deeplyNested)).isEqualTo(payload);
+  }
 }

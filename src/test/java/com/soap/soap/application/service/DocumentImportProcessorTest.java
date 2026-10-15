@@ -648,4 +648,101 @@ class DocumentImportProcessorTest {
         .failFinal(eq(jobId), eq(leaseToken), eq(WORKER_ID), eq("INVALID_EPUB"), anyString());
     inOrder.verify(sqsClient).deleteMessage(any(DeleteMessageRequest.class));
   }
+
+  @Test
+  @DisplayName("Case S: S3 staging destination is not pre-created on disk and cleans up on success")
+  void caseS_s3StagingDestinationNotPreCreated_andCleanedUpOnSuccess() throws Exception {
+    UUID jobId = UUID.randomUUID();
+    UUID docId = UUID.randomUUID();
+    UUID leaseToken = UUID.randomUUID();
+    ImportJob job = createJob(jobId, docId, ImportJobStatus.PROCESSING, 1);
+    ImportedDocument doc = createDoc(docId);
+
+    when(importJobs.claim(eq(jobId), eq(WORKER_ID), any()))
+        .thenReturn(WorkerClaim.acquired(job, leaseToken));
+    when(importedDocuments.findDocumentById(docId)).thenReturn(Optional.of(doc));
+
+    java.util.concurrent.atomic.AtomicReference<Path> capturedPath =
+        new java.util.concurrent.atomic.AtomicReference<>();
+
+    org.mockito.Mockito.doAnswer(
+            invocation -> {
+              Path destination = invocation.getArgument(1);
+              capturedPath.set(destination);
+              // CRITICAL REGRESSION ASSERTION: Destination must NOT exist on disk prior to download
+              assertThat(java.nio.file.Files.exists(destination))
+                  .as("S3 download target path must not be pre-created on disk")
+                  .isFalse();
+              assertThat(destination.getFileName().toString())
+                  .startsWith("worker-source-" + jobId + "-")
+                  .endsWith(".epub");
+              // Simulate successful S3 object download writing bytes
+              java.nio.file.Files.writeString(destination, "simulated epub content");
+              return null;
+            })
+        .when(documentObjectStorage)
+        .downloadObject(any(), any());
+
+    ParsedDocumentSection section =
+        new ParsedDocumentSection("Chapter 1", "sec-1", List.of("Some content."));
+    ParsedDocument parsed =
+        new ParsedDocument("Book Title", "Author Name", "en", List.of(section), null);
+    when(documentParser.parse(any(Path.class), eq(DocumentFormat.EPUB))).thenReturn(parsed);
+    when(languageResolver.resolve(any(), eq("en"))).thenReturn("en");
+
+    DocumentChunk chunk = new DocumentChunk("Some content.", 2);
+    when(chunker.chunk(any(), eq("en"))).thenReturn(List.of(chunk));
+    when(completeUseCase.completeImport(any(CompleteDocumentImportCommand.class))).thenReturn(true);
+
+    ImportExecutionOutcome outcome = processor.processImport(jobId, "receipt-s");
+
+    assertThat(outcome.type()).isEqualTo(OutcomeType.COMPLETED);
+    assertThat(capturedPath.get()).isNotNull();
+    // CRITICAL CLEANUP ASSERTION: Staging temporary file must be cleaned up on completion
+    assertThat(java.nio.file.Files.exists(capturedPath.get()))
+        .as("Staging temporary file must be deleted after successful import")
+        .isFalse();
+  }
+
+  @Test
+  @DisplayName("Case T: S3 staging destination cleans up even on parse failure")
+  void caseT_s3StagingDestinationCleanedUpOnParseFailure() throws Exception {
+    UUID jobId = UUID.randomUUID();
+    UUID docId = UUID.randomUUID();
+    UUID leaseToken = UUID.randomUUID();
+    ImportJob job = createJob(jobId, docId, ImportJobStatus.PROCESSING, 1);
+    ImportedDocument doc = createDoc(docId);
+
+    when(importJobs.claim(eq(jobId), eq(WORKER_ID), any()))
+        .thenReturn(WorkerClaim.acquired(job, leaseToken));
+    when(importedDocuments.findDocumentById(docId)).thenReturn(Optional.of(doc));
+
+    java.util.concurrent.atomic.AtomicReference<Path> capturedPath =
+        new java.util.concurrent.atomic.AtomicReference<>();
+
+    org.mockito.Mockito.doAnswer(
+            invocation -> {
+              Path destination = invocation.getArgument(1);
+              capturedPath.set(destination);
+              assertThat(java.nio.file.Files.exists(destination)).isFalse();
+              java.nio.file.Files.writeString(destination, "corrupt content");
+              return null;
+            })
+        .when(documentObjectStorage)
+        .downloadObject(any(), any());
+
+    when(documentParser.parse(any(), any()))
+        .thenThrow(
+            new com.soap.soap.application.exception.DocumentImportException(
+                com.soap.soap.application.exception.DocumentImportException.Reason.INVALID_EPUB,
+                "Corrupt file"));
+
+    ImportExecutionOutcome outcome = processor.processImport(jobId, "receipt-t");
+
+    assertThat(outcome.type()).isEqualTo(OutcomeType.TERMINAL_FAILED);
+    assertThat(capturedPath.get()).isNotNull();
+    assertThat(java.nio.file.Files.exists(capturedPath.get()))
+        .as("Staging temporary file must be deleted after failed parse")
+        .isFalse();
+  }
 }

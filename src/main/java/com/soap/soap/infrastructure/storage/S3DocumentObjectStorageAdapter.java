@@ -5,7 +5,9 @@ import com.soap.soap.application.exception.TransientStorageException;
 import com.soap.soap.application.port.out.DocumentObjectStoragePort;
 import com.soap.soap.domain.model.StoredObjectAttributes;
 import com.soap.soap.domain.model.UploadAuthorization;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -209,6 +211,11 @@ public class S3DocumentObjectStorageAdapter implements DocumentObjectStoragePort
     }
 
     try {
+      Path parent = destinationPath.getParent();
+      if (parent != null) {
+        Files.createDirectories(parent);
+      }
+      Files.deleteIfExists(destinationPath);
       s3Client.getObject(
           GetObjectRequest.builder().bucket(bucket).key(storageKey).build(), destinationPath);
     } catch (NoSuchKeyException e) {
@@ -222,6 +229,13 @@ public class S3DocumentObjectStorageAdapter implements DocumentObjectStoragePort
     } catch (SdkClientException e) {
       throw new TransientStorageException(
           "Transient SDK client error downloading object " + storageKey + ": " + e.getMessage(), e);
+    } catch (IOException e) {
+      throw new TransientStorageException(
+          "IO error preparing download destination for object "
+              + storageKey
+              + ": "
+              + e.getMessage(),
+          e);
     }
   }
 
