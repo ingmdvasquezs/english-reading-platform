@@ -144,7 +144,7 @@ variable "rds_username" {
 variable "backend_image_tag" {
   type        = string
   description = "Docker image tag in ECR to deploy on EC2."
-  default     = "394fc2d-b1"
+  default     = "8ab2309-b1"
 }
 
 variable "app_domain" {
