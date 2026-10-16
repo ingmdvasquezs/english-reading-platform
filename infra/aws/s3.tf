@@ -205,3 +205,103 @@ resource "aws_s3_bucket_policy" "frontend" {
 
   depends_on = [aws_s3_bucket_public_access_block.frontend]
 }
+
+# -----------------------------------------------------------------------------
+# Phase 18.3A: Dedicated Private Platform Media S3 Bucket (Editorial Content)
+# -----------------------------------------------------------------------------
+
+resource "aws_s3_bucket" "platform_media" {
+  bucket        = "${local.name_prefix}-platform-media-${data.aws_caller_identity.current.account_id}"
+  force_destroy = false
+
+  tags = merge(local.common_tags, {
+    Name      = "${local.name_prefix}-platform-media"
+    Component = "platform-media-storage"
+  })
+}
+
+resource "aws_s3_bucket_public_access_block" "platform_media" {
+  bucket = aws_s3_bucket.platform_media.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_ownership_controls" "platform_media" {
+  bucket = aws_s3_bucket.platform_media.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "platform_media" {
+  bucket = aws_s3_bucket.platform_media.id
+
+  versioning_configuration {
+    status = "Disabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "platform_media" {
+  bucket = aws_s3_bucket.platform_media.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+    bucket_key_enabled = false
+  }
+}
+
+data "aws_iam_policy_document" "platform_media_bucket_policy" {
+  statement {
+    sid     = "AllowCloudFrontServicePrincipalOAC"
+    effect  = "Allow"
+    actions = ["s3:GetObject"]
+    resources = [
+      "${aws_s3_bucket.platform_media.arn}/*"
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.main.arn]
+    }
+  }
+
+  statement {
+    sid     = "EnforceTLSRequestsOnly"
+    effect  = "Deny"
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.platform_media.arn,
+      "${aws_s3_bucket.platform_media.arn}/*"
+    ]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "platform_media" {
+  bucket = aws_s3_bucket.platform_media.id
+  policy = data.aws_iam_policy_document.platform_media_bucket_policy.json
+
+  depends_on = [aws_s3_bucket_public_access_block.platform_media]
+}

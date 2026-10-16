@@ -126,3 +126,13 @@ output "backend_eip_public_dns" {
   description = "Stable AWS public DNS hostname assigned to backend Elastic IP (used as CloudFront custom origin)."
   value       = aws_eip.backend.public_dns
 }
+
+output "platform_media_bucket_name" {
+  description = "Name of the private S3 bucket hosting editorial platform media."
+  value       = aws_s3_bucket.platform_media.id
+}
+
+output "platform_media_cloudfront_path" {
+  description = "CloudFront path prefix mapped to platform media."
+  value       = "/media"
+}

@@ -11,6 +11,15 @@ resource "aws_cloudfront_origin_access_control" "frontend" {
   signing_protocol                  = "sigv4"
 }
 
+# 1b. CloudFront Origin Access Control (OAC) for private Platform Media S3 bucket
+resource "aws_cloudfront_origin_access_control" "platform_media" {
+  name                              = "${local.name_prefix}-platform-media-oac"
+  description                       = "OAC for private Platform Media S3 bucket"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
 # 2. CloudFront Function for Angular SPA client-side route rewrites
 # Scoped ONLY to the frontend S3 default cache behavior (never touches /api/* or /ws*)
 resource "aws_cloudfront_function" "spa_rewrite" {
@@ -30,6 +39,22 @@ function handler(event) {
 
     // Rewrite client-side navigation paths (e.g. /login, /library, /reader/view) to /index.html
     request.uri = '/index.html';
+    return request;
+}
+EOT
+}
+
+# 2b. CloudFront Function to rewrite /media/* requests by stripping the /media prefix
+# Enables clients to request /media/covers/CO/x.webp while S3 stores covers/CO/x.webp
+resource "aws_cloudfront_function" "media_rewrite" {
+  name    = "${local.name_prefix}-media-rewrite"
+  runtime = "cloudfront-js-2.0"
+  comment = "Strip /media prefix from request URI for Platform Media S3 origin"
+  publish = true
+  code    = <<-EOT
+function handler(event) {
+    var request = event.request;
+    request.uri = request.uri.replace(/^\/media/, '');
     return request;
 }
 EOT
@@ -104,6 +129,13 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
+  # Origin C: Private Platform Media S3 Bucket (via OAC)
+  origin {
+    domain_name              = aws_s3_bucket.platform_media.bucket_regional_domain_name
+    origin_id                = "S3-platform-media"
+    origin_access_control_id = aws_cloudfront_origin_access_control.platform_media.id
+  }
+
   # ---------------------------------------------------------------------------
   # Default Cache Behavior: Angular Frontend (S3)
   # ---------------------------------------------------------------------------
@@ -118,6 +150,24 @@ resource "aws_cloudfront_distribution" "main" {
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.spa_rewrite.arn
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # Ordered Cache Behavior 0: Platform Media Assets (/media/*)
+  # ---------------------------------------------------------------------------
+  ordered_cache_behavior {
+    path_pattern           = "/media/*"
+    target_origin_id       = "S3-platform-media"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
+    compress               = true
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.media_rewrite.arn
     }
   }
 
