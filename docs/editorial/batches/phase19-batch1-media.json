@@ -1,0 +1,1100 @@
+{
+  "manifestVersion": "19.4A",
+  "generatedAt": "2026-10-16T21:17:44.186Z",
+  "batchNumber": 1,
+  "totalMediaObjects": 36,
+  "summary": {
+    "readingCoversCount": 24,
+    "countryHeroesCount": 7,
+    "collectionHeroesCount": 5,
+    "targetFormats": {
+      "webp": 36
+    }
+  },
+  "readingCovers": [
+    {
+      "readingId": "460b34f3-30eb-4d4e-8489-495dab906c79",
+      "slug": "floating-islands-lake-titicaca",
+      "title": "The Floating Islands of Lake Titicaca",
+      "countryCode": "PE",
+      "editorialLevel": "A1",
+      "coverKey": "covers/PE/460b34f3-30eb-4d4e-8489-495dab906c79.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Atmospheric golden-hour composition showing a traditional Uros floating totora island on the serene, deep-blue waters of Lake Titicaca. In the foreground, woven golden totora reeds form the living ground, with a handcrafted reed home and a slender reed canoe (caballito/balsa de totora) moored at the edge. Soft morning mist curls across the water with the dark silhouette of the distant Andes cordillera under a crisp cobalt sky.",
+      "mustInclude": [
+        "Natural woven golden totora reeds on water surface",
+        "Traditional Uros thatched reed home",
+        "Handcrafted reed canoe (balsa de totora) moored at island edge",
+        "Distant Andean mountain silhouette under clear blue sky"
+      ],
+      "mustAvoid": [
+        "Tourist crowds or tour boats",
+        "Modern plastic items or concrete structures",
+        "Caricatured faces or cartoon aesthetics",
+        "Text or logos on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: A tranquil floating island of the Uros community constructed entirely of golden totora reeds on the mirror-like waters of Lake Titicaca, Peru. Setting: High Andean plateau at 3,812 meters elevation, crisp cobalt-blue sky with soft morning mist curling across cold crystalline waters; the distant dark silhouette of Andean mountain cordillera on the horizon. Composition: Elegant eye-level view focusing on the layered reed ground, a traditional thatched totora reed house, and a slender hand-woven reed canoe (balsa de totora) moored gently at the water's edge. Lighting: Warm golden dawn light catching the yellow-amber fibers of the reeds and casting soft reflections on the deep navy lake. Mood: Peaceful, ancient, dignified living cultural heritage. Style: Semi-realistic editorial illustration, sophisticated textures, rich depth of field. Strictly no text, no book titles, no typography, no tourists, no modern plastics, no motorboats, no logos, no cartoon styling."
+    },
+    {
+      "readingId": "18802f76-e718-4d84-95ce-11555834cbc4",
+      "slug": "golden-lord-sipan",
+      "title": "The Golden Lord of Sipán",
+      "countryCode": "PE",
+      "editorialLevel": "B2",
+      "coverKey": "covers/PE/18802f76-e718-4d84-95ce-11555834cbc4.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Dramatic museum-grade archaeological composition focusing on the sublime royal regalia of the Moche ruler. Soft directional museum lighting illuminates a ceremonial gold-and-turquoise crescent headdress, an intricate golden pectoral necklace depicting peanut beads (half silver, half gold), and polished copper scepters resting upon dark textured adobe cloth. Subtle shadows evoke the reverence and mystery of Huaca Rajada.",
+      "mustInclude": [
+        "Authentic Moche iconography and metalwork",
+        "Crescent gold headdress and bimetallic peanut necklace motif",
+        "Rich turquoise inlay and ceremonial scepters",
+        "Dignified museum-quality spotlighting against dark backdrop"
+      ],
+      "mustAvoid": [
+        "Hollywood adventure/pulp tropes (Indiana Jones style)",
+        "Skull or horror imagery",
+        "Glowing fantasy magic runes",
+        "Inaccurate Aztec or Inca mixed motifs"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: Museum-grade archaeological still life of the royal funerary regalia of the Lord of Sipán, pre-Columbian Moche civilization of northern Peru. Setting: Dignified, darkened museum vault or ritual tomb chamber in Huaca Rajada with textured earthen adobe walls. Composition: Dramatic centered close-up focusing on the magnificent crescent-shaped golden ceremonial headdress, a bimetallic collar of large sculpted peanut beads crafted in alternating electrum gold and silver, and polished turquoise-inlaid ear ornaments and ceremonial scepters. Lighting: Dramatic museum spotlighting casting rich specular highlights on the burnished gold surfaces and deep velvety shadows. Mood: Reverent, majestic, profound historical significance. Style: Sophisticated semi-realistic editorial illustration, fine metallic textures and ancient craftsmanship. Strictly no text, no titles, no pulp adventure tropes, no skulls or skeletons, no fantasy glowing runes, no Aztec or Inca elements, no cartoon styling."
+    },
+    {
+      "readingId": "b3b6c114-a981-4833-a317-b6191a039fe2",
+      "slug": "warm-cup-mate-friends",
+      "title": "A Warm Cup of Mate with Friends",
+      "countryCode": "AR",
+      "editorialLevel": "A1",
+      "coverKey": "covers/AR/b3b6c114-a981-4833-a317-b6191a039fe2.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Warm, intimate still-life scene capturing Argentine mate ritual on a rustic wooden table bathed in soft natural afternoon sunlight. An authentic carved calabash gourd filled with yerba mate and an elegant silver bombilla take center stage, beside a vintage thermal flask and a plate of golden baked medialunas. In the soft-focus background, friends gather in casual, relaxed conversation.",
+      "mustInclude": [
+        "Traditional cured calabash mate gourd with silver bombilla straw",
+        "Fine green yerba mate leaves with a gentle dusting of herbal powder",
+        "Warm inviting ambient light on rustic wooden tabletop",
+        "Thermos flask and fresh Argentine medialunas pastries"
+      ],
+      "mustAvoid": [
+        "Commercial beverage can or modern energy drink aesthetics",
+        "Commercial tea teabags",
+        "Brand logos or advertisements",
+        "Cartoonish steam clouds"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: An authentic traditional Argentine yerba mate ritual on a rustic wooden table. Setting: Sunlit Argentine home patio or cozy country kitchen bathed in warm late-afternoon daylight. Composition: Intimate still-life focal point featuring a carved calabash gourd packed with vibrant green yerba mate leaves and an ornate silver bombilla straw, beside a classic stainless steel thermos flask and a plate of golden, freshly baked medialunas pastries; in the soft-focus blurred background, friends engage in warm, relaxed conversation. Lighting: Golden-hour sunbeams streaming across rustic wood grain with soft atmospheric dust motes. Mood: Welcoming, intimate, culturally grounded, convivial warmth. Style: Semi-realistic editorial illustration, tactile textures, rich warm palette. Strictly no text, no typography, no commercial tea bags, no beverage cans, no corporate logos, no cartoonish steam clouds."
+    },
+    {
+      "readingId": "d00013c9-95b9-474c-9e72-941d47e02119",
+      "slug": "living-ice-perito-moreno",
+      "title": "The Living Ice of Perito Moreno",
+      "countryCode": "AR",
+      "editorialLevel": "A2",
+      "coverKey": "covers/AR/d00013c9-95b9-474c-9e72-941d47e02119.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Majestic cinematic view of the towering frontal ice wall of the Perito Moreno Glacier rising seventy meters above the turquoise waters of Lake Argentino. Crisp morning light highlights deep crevasses radiating brilliant sapphire and cyan tones through dense glacial ice. Small icebergs float gracefully in the foreground, with the snow-dusted granite peaks of the Patagonian Andes framing the horizon.",
+      "mustInclude": [
+        "Giant vertical glacial ice wall with deep crevasses",
+        "Intense sapphire and cyan hues in compressed ancient ice",
+        "Turquoise glacial lake water with floating ice fragments",
+        "Patagonian mountain background with snow-capped peaks"
+      ],
+      "mustAvoid": [
+        "Polar bears or non-native fauna",
+        "Fantasy ice palaces or surreal neon glows",
+        "Cruise ships or crowded viewing platforms",
+        "Apocalyptic destruction caricatures"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The colossal vertical ice wall of Perito Moreno Glacier rising seventy meters above the turquoise waters of Lake Argentino in Patagonia, Argentina. Setting: Los Glaciares National Park, framed by rugged granite peaks and snow-dusted Andean mountain slopes. Composition: Impressive low-angle panoramic view showcasing the dramatic sheer face of compressed ancient ice, filled with labyrinthine deep crevasses glowing with incandescent sapphire and cyan hues; small sculpted icebergs float peacefully in the crystalline foreground water. Lighting: Crisp, cold morning sunlight illuminating the frozen pinnacles and casting deep cerulean shadows. Mood: Monumental, awe-inspiring, serene natural grandeur. Style: Realistic editorial landscape illustration, tactile icy textures, cinematic depth. Strictly no text, no typography, no polar bears, no fantasy ice castles, no cruise ships, no apocalyptic collapse caricatures, no cartoon styling."
+    },
+    {
+      "readingId": "a15a3969-4413-4a1c-8175-6f4102be7831",
+      "slug": "funiculars-valparaiso",
+      "title": "The Funiculars of Valparaíso",
+      "countryCode": "CL",
+      "editorialLevel": "A2",
+      "coverKey": "covers/CL/a15a3969-4413-4a1c-8175-6f4102be7831.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Nostalgic coastal editorial illustration featuring a vintage wooden ascensor car ascending the steep, colorful hillside of Valparaíso. Warm late-afternoon Pacific light illuminates the textured clapboard and corrugated-iron architecture of Cerro Alegre in rich terracottas, greens, and ochres. In the background below, the Pacific Ocean sparkles with container ships anchored in the bay.",
+      "mustInclude": [
+        "Classic wooden funicular carriage ascending steep iron rails",
+        "Steep hillside gradient with colorful bohemian hillside houses",
+        "Warm Pacific late-afternoon sunlight and ocean vista",
+        "Authentic architectural details of Valparaíso hills"
+      ],
+      "mustAvoid": [
+        "Modern futuristic glass monorails",
+        "Amusement park rollercoaster look",
+        "Graffiti with profanity or brand logos",
+        "Flat cartoon coloring"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: A historic wooden funicular elevator car (ascensor) climbing the extraordinarily steep hillside of Valparaíso, Chile. Setting: Cerro Alegre hillside neighborhood overlooking the expansive blue Pacific Ocean and bustling harbor below. Composition: Dynamic ascending vertical angle showing the weathered, brightly painted wooden funicular cabin on iron rails, flanked by colorful Victorian and bohemian corrugated-sheet houses in ochre, turquoise, and terracotta; in the background, container ships rest on the glittering sea under an open coastal sky. Lighting: Warm late-afternoon Pacific sun highlighting weathered wood textures and vivid architectural colors. Mood: Nostalgic, picturesque, authentic living urban heritage. Style: Semi-realistic editorial illustration, rich architectural detail, warm atmospheric haze. Strictly no text, no typography, no modern futuristic monorails, no rollercoaster tropes, no vulgar graffiti, no cartoon styling."
+    },
+    {
+      "readingId": "560f5592-50fd-4136-9b38-ee2539c90819",
+      "slug": "eyes-universe-atacama",
+      "title": "Eyes on the Universe in the Atacama Desert",
+      "countryCode": "CL",
+      "editorialLevel": "B1",
+      "coverKey": "covers/CL/560f5592-50fd-4136-9b38-ee2539c90819.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Breathtaking astrophotography-style editorial illustration of the Atacama Desert at midnight. Enormous modern observatory dish antennas and telescope domes of ALMA/Paranal are silhouetted against an intensely clear, pristine desert sky. The Milky Way arches majestically overhead in an incandescent river of dust lanes, nebulae, and stellar clusters, casting faint shadows across the hyper-arid gravel plains.",
+      "mustInclude": [
+        "High-altitude parabolic radio telescope antennas and observatory dome",
+        "Hyper-arid desert terrain under dark skies",
+        "Spectacular, scientifically accurate Milky Way galactic core",
+        "Deep cosmic starlight with subtle earthly silhouettes"
+      ],
+      "mustAvoid": [
+        "Sci-fi flying saucers or alien spacecraft",
+        "Bright urban light pollution or neon lasers",
+        "Unrealistic neon purple nebula explosions",
+        "Text or constellation lines overlaid"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: Advanced astronomical observatories under the hyper-arid night sky of the Atacama Desert in northern Chile. Setting: Chajnantor Plateau at five thousand meters altitude, barren rust-colored desert gravel under the clearest night atmosphere on Earth. Composition: Majestic low-angle composition with massive parabolic radio antennas of ALMA and optical telescope domes silhouetted against the colossal glowing arch of the Milky Way galaxy, filled with intricate cosmic dust lanes, incandescent star clusters, and nebulae casting faint shadows on the desert floor. Lighting: Pristine starlight and subtle red instrumentation glow, deep indigo and obsidian desert shadows. Mood: Boundless scientific wonder, quiet human curiosity confronting the cosmos. Style: Photorealistic editorial illustration, magnificent astronomical accuracy. Strictly no text, no typography, no sci-fi alien ships, no laser beams, no city light pollution, no cartoon styling."
+    },
+    {
+      "readingId": "83907406-98cd-4cd6-bc2a-5d3b9ffb7316",
+      "slug": "great-green-heart-amazon",
+      "title": "The Great Green Heart: Life in the Amazon Canopy",
+      "countryCode": "BR",
+      "editorialLevel": "A2",
+      "coverKey": "covers/BR/83907406-98cd-4cd6-bc2a-5d3b9ffb7316.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Rich, immersive canopy-level perspective looking out over an endless expanse of Brazilian Amazon rainforest at sunrise. Sunbeams pierce through morning river mists, illuminating lush emergent kapok branches laden with wild bromeliads and flowering orchids. A pair of vibrant scarlet macaws glides gracefully across the midground above the dense green canopy.",
+      "mustInclude": [
+        "High canopy viewpoint looking across endless treetop ocean",
+        "Bromeliads and epiphytes clinging to massive emergent tree limbs",
+        "Golden morning sunbeams piercing through jungle river mist",
+        "Pair of native scarlet macaws in elegant flight"
+      ],
+      "mustAvoid": [
+        "Deforestation, bulldozers, or fire scars",
+        "African safari wildlife (lions, giraffes)",
+        "Cartoon Jungle Book aesthetics",
+        "Dark menacing horror atmosphere"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The rich canopy layer of the Brazilian Amazon tropical rainforest at daybreak. Setting: High above the forest floor forty meters up in the emergent treetops of the central Amazon basin. Composition: Immersive canopy perspective looking across an endless rolling green ocean of jungle foliage; massive moss-covered kapok branches in the foreground host vibrant wild bromeliads and flowering orchids, while a pair of scarlet macaws flies gracefully across the misty middle distance. Lighting: Warm golden tropical sunbeams breaking through rising river mist, creating dramatic god rays through moisture-laden canopy air. Mood: Lush, vibrant, primeval biodiversity and ecological majesty. Style: Semi-realistic editorial nature illustration, intricate botanical detail, atmospheric depth. Strictly no text, no typography, no deforestation, no bulldozers, no African safari animals, no cartoon styling."
+    },
+    {
+      "readingId": "c798b670-714a-40a9-8363-7d9ed87288f1",
+      "slug": "dreamer-dirigibles-santos-dumont",
+      "title": "The Dreamer of Dirigibles: Alberto Santos-Dumont",
+      "countryCode": "BR",
+      "editorialLevel": "B2",
+      "coverKey": "covers/BR/c798b670-714a-40a9-8363-7d9ed87288f1.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Elegant Belle Époque historical illustration showing Santos-Dumont’s elongated yellow silk dirigible (Airship No. 6) gliding gracefully around the Eiffel Tower on a crisp autumn morning in Paris (1901). Below, Santos-Dumont is visible in the wicker basket, sporting his iconic Panama hat and tailored suit, checking his wrist.",
+      "mustInclude": [
+        "Accurate elongated dirigible airship with exposed lightweight engine",
+        "Eiffel Tower in the background under soft Parisian autumn morning light",
+        "Alberto Santos-Dumont in basket wearing his signature hat",
+        "Pioneering early 20th-century aviation aesthetic"
+      ],
+      "mustAvoid": [
+        "Steampunk fantasy rayguns or excessive brass gears",
+        "Modern Goodyear commercial blimp look",
+        "Hindenburg fire disaster imagery",
+        "Childish cartoon caricature"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: Brazilian aviation pioneer Alberto Santos-Dumont piloting his steerable airship (Dirigible No. 6) around the Eiffel Tower in Paris (1901). Setting: Early 20th-century Belle Époque autumn morning over Paris. Composition: Elegant historical perspective showing the elongated yellow silk cigar-shaped dirigible cruising gracefully beside the upper structure of the Eiffel Tower; Santos-Dumont is visible in the exposed wicker basket beneath, dressed in his tailored wool suit and trademark Panama hat, checking his Cartier wristwatch. Lighting: Crisp, pale golden autumn sunlight filtering through soft Parisian morning haze. Mood: Adventurous, elegant, visionary human ingenuity. Style: Classic Belle Époque editorial illustration, refined vintage color palette, precise historical aeronautical mechanics. Strictly no text, no typography, no steampunk fantasy weapons, no modern blimp logos, no Hindenburg fire tropes, no cartoon styling."
+    },
+    {
+      "readingId": "6552bf36-cbd1-4b8b-ad6c-da8e6a3a4f59",
+      "slug": "giant-gentle-ones-galapagos",
+      "title": "The Giant Gentle Ones of the Galapagos",
+      "countryCode": "EC",
+      "editorialLevel": "A2",
+      "coverKey": "covers/EC/6552bf36-cbd1-4b8b-ad6c-da8e6a3a4f59.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Dignified wildlife portrait of a magnificent Galápagos giant tortoise peacefully grazing in the volcanic highlands of Santa Cruz Island. The tortoise's weathered domed shell and wise, ancient face are captured in warm tropical daylight amidst lush ferns and yellow Scalesia flowers, with a misty volcanic caldera resting on the horizon.",
+      "mustInclude": [
+        "Anatomically accurate Galápagos giant land tortoise",
+        "Weathered volcanic soil and lush highland vegetation (ferns, Scalesia)",
+        "Calm dignified nature portraiture lighting",
+        "Misty volcanic caldera in the distant background"
+      ],
+      "mustAvoid": [
+        "Cartoon smiling faces or anthropomorphic turtles",
+        "Marine sea turtles swimming underwater (this is terrestrial)",
+        "Tourists crowding or touching the tortoise",
+        "Zoo cages or concrete borders"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: A magnificent, ancient Galápagos giant tortoise peacefully grazing in the volcanic highlands. Setting: Santa Cruz Island volcanic highlands, Ecuador, surrounded by lush green ferns, wild grasses, and yellow Scalesia blossoms with a mist-shrouded volcanic peak in the distance. Composition: Dignified, low-angle wildlife portrait highlighting the weathered, dome-shaped shell, textured scaly skin, and calm ancient eyes of the tortoise as it browses native vegetation on dark volcanic soil. Lighting: Soft, diffused equatorial daylight through highland mist, highlighting mossy textures on the shell. Mood: Timeless, tranquil, dignified ecological conservation. Style: Semi-realistic nature illustration, anatomical fidelity, serene naturalism. Strictly no text, no typography, no cartoon smiling turtle faces, no marine turtles underwater, no tourist crowds, no zoo enclosures, no cartoon styling."
+    },
+    {
+      "readingId": "733a9697-1356-4bc3-a57b-5ab9f9485e3c",
+      "slug": "emerald-mirror-quilotoa",
+      "title": "The Emerald Mirror of Quilotoa",
+      "countryCode": "EC",
+      "editorialLevel": "B1",
+      "coverKey": "covers/EC/733a9697-1356-4bc3-a57b-5ab9f9485e3c.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Striking panoramic landscape illustration of the colossal Quilotoa volcanic crater lake in the Ecuadorian Andes. From the high paramo rim, the viewer gazes down into the vast caldera filled with hypnotic, glowing emerald and turquoise water. Jagged crater walls of gray volcanic rock and yellow sulfur streaks frame the tranquil water, beneath dramatic passing cloud shadows.",
+      "mustInclude": [
+        "Wide circular volcanic caldera rim with steep crater walls",
+        "Glowing emerald-green and turquoise water surface",
+        "Rugged paramo vegetation on high ridges",
+        "Dramatic Andean mountain sky with moving cloud shadows"
+      ],
+      "mustAvoid": [
+        "Tropical palm trees or ocean beaches",
+        "Motorized yachts or speedboats",
+        "Fantasy molten lava fountains (it is an extinct crater lake)",
+        "Flat monotone water coloring"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The colossal volcanic crater lake of Quilotoa in the Ecuadorian Andes. Setting: High-altitude Western Cordillera paramo at four thousand meters, looking down into a vast three-kilometer caldera. Composition: Sweeping panoramic composition from the rugged paramo rim looking down into the giant volcanic bowl filled with a tranquil lake of radiant emerald-green and turquoise mineral water; dramatic jagged caldera cliffs with yellow sulfur streaks frame the luminous water below shifting mountain clouds. Lighting: Dramatic Andean sunlight breaking through fast-moving clouds, casting localized patches of brilliant emerald light across the water surface. Mood: Breathtaking, mystical, raw geological power and serenity. Style: Realistic editorial landscape illustration, rich mineral palettes, majestic scale. Strictly no text, no typography, no tropical beach palms, no speedboats, no fantasy volcanic eruptions, no cartoon styling."
+    },
+    {
+      "readingId": "4b85c8c9-5545-4384-8996-426428b803ad",
+      "slug": "walking-sky-uyuni-salt-flats",
+      "title": "Walking on the Sky: The Uyuni Salt Flats",
+      "countryCode": "BO",
+      "editorialLevel": "A1",
+      "coverKey": "covers/BO/4b85c8c9-5545-4384-8996-426428b803ad.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Ethereal, minimalist landscape illustration of the Salar de Uyuni during the rainy season. A mirror-smooth film of water transforms the white salt desert into an infinite reflection of brilliant blue sky and billowy white clouds. A solitary traveler in distance walking gently on the surface evokes the surreal sensation of walking suspended between sky and earth.",
+      "mustInclude": [
+        "Flawless water mirror reflecting sky and clouds across the ground",
+        "Infinite horizon where earth and sky seamlessly merge",
+        "Pure bright white salt crust under shallow clear water",
+        "Subtle distant solitary silhouette emphasizing vast scale"
+      ],
+      "mustAvoid": [
+        "4x4 rally vehicles racing or kicking up mud",
+        "Gimmicky forced-perspective tourist photo props",
+        "Trash, tire tracks, or dirty mud puddles",
+        "Cluttered foreground elements"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The Salar de Uyuni in Bolivia during the rainy season, transformed into an infinite natural mirror. Setting: Altiplano salt desert covered with a pristine, two-centimeter layer of calm rainwater under an expansive blue sky. Composition: Surreal, minimalist composition where the crystalline water surface creates a flawless reflection of bright cumulus clouds and azure sky; a tiny solitary walker in the far distance walks across the water, making the boundary between heaven and earth completely vanish into an endless space of air and clouds. Lighting: Brilliant, pure high-altitude sunlight casting sharp, vibrant reflections and dazzling white horizons. Mood: Dreamlike, boundless, contemplative, wondrous serenity. Style: Semi-realistic editorial illustration, pristine clarity, surreal scale. Strictly no text, no typography, no rally trucks, no muddy tire tracks, no tacky tourist props, no cartoon styling."
+    },
+    {
+      "readingId": "543b993c-050d-4416-bc8b-5ea960fb6cea",
+      "slug": "stone-gate-sun-tiwanaku",
+      "title": "The Stone Gate of the Sun: Tiwanaku",
+      "countryCode": "BO",
+      "editorialLevel": "B1",
+      "coverKey": "covers/BO/543b993c-050d-4416-bc8b-5ea960fb6cea.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Archaeological and atmospheric portrayal of the monolithic Puerta del Sol at the Tiwanaku site on the high Bolivian altiplano. The solitary carved gray andesite portal stands resolute under the golden glow of a winter solstice sunrise, with long shadows stretching across the grassy plain. Precise relief carvings of the Staff God and winged attendants are rendered with reverent fidelity.",
+      "mustInclude": [
+        "Authentic monolithic Gate of the Sun (Puerta del Sol)",
+        "Detailed low-relief carving of the central Staff God on lintel",
+        "Windswept high-altitude altiplano plain and Andean morning light",
+        "Dignified archaeological and sacred context"
+      ],
+      "mustAvoid": [
+        "Extraterrestrial/alien conspiracy tropes",
+        "Glowing magic fantasy portals",
+        "Inaccurate Egyptian or Aztec hieroglyphs",
+        "Modern rubble or construction equipment"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The monolithic Gate of the Sun (Puerta del Sol) at the pre-Inca archaeological site of Tiwanaku, Bolivia. Setting: Windswept altiplano plains near Lake Titicaca at nearly four thousand meters altitude, under an immense Andean sunrise. Composition: Dignified three-quarter perspective of the single massive andesite megalithic portal standing solitary on the golden grass plateau; the intricate low-relief carvings across the lintel—depicting the central Staff God with solar rays and running winged messengers—catch the sharp morning light with dramatic cast shadows. Lighting: Low-angled golden winter solstice dawn light accentuating ancient stone relief chisel marks against deep mountain shadows. Mood: Sacred, monumental, archaeologically profound, timeless mystery. Style: Realistic archaeological editorial illustration, authentic Andean stone textures, reverent atmosphere. Strictly no text, no typography, no alien/UFO tropes, no glowing magic portals, no inaccurate Aztec pyramids, no cartoon styling."
+    },
+    {
+      "readingId": "b6a72be6-cb42-40ad-be7b-9b4156b1823a",
+      "slug": "volcanoes-guarding-lake-atitlan",
+      "title": "The Volcanoes Guarding Lake Atitlán",
+      "countryCode": "GT",
+      "editorialLevel": "A2",
+      "coverKey": "covers/GT/b6a72be6-cb42-40ad-be7b-9b4156b1823a.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Scenic highlands illustration capturing the serene morning majesty of Lake Atitlán. Three towering volcanic cones (San Pedro, Tolimán, and Atitlán) rise proudly above crystalline blue waters. In the foreground, vibrant native wildflowers and coffee trees frame the lake, while a traditional wooden cayuco canoe glides silently in the midground.",
+      "mustInclude": [
+        "Three distinct volcanic cones rising from the southern lakeshore",
+        "Deep crystalline blue caldera lake waters",
+        "Lush highland foliage (native avocado, pine, and coffee plants)",
+        "Traditional wooden cayuco canoe on the water"
+      ],
+      "mustAvoid": [
+        "Violent explosive volcanic eruptions",
+        "Modern roaring speedboats or jet skis",
+        "Generic resort hotel swimming pools",
+        "Cartoonish oversaturated colors"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The volcanic sentinels guarding Lake Atitlán in the western highlands of Guatemala. Setting: Highland volcanic caldera lake surrounded by dramatic topography. Composition: Elevated perspective looking across the crystalline blue waters of the lake toward the majestic three conical peaks of volcanoes San Pedro, Tolimán, and Atitlán rising steeply into fluffy white cumulus clouds; in the foreground, fertile terraced slopes with blooming avocado, pine, and coffee trees frame a traditional wooden cayuco canoe gliding across calm waters. Lighting: Gentle morning sun illuminating deep green mountain ridges and casting soft ripples across the blue lake. Mood: Peaceful, majestic, culturally grounded highland beauty. Style: Semi-realistic landscape illustration, rich atmospheric depth, vibrant natural colors. Strictly no text, no typography, no explosive catastrophic eruptions, no luxury hotel swimming pools, no roaring motorboats, no cartoon styling."
+    },
+    {
+      "readingId": "f4442bb4-77ae-48f6-9191-9c5985375078",
+      "slug": "city-shook-rebuilt-antigua",
+      "title": "The City That Shook and Rebuilt: Antigua Guatemala",
+      "countryCode": "GT",
+      "editorialLevel": "B2",
+      "coverKey": "covers/GT/f4442bb4-77ae-48f6-9191-9c5985375078.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Evocative architectural illustration of Antigua Guatemala featuring the iconic yellow Arch of Santa Catalina framing the smoking cone of Volcán de Fuego in the distance. The foreground cobblestone street is adorned with an intricate, colorful Holy Week sawdust carpet (alfombra) in geometric Maya-inspired motifs. Warm colonial lanterns and bougainvillea draping weathered adobe walls complete the scene.",
+      "mustInclude": [
+        "Iconic yellow Arch of Santa Catalina (Arco de Santa Catalina)",
+        "Volcán de Fuego with subtle smoke plume in distance",
+        "Cobblestone street with handcrafted dyed-sawdust carpet (alfombra)",
+        "Colonial baroque architecture with bougainvillea flowers"
+      ],
+      "mustAvoid": [
+        "Graphic disaster destruction / buildings actively falling down",
+        "Modern asphalt, automobiles, or neon commercial signs",
+        "Caricatured or disrespectful portrayals of religious processions",
+        "Flat tourist postcard style"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: Historic Spanish colonial architecture and cultural endurance in Antigua Guatemala. Setting: Cobblestone colonial street in the shadow of the volcanic peaks of Agua and Fuego. Composition: Classic street view featuring the iconic yellow Arch of Santa Catalina (Arco de Santa Catalina) framing the smoking cone of Volcán de Fuego in the background; the cobblestone street is adorned with an intricate, vibrant Holy Week carpet (alfombra) handcrafted from brightly dyed sawdust and flower petals in traditional Mayan geometric motifs, flanked by pastel adobe walls and blooming bougainvillea. Lighting: Warm golden late-afternoon sunlight washing over yellow arches and cobblestones. Mood: Resilient, historic, culturally rich communal beauty. Style: Realistic architectural and cultural editorial illustration, warm colonial palette. Strictly no text, no typography, no catastrophic collapsing buildings, no modern cars or neon signs, no cartoon styling."
+    },
+    {
+      "readingId": "dd50bd4c-2947-49d7-b769-9a21bee6ea99",
+      "slug": "how-silent-films-spoke",
+      "title": "How Silent Films Spoke to the World",
+      "countryCode": null,
+      "editorialLevel": "A2",
+      "coverKey": "covers/thematic/dd50bd4c-2947-49d7-b769-9a21bee6ea99.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Classic 1920s cinema illustration inside a vintage picture palace. A golden beam of light from a film projector cuts through the darkened hall, illuminating silver dust motes and falling onto a glowing silver screen showing an expressive silent-movie scene. In the foreground pit, the silhouette of a theater pianist plays passionately at an upright grand piano.",
+      "mustInclude": [
+        "Luminous projector beam cutting through the darkened cinema",
+        "Glowing black-and-white movie screen with expressive actors",
+        "Silhouette of live pianist accompanying the film",
+        "Ornate 1920s cinema hall architectural details"
+      ],
+      "mustAvoid": [
+        "Modern digital DLP projector look",
+        "Smartphones glowing in the audience",
+        "Popcorn boxes or soda cups cluttering the scene",
+        "Childish cartoon icons"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The universal visual art of early silent cinema. Setting: A grand 1920s movie palace theater filled with an enthralled audience. Composition: Looking from the rear of the darkened auditorium toward the luminous silver screen; a brilliant golden beam of light from a 35mm projector cuts through atmospheric haze and shimmering dust motes, casting the expressive black-and-white scene of an actor onto the screen; in the orchestra pit below, the dark silhouette of a live theater pianist plays passionately at a grand piano. Lighting: High-contrast dramatic chiaroscuro with a blazing projection beam cutting through deep velvet theater shadows. Mood: Enchanting, nostalgic, evocative magic of early storytelling. Style: Cinematic historical editorial illustration, rich textural contrast, warm and sepia undertones. Strictly no text, no typography, no modern smartphones, no digital projectors, no popcorn clutter, no cartoon styling."
+    },
+    {
+      "readingId": "f95f4902-aedc-45c2-949a-392d1796f530",
+      "slug": "how-music-shapes-movie-scenes",
+      "title": "How Music Shapes a Movie Scene",
+      "countryCode": null,
+      "editorialLevel": "B2",
+      "coverKey": "covers/thematic/f95f4902-aedc-45c2-949a-392d1796f530.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Sophisticated artistic composition bridging visual cinema and orchestral sound. A conductor's expressive hand holding a baton is viewed in dramatic studio lighting, with a large orchestral scoring stage visible where cello and brass players perform. In the background, a giant translucent movie projection reveals a tense, dramatic film scene being synchronized in real time.",
+      "mustInclude": [
+        "Professional film scoring studio / soundstage with acoustic panels",
+        "Orchestral instruments (strings, cellos, French horns) in performance",
+        "Conductor's baton and expressive hand gesture in focus",
+        "Giant projection screen in the background playing film footage"
+      ],
+      "mustAvoid": [
+        "Floating cartoon music notes (stereotypical cliché)",
+        "Rock band electric guitars or synthesizers",
+        "DJ turntables or modern party headphones",
+        "Chaotic abstract graffiti lines"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The psychological power of orchestral film scoring. Setting: A prestigious acoustic recording soundstage / scoring studio. Composition: Dramatic close-up on a conductor's expressive hand holding a slender wooden baton in mid-motion, surrounded by sheet music on a stand; in the atmospheric background, orchestral cello, violin, and French horn players perform in focus, while high above on a giant studio projection screen, a tense and cinematic movie scene plays in synchronization. Lighting: Moody studio spotlighting focusing on the baton and instruments, with cool cinematic blue light spilling from the background projection screen. Mood: Intense, psychological, emotionally resonant artistic creation. Style: Sophisticated editorial illustration, dynamic composition, cinematic depth of field. Strictly no text, no typography, no floating cartoon music notes, no rock electric guitars, no DJ equipment, no cartoon styling."
+    },
+    {
+      "readingId": "6658c871-1b1d-4d5e-b568-505eac4a9698",
+      "slug": "spirit-long-distance-runner",
+      "title": "The Spirit of the Long Distance Runner",
+      "countryCode": null,
+      "editorialLevel": "A2",
+      "coverKey": "covers/thematic/6658c871-1b1d-4d5e-b568-505eac4a9698.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Inspiring, dynamic illustration of an endurance runner on an open coastal asphalt highway at dawn. Captured from a low dynamic three-quarter angle, the runner displays focused athletic determination, steady breath, and rhythmic stride as golden morning light illuminates the path ahead. The ocean horizon and long shadows emphasize personal journey and mental resilience.",
+      "mustInclude": [
+        "Endurance athlete running in athletic, balanced form",
+        "Open coastal highway at sunrise with long morning shadows",
+        "Focused, determined facial expression and rhythmic motion",
+        "Vast peaceful landscape conveying inner mental dialogue"
+      ],
+      "mustAvoid": [
+        "Commercial brand logos (Nike, Adidas, etc.)",
+        "Clichéd finish-line ribbon breaking with confetti",
+        "Grotesque painful agony / collapse",
+        "Crowds of cheering spectators"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The mental fortitude and physiological endurance of a long-distance marathon runner. Setting: An open, winding coastal asphalt highway stretching toward a distant horizon at dawn. Composition: Low dynamic three-quarter perspective of an athletic female runner in full, rhythmic, balanced stride; her breath is visible in the crisp morning air, her posture embodies discipline and calm focus; the rising sun crests the ocean horizon, casting long dramatic shadows across the pavement. Lighting: Radiant golden-pink sunrise light illuminating the runner's silhouette and glistening ocean waters. Mood: Solitary resilience, quiet determination, personal triumph of the human spirit. Style: Realistic athletic editorial illustration, cinematic motion, inspiring expansive landscape. Strictly no text, no typography, no commercial sneaker brand logos, no finish line confetti clichés, no grotesque pain, no cheering spectator crowds, no cartoon styling."
+    },
+    {
+      "readingId": "09b4a451-92d0-47a0-af9e-2e1dad038430",
+      "slug": "how-teams-bounce-back-defeat",
+      "title": "How Great Teams Bounce Back from Defeat",
+      "countryCode": null,
+      "editorialLevel": "B1",
+      "coverKey": "covers/thematic/09b4a451-92d0-47a0-af9e-2e1dad038430.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Intense, emotionally resonant sports illustration set in a modern locker room during a tactical debrief. A unified group of diverse athletes leans in together around a digital strategy whiteboard, listening intently as their coach gestures toward tactical adjustments. The lighting is warm and purposeful, conveying focus, trust, and renewed determination.",
+      "mustInclude": [
+        "Athletic team huddle in locker room environment",
+        "Tactical whiteboard with player formations and adjustments",
+        "Attentive, determined expressions showing unity and resilience",
+        "Warm, focused dramatic lighting"
+      ],
+      "mustAvoid": [
+        "Weeping, defeated players slumped in total despair",
+        "Violent shouting arguments or broken equipment",
+        "Generic corporate office business suits",
+        "Trophy celebrations (the theme is bouncing back from defeat)"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: Collective resilience and tactical trust in competitive sports following a setback. Setting: A professional team locker room during an analytical post-game debrief. Composition: An intimate, cohesive huddle of diverse athletes gathered closely around a tactical strategy whiteboard; a mentor coach gestures thoughtfully toward tactical adjustments on the board; the players display expressions of mature focus, mutual trust, and renewed determination, with hands resting on each other's shoulders. Lighting: Warm, focused directional lighting illuminating the whiteboard and faces, contrasting with soft shadows around the locker room stalls. Mood: Serious, unifying, psychologically safe, deeply determined resolve. Style: Contemporary realistic editorial illustration, authentic athletic atmosphere, emotional maturity. Strictly no text on image, no typography, no crying players in despair, no violent shouting, no corporate business suits, no cartoon styling."
+    },
+    {
+      "readingId": "8ac44d49-676d-4bea-8d7f-e64d95780bc3",
+      "slug": "morning-walk-clears-mind",
+      "title": "The Morning Walk That Clears the Mind",
+      "countryCode": null,
+      "editorialLevel": "A1",
+      "coverKey": "covers/thematic/8ac44d49-676d-4bea-8d7f-e64d95780bc3.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Serene, calming editorial illustration of a peaceful tree-lined avenue in a quiet neighborhood at daybreak. Gentle morning sunbeams filter through lush leafy branches, casting dappled light across the sidewalk. A solitary walker strolls calmly with hands in coat pockets, breathing in the fresh morning air with a relaxed, tranquil demeanor.",
+      "mustInclude": [
+        "Leafy residential street or park path bathed in soft dawn light",
+        "Dappled sunbeams piercing through green tree canopies",
+        "Solitary person walking with calm, contemplative posture",
+        "Clean, peaceful neighborhood atmosphere free of clutter"
+      ],
+      "mustAvoid": [
+        "Heavy rush-hour automobile traffic or exhaust fumes",
+        "Crowded train stations or rushed commuters",
+        "Persons glued to glowing smartphone screens",
+        "Gloomy, rainy, or depressive weather"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: The restorative psychological and physical clarity of an early morning walk. Setting: A serene, leafy tree-lined avenue in a quiet residential neighborhood at daybreak. Composition: Peaceful perspective down a gently curving sidewalk flanked by ancient oak and maple trees; soft morning sunlight streams through leaves, creating dappled golden pools of light on the pavement; a solitary figure in comfortable clothing walks with relaxed, mindful posture, breathing deeply with hands in coat pockets. Lighting: Warm, diffused sunrise rays filtering through green foliage with soft morning air haze. Mood: Tranquil, refreshing, mindful calm, mental clarity and renewal. Style: Semi-realistic editorial illustration, soft impressionistic lighting touches, clean natural textures. Strictly no text, no typography, no heavy automobile traffic, no smartphones in hand, no gloomy rainy weather, no cartoon styling."
+    },
+    {
+      "readingId": "a3bc0476-8f25-4d7f-96b4-4f5d5417cee5",
+      "slug": "neighbor-fixed-broken-bicycles",
+      "title": "The Neighbor Who Fixed Broken Bicycles",
+      "countryCode": null,
+      "editorialLevel": "A2",
+      "coverKey": "covers/thematic/a3bc0476-8f25-4d7f-96b4-4f5d5417cee5.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Heartwarming narrative illustration set inside a sun-drenched neighborhood garage workshop. An elderly craftsman in a canvas apron patiently guides a young boy's hands as they adjust the chain on an upside-down vintage bicycle. Tools hang neatly organized on wooden pegboards in the background, with bicycle rims, tires, and jars of nuts and bolts catching warm morning light.",
+      "mustInclude": [
+        "Cozy garage workshop with wooden workbench and hand tools",
+        "Elderly mentor and young boy working together on a vintage bicycle",
+        "Natural warm light streaming through a workshop window",
+        "Detailed mechanical parts (chains, sprockets, tire spokes)"
+      ],
+      "mustAvoid": [
+        "Modern high-tech carbon fiber racing bikes",
+        "Industrial automated robotic assembly lines",
+        "Messy junkyard trash heap aesthetics",
+        "Commercial retail cash registers"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: Generational mentorship, community generosity, and mechanical craft. Setting: A sun-drenched, well-loved garage workshop filled with vintage bicycle tools. Composition: Warm storytelling scene where an elderly, kind-faced retired machinist in a canvas apron leans over an upside-down vintage bicycle, gently guiding the hands of an eager young neighborhood boy as they align a bicycle chain; the background features wooden pegboards with organized wrenches, hanging bicycle rims, and jars of nuts and bolts. Lighting: Generous golden morning sunlight pouring through a dust-mote filled garage window. Mood: Heartwarming, communal, generous, wholesome practical wisdom. Style: Rich narrative editorial illustration, Norman Rockwell-inspired warmth with contemporary realism. Strictly no text, no typography, no automated industrial robots, no junkyard scrap, no cash registers, no cartoon styling."
+    },
+    {
+      "readingId": "a6ec1b08-4953-4f33-9554-bbe23d7de97a",
+      "slug": "accidental-discoveries-science",
+      "title": "The Accidental Discoveries That Changed Science",
+      "countryCode": null,
+      "editorialLevel": "B1",
+      "coverKey": "covers/thematic/a6ec1b08-4953-4f33-9554-bbe23d7de97a.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Atmospheric historical science illustration set in a 1920s laboratory. In sharp focus on a wooden workbench sits a glass petri dish containing a blue-green Penicillium mold colony surrounded by a clear bacterial inhibition halo. In the soft-focus background, vintage brass microscope, glass beakers with amber reagents, and handwritten research notebooks are illuminated by gentle window daylight.",
+      "mustInclude": [
+        "Glass petri dish with distinct clear circular zone around mold growth",
+        "Vintage brass monocular microscope and laboratory glassware",
+        "Handwritten laboratory research notebooks with sketches",
+        "Authentic early 20th-century scientific laboratory atmosphere"
+      ],
+      "mustAvoid": [
+        "Mad scientist clichés (electric lightning arcs, bubbling toxic green liquids)",
+        "Futuristic holographic displays",
+        "Cartoon microbes with funny faces",
+        "Modern digital electronic equipment"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: Serendipitous breakthrough in science: Alexander Fleming's discovery of penicillin. Setting: An authentic 1928 bacteriology laboratory workbench in London. Composition: Focused still-life close-up on a glass petri dish resting on wooden boards; inside the dish, a fuzzy blue-green mold colony is surrounded by a distinctly clear ring of destroyed bacteria; in the soft-focus background, vintage brass monocular microscope, glass test tubes with amber reagents, and leather-bound research notebooks catch gentle daylight from an adjacent window. Lighting: Soft, natural English window light illuminating the transparent glass dish and aged wood textures. Mood: Intellectual curiosity, momentous historical discovery, quiet scientific revelation. Style: Realistic historical scientific illustration, delicate glass textures, dignified scholarly atmosphere. Strictly no text, no typography, no mad scientist lightning bolts, no bubbling green fantasy slime, no cartoon microbes, no cartoon styling."
+    },
+    {
+      "readingId": "1bf9155c-4161-4d47-85cc-1cf075ddd0dc",
+      "slug": "woman-who-unlocked-stars",
+      "title": "The Woman Who Unlocked the Stars",
+      "countryCode": null,
+      "editorialLevel": "B1",
+      "coverKey": "covers/thematic/1bf9155c-4161-4d47-85cc-1cf075ddd0dc.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Poetic, historically accurate portrait of Henrietta Swan Leavitt at work in her office at the Harvard College Observatory (circa 1908). Leavitt examines a photographic glass plate illuminated from beneath by an angled mirror, holding a magnifying loupe and a millimeter ruler. Her focused, brilliant expression is complemented by faint celestial constellations reflecting softly against the dark office windowpane.",
+      "mustInclude": [
+        "Astronomer Henrietta Leavitt working at illuminated glass-plate desk",
+        "Photographic glass star plates showing negative black star dots",
+        "Magnifying glass loupe and precision glass millimeter ruler",
+        "Period Edwardian dress and authentic observatory archival setting"
+      ],
+      "mustAvoid": [
+        "Modern computers, tablets, or digital screens",
+        "Glowing magic fantasy orbs",
+        "Inaccurate glamorous red-carpet styling",
+        "Futuristic space telescopes"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: Astronomer Henrietta Swan Leavitt discovering the cosmic period-luminosity relation at Harvard. Setting: The computing office of the Harvard College Observatory (circa 1908). Composition: Elegant historical portrait showing Henrietta Leavitt seated at a slanted wooden desk illuminated from below by an angled mirror; she leans intently over a glass photographic plate of the Magellanic Clouds, holding a magnifying loupe in one hand and a precision glass measuring scale in the other; through the dark office window behind her, the faint cosmic glow of star clusters and constellations shines in the night sky. Lighting: Gentle upward glow from the frosted glass light table illuminating her focused, intelligent expression, contrasted against warm ambient lamplight. Mood: Brilliant, perseverant, groundbreaking intellectual triumph. Style: Fine historical editorial illustration, refined period fidelity, poetic cosmic undertones. Strictly no text, no typography, no modern computers or tablets, no fantasy magic orbs, no inaccurate red-carpet glamor, no cartoon styling."
+    },
+    {
+      "readingId": "54ed302a-1e60-4884-bd55-249586e1ebf8",
+      "slug": "boy-who-built-windmill",
+      "title": "The Boy Who Built a Windmill",
+      "countryCode": null,
+      "editorialLevel": "A1",
+      "coverKey": "covers/thematic/54ed302a-1e60-4884-bd55-249586e1ebf8.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Triumphant, inspiring editorial illustration of young William Kamkwamba standing beside his handcrafted wooden tower in Wimbe, Malawi. The rustic windmill—ingeniously assembled from blue tractor fan blades, plastic PVC pipes, and a bicycle frame—spins vigorously against a golden late-afternoon African sky. In the foreground, a single electric light bulb wired to the dynamo glows brightly.",
+      "mustInclude": [
+        "Hand-built wooden tower with repurposed bicycle and tractor fan blades",
+        "A single glowing electric light bulb powered by the spinning dynamo",
+        "William Kamkwamba standing with dignified pride beside his creation",
+        "Golden African late-afternoon savannah sky and acacia trees"
+      ],
+      "mustAvoid": [
+        "Massive industrial commercial wind turbines",
+        "Sensationalized poverty, despair, or helpless stereotypes",
+        "Childish cartoon caricature",
+        "High-voltage electrical transmission towers"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: William Kamkwamba and his handcrafted wooden windmill powering his village in Malawi. Setting: Wimbe village, rural Malawi, under an expansive open late-afternoon African sky. Composition: Inspiring, triumphant composition showing fourteen-year-old William standing proudly beside his rustic wooden tower; the makeshift windmill—crafted from blue tractor fan blades, melted PVC pipes, and a bicycle frame—spins against the wind; in the foreground, a single connected electric light bulb glows warmly, casting light onto his smiling, determined face. Lighting: Warm golden hour sunlight washing across the dry savannah grasses, with the bright yellow glow of the light bulb shining in the dusk. Mood: Ingenious, triumphant, hopeful, empowering human resourcefulness. Style: Realistic narrative editorial illustration, rich African landscape palette, dignified emotional truth. Strictly no text, no typography, no commercial industrial wind turbines, no poverty caricature, no cartoon styling."
+    },
+    {
+      "readingId": "34d9648e-7e2a-43ce-bb76-b498e4540c55",
+      "slug": "case-missing-pocket-watch",
+      "title": "The Case of the Missing Diamond Pocket Watch",
+      "countryCode": null,
+      "editorialLevel": "A2",
+      "coverKey": "covers/thematic/34d9648e-7e2a-43ce-bb76-b498e4540c55.webp",
+      "imageSpec": {
+        "type": "READING_COVER",
+        "aspectRatio": "2:3",
+        "targetWidth": 800,
+        "targetHeight": 1200,
+        "format": "webp",
+        "targetMaxBytes": 250000
+      },
+      "artDirection": "Elegant classic detective still-life in the tradition of Golden Age English mystery fiction. On an opulent mahogany library desk sits an open velvet watch case next to a brass magnifying glass, a leather-bound notebook, and a smoking pipe. Through open French doors in the background, a snowy winter manor garden is visible with faint footprints in the pristine snow.",
+      "mustInclude": [
+        "Fine mahogany study desk with green leather inlay and desk lamp",
+        "Open velvet watch presentation case",
+        "Classic brass magnifying glass and handwritten investigation notes",
+        "Snow-covered manor garden visible through French doors in background"
+      ],
+      "mustAvoid": [
+        "Violent crime scene elements, blood, or gore",
+        "Yellow modern police caution tape",
+        "Modern digital fingerprint scanners or forensics kits",
+        "Film noir gritty trench coat gangster clichés"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic illustration in vertical 2:3 book-cover format. Subject: Classic fair-play detective mystery in the tradition of Golden Age crime fiction. Setting: An opulent Victorian/Edwardian manor library study on a snowy winter evening. Composition: Still-life investigative scene on a polished mahogany library desk with green leather inlay; in sharp focus rests an open, empty dark-blue velvet jewelry case, a classic brass magnifying glass, a leather-bound investigator's notebook with pencil, and a warm green banker's desk lamp; through French doors in the background, a snowy country garden is visible with fresh footprints leading into the moonlit woods. Lighting: Warm ambient glow from the green banker's lamp contrasting with cool moonlight and crisp white snow outside. Mood: Intriguing, intellectual, cozy, sophisticated English detective puzzle. Style: Realistic editorial still-life illustration, rich mahogany and velvet textures, classic mystery atmosphere. Strictly no text, no typography, no blood or graphic violence, no modern police tape, no film noir fedoras with guns, no cartoon styling."
+    }
+  ],
+  "countryHeroes": [
+    {
+      "countryCode": "PE",
+      "countryName": "Perú",
+      "assetKey": "countries/PE/hero.webp",
+      "imageSpec": {
+        "type": "COUNTRY_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Majestic panoramic landscape of the Peruvian Andes featuring the legendary citadel of Machu Picchu and the winding Urubamba River valley in the early morning. Golden sun rays break through soft mountain mist, illuminating agricultural stone terraces and the iconic peak of Huayna Picchu under a cobalt alpine sky.",
+      "mustInclude": [
+        "Iconic stone agricultural terraces and citadel architecture of Machu Picchu",
+        "Huayna Picchu mountain peak framed against morning sky",
+        "Soft morning cloud mist rising from the Urubamba canyon",
+        "Warm golden dawn lighting highlighting green Andean slopes"
+      ],
+      "mustAvoid": [
+        "Tourist crowds, selfie sticks, or modern park signs",
+        "Cartoon llama caricatures",
+        "Inaccurate fantasy ruins",
+        "Text or logos on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic landscape in wide 16:9 format. Subject: The legendary sanctuary of Machu Picchu and the Sacred Valley of Peru at sunrise. Setting: High Andean cloud forest above the winding Urubamba River canyon. Composition: Sweeping wide-angle vista showcasing the ancient agricultural stone terraces and megalithic stone masonry of the citadel, with the iconic peak of Huayna Picchu rising proudly against an azure mountain sky; ethereal morning mist drifts through the valley below, with the lower third and sides leaving clear compositional breathing space for UI overlays. Lighting: Majestic golden dawn sunbeams illuminating emerald-green terraces and ancient stone walls with warm highlights. Mood: Timeless, monumental, culturally profound, majestic national heritage. Style: High-fidelity realistic landscape illustration, panoramic depth. Strictly no text, no typography, no tourist crowds, no cartoon llamas, no modern park railings, no flags, no logos."
+    },
+    {
+      "countryCode": "AR",
+      "countryName": "Argentina",
+      "assetKey": "countries/AR/hero.webp",
+      "imageSpec": {
+        "type": "COUNTRY_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Breathtaking panoramic landscape of southern Patagonia in Los Glaciares National Park. The jagged granite spires of Mount Fitz Roy (Chaltén) rise dramatically into a clear azure sky, glowing with golden-pink alpine sunrise light, reflected perfectly in a crystalline turquoise glacial lake framed by golden autumn lenga beech forests.",
+      "mustInclude": [
+        "Iconic granite spires of Mount Fitz Roy (Cerro Chaltén)",
+        "Crystal-clear glacial lake in foreground with mountain reflection",
+        "Patagonian autumn foliage with golden lenga trees",
+        "Alpenglow sunrise lighting on granite mountain faces"
+      ],
+      "mustAvoid": [
+        "Tango dancers on a glacier (incongruous montage)",
+        "Football/soccer stadiums in wilderness",
+        "Commercial advertisements or logos",
+        "Text on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic landscape in wide 16:9 format. Subject: The wild grandeur of Argentine Patagonia in Los Glaciares National Park. Setting: Southern Andes mountains in Santa Cruz province, Argentina. Composition: Expansive panoramic view featuring the imposing jagged granite spires of Mount Fitz Roy (Cerro Chaltén) rising above pristine turquoise glacial lakes; in the foreground, golden autumn lenga forests and sweeping steppe plains frame the scene with generous compositional breathing room for digital UI overlays. Lighting: Breathtaking early morning alpenglow bathing the mountain granite peaks in rose-gold and amber hues under a crisp cerulean sky. Mood: Untamed, pristine, vast, poetic natural grandeur. Style: Realistic cinematic landscape illustration, exquisite alpine detail, dramatic atmospheric depth. Strictly no text, no typography, no tango clichés in the wilderness, no soccer balls, no city buildings, no flags, no logos."
+    },
+    {
+      "countryCode": "CL",
+      "countryName": "Chile",
+      "assetKey": "countries/CL/hero.webp",
+      "imageSpec": {
+        "type": "COUNTRY_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Panoramic vista of the vast Atacama Desert salt flats and distant snow-capped Andean volcanoes at twilight. In the foreground, glowing salt crust formations surround a tranquil lagoon reflecting pink, amber, and violet twilight sky, where a small flock of native Andean flamingos wades peacefully.",
+      "mustInclude": [
+        "Vast expanses of Atacama salt formations (Salar de Atacama)",
+        "Distant symmetrical volcanic peaks with snow dusted summits",
+        "Tranquil salt lagoon with twilight pastel color reflections",
+        "Graceful Andean flamingos feeding peacefully in the distance"
+      ],
+      "mustAvoid": [
+        "Industrial mining machinery or dump trucks",
+        "Rally cars tearing through salt flats",
+        "Cartoonish cactus with sunglasses",
+        "Text or logos on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic landscape in wide 16:9 format. Subject: The dramatic desert landscapes of Chile: the Atacama salt flats and Andean volcanic range. Setting: High-altitude Atacama Desert plateau at sunset. Composition: Expansive horizontal panorama showing geometric white salt crust formations leading toward tranquil, glassy lagoons that reflect the pastel tones of the twilight sky; in the distant background, the majestic symmetrical cones of the Licancabur volcano rise under a sky transitioning from amber to indigo, with graceful Andean flamingos in the middle ground and open breathing space in the foreground for UI text. Lighting: Delicate twilight pastel palette of rose, violet, and gold reflecting off the salt flats. Mood: Serene, vast, otherworldly, geological majesty. Style: Realistic landscape illustration, panoramic scale, subtle chromatic subtlety. Strictly no text, no typography, no mining machinery, no rally cars, no cartoon styling, no flags, no logos."
+    },
+    {
+      "countryCode": "BR",
+      "countryName": "Brasil",
+      "assetKey": "countries/BR/hero.webp",
+      "imageSpec": {
+        "type": "COUNTRY_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Spectacular aerial panoramic view of the Brazilian Amazon Basin at sunset. The winding silver ribbon of the Amazon River meanders gracefully through an immense, unbroken green canopy of tropical rainforest, with sunbeams glinting across calm water and tropical clouds painted in brilliant orange and gold.",
+      "mustInclude": [
+        "Grand meandering curves of the Amazon River system",
+        "Vast unbroken dense rainforest canopy stretching to the horizon",
+        "Dramatic golden sunset sky with luminous tropical cloud formations",
+        "Rich layers of green vegetation and reflective river waters"
+      ],
+      "mustAvoid": [
+        "Carnival parade montages superimposed on the jungle",
+        "Deforestation, smoke plumes, or agricultural clear-cuts",
+        "Football/soccer balls floating in the river",
+        "Text or logos on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic landscape in wide 16:9 format. Subject: The immense primeval wilderness of Brazil: the Amazon River Basin at sunset. Setting: Unbroken tropical rainforest expanse along the grand Amazon river system. Composition: Magnificent wide-angle aerial perspective showing the sweeping curves of a major river tributary reflecting a fiery tropical sunset; endless rolling canopies of lush green jungle stretch to the curvature of the horizon, with sunbeams cutting through rain clouds and ample visual breathing room along the lower third for overlay typography. Lighting: Spectacular sunset lighting with rich ambers, deep emeralds, and glowing golden river reflections. Mood: Colossal, fertile, ancient, ecological heartbeat of the continent. Style: Realistic panoramic landscape illustration, breathtaking natural scale. Strictly no text, no typography, no carnival montages, no deforestation scars, no city skylines, no flags, no logos."
+    },
+    {
+      "countryCode": "EC",
+      "countryName": "Ecuador",
+      "assetKey": "countries/EC/hero.webp",
+      "imageSpec": {
+        "type": "COUNTRY_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Majestic wide landscape of the Ecuadorian Andes featuring Mount Chimborazo—the highest summit from the Earth's center. The colossal glaciated volcanic peak towers majestically above golden paramo highlands, where wild vicuñas graze amidst native chuquiragua flowering shrubs under a clear high-altitude sky.",
+      "mustInclude": [
+        "Colossal snow-capped summit of Mount Chimborazo",
+        "High-altitude Andean paramo grasslands in foreground",
+        "Wild native vicuñas grazing peacefully in natural habitat",
+        "Crisp crystalline mountain atmosphere"
+      ],
+      "mustAvoid": [
+        "Tropical beach umbrellas mixed with snowy peaks",
+        "Cartoony animals or mascot figures",
+        "Commercial trekking logos or branded gear",
+        "Text or logos on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic landscape in wide 16:9 format. Subject: Mount Chimborazo, the highest summit in Ecuador and closest point on Earth to the stars. Setting: High Andean paramo plateau in Chimborazo Province. Composition: Awe-inspiring wide vista dominated by the massive, glaciated volcanic massif of Chimborazo towering majestically into the deep blue sky; in the foreground, golden tussock grasslands (pajonal) roll gently across the plateau, where a small herd of native wild vicuñas grazes peacefully, leaving the lower third clear for UI text integration. Lighting: Crystal-clear, high-altitude Andean morning sunlight accentuating sparkling glacier ice and golden paramo grass textures. Mood: Monumental, pristine, eternal, contemplative highland serenity. Style: Realistic panoramic landscape illustration, dramatic alpine scale and clarity. Strictly no text, no typography, no beach elements, no cartoon animals, no climbing equipment clutter, no flags, no logos."
+    },
+    {
+      "countryCode": "BO",
+      "countryName": "Bolivia",
+      "assetKey": "countries/BO/hero.webp",
+      "imageSpec": {
+        "type": "COUNTRY_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Breathtaking panoramic view of the flooded Salar de Uyuni at sunset. A thin layer of still water turns the enormous salt flat into a flawless mirror, perfectly reflecting fiery crimson, orange, and purple sunset clouds above and below, creating a surreal world of endless sky with distant mountain silhouettes.",
+      "mustInclude": [
+        "Infinite mirror reflection across the flooded Salar de Uyuni",
+        "Spectacular Andean sunset with vivid colors reflected across the salt floor",
+        "Sharp, clean horizon where earth and sky mirror each other",
+        "Distant silhouettes of Andean volcanic mountains"
+      ],
+      "mustAvoid": [
+        "Muddy tire ruts or broken vehicles",
+        "Campy tourist forced-perspective props (giant plastic dinosaurs)",
+        "Garbage or debris",
+        "Text or logos on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic landscape in wide 16:9 format. Subject: The infinite mirror reflections of the Salar de Uyuni in Bolivia at twilight. Setting: The world's largest salt flat flooded with a thin layer of still rainwater. Composition: Breathtaking wide-angle panoramic view where the tranquil water creates an unbroken mirror of the evening sky; brilliant clouds painted in deep crimson, magenta, and twilight indigo reflect seamlessly across the ground; distant volcanic mountain silhouettes sit on the razor-sharp horizon, leaving uncluttered horizontal space for digital interface text. Lighting: Luminous post-sunset afterglow with rich gradients of purple, coral, and midnight blue reflecting on water. Mood: Ethereal, infinite, transcendent, boundless natural poetry. Style: Realistic panoramic landscape illustration, pristine reflection fidelity, surreal scale. Strictly no text, no typography, no muddy tire marks, no tourist vehicles, no novelty props, no flags, no logos."
+    },
+    {
+      "countryCode": "GT",
+      "countryName": "Guatemala",
+      "assetKey": "countries/GT/hero.webp",
+      "imageSpec": {
+        "type": "COUNTRY_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Stunning panoramic morning vista over Lake Atitlán in the volcanic highlands of Guatemala. From a high viewpoint, the deep blue caldera waters are framed by the magnificent conical silhouettes of volcanoes San Pedro, Tolimán, and Atitlán, with traditional terraced hillsides and wildflowers in the foreground.",
+      "mustInclude": [
+        "Three towering volcanic cones rising gracefully above Lake Atitlán",
+        "Crystalline blue waters of the highland caldera lake",
+        "Lush green hillsides and indigenous terraced farmland",
+        "Soft morning mist drifting across the lake shore"
+      ],
+      "mustAvoid": [
+        "Violent explosive volcanic eruptions",
+        "Tourist hotel resort swimming pools",
+        "Caricatured or staged exoticized models",
+        "Text or logos on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic landscape in wide 16:9 format. Subject: The sacred volcanic amphitheater of Lake Atitlán in the highlands of Guatemala. Setting: High-altitude freshwater caldera lake surrounded by dramatic volcanic cones. Composition: Wide panoramic vista from an elevated mountain viewpoint looking out across the deep azure lake; the iconic conical silhouettes of San Pedro, Tolimán, and Atitlán volcanoes rise gracefully through morning cloud banks; lush terraced hillsides with wildflowers frame the edges, with open water in the lower third providing clear visual breathing space for UI elements. Lighting: Radiant morning sunlight filtering through mist, casting emerald and turquoise tones across the calm water. Mood: Sacred, tranquil, timeless, majestic cultural and natural heritage. Style: Realistic panoramic landscape illustration, rich highland atmosphere. Strictly no text, no typography, no violent volcanic explosions, no speedboats, no hotel resorts, no flags, no logos."
+    }
+  ],
+  "collectionHeroes": [
+    {
+      "collectionSlug": "cinema-and-storytelling",
+      "collectionTitle": "Cinema & Storytelling",
+      "assetKey": "collections/cinema-and-storytelling/hero.webp",
+      "imageSpec": {
+        "type": "COLLECTION_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Cinematic wide-angle illustration inside a majestic movie theater. A luminous beam from an antique 35mm film projector slices through atmospheric haze and silver dust motes, illuminating rows of plush crimson velvet seats and throwing a warm golden glow onto an expansive widescreen canvas.",
+      "mustInclude": [
+        "Luminous cinematic projector beam cutting across atmospheric darkness",
+        "Grand cinema hall with classic tiered crimson velvet seats",
+        "Warm golden cinematic lighting evoking the magic of motion pictures",
+        "Architectural elegance of a golden-era theater"
+      ],
+      "mustAvoid": [
+        "Movie studio franchise logos (Marvel, Disney, etc.)",
+        "Messy modern popcorn bags and plastic drink cups",
+        "Smartphones or laptop screens",
+        "Text or movie titles written on screen"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic illustration in wide 16:9 format. Subject: The magic and communal atmosphere of motion picture storytelling. Setting: A grand, atmospheric movie palace auditorium. Composition: Wide perspective from the back of an ornate classic theater hall; a luminous, warm golden beam from a vintage film projector cuts through the atmospheric darkness and floating dust particles, illuminating rows of curved velvet seats and casting a soft glow onto a wide cinematic canvas; the composition is balanced and elegant, leaving clean breathing space for UI title text. Lighting: High-contrast cinematic lighting with a glowing amber projector beam slicing through rich shadow. Mood: Enchanting, immersive, nostalgic, celebrating the wonder of cinema. Style: Cinematic editorial illustration, sophisticated atmospheric depth, rich velvet textures. Strictly no text on screen, no typography, no movie franchise logos, no modern smartphones, no popcorn clutter."
+    },
+    {
+      "collectionSlug": "sports-and-resilience",
+      "collectionTitle": "Sports & Resilience",
+      "assetKey": "collections/sports-and-resilience/hero.webp",
+      "imageSpec": {
+        "type": "COLLECTION_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Wide, inspiring cinematic scene of athletes training at dawn on an outdoor athletic track nestled against a natural hill landscape. Sunbeams pierce through morning mist, highlighting motion blur, breath in cool air, long shadows, and the quiet discipline of endurance athletes running forward in synchrony.",
+      "mustInclude": [
+        "Outdoor running track illuminated by low golden morning sun",
+        "Athletes in dynamic, focused motion with long dawn shadows",
+        "Atmospheric morning mist conveying dedication and resilience",
+        "Clean, dignified athletic setting"
+      ],
+      "mustAvoid": [
+        "Commercial sportswear branding logos (Nike, Adidas, etc.)",
+        "Glitzy trophy podiums or champagne spraying",
+        "Graphic sports injuries or physical agony",
+        "Text or scoreboards"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic illustration in wide 16:9 format. Subject: The dedication, discipline, and resilience of athletic training. Setting: An open outdoor athletics stadium or scenic mountain track at dawn. Composition: Wide cinematic composition showing a group of diverse endurance athletes running along an outdoor all-weather running track in harmonious stride; the low-angled morning sun casts long, dramatic shadows across the track lanes; surrounding hills are shrouded in soft morning mist, with generous uncluttered open track in the foreground for UI overlays. Lighting: Golden dawn light cutting through cool morning mist, creating sharp rim lighting on runners. Mood: Inspiring, focused, disciplined, celebrating perseverance and teamwork. Style: Dynamic realistic editorial illustration, cinematic motion blur, dignified athletic atmosphere. Strictly no text, no typography, no brand logos (Nike, Adidas, etc.), no commercial stadium billboards, no cartoon styling."
+    },
+    {
+      "collectionSlug": "everyday-life-stories",
+      "collectionTitle": "Everyday Life Stories",
+      "assetKey": "collections/everyday-life-stories/hero.webp",
+      "imageSpec": {
+        "type": "COLLECTION_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Warm, inviting wide editorial scene of a vibrant neighborhood street at golden hour. Warm light washes over outdoor sidewalk cafe tables, a cozy local bakery window, leafy street trees, and friendly pedestrians strolling and riding classic city bicycles, conveying community connection, human warmth, and peaceful daily life.",
+      "mustInclude": [
+        "Charming urban neighborhood street with warm sidewalk life",
+        "Soft golden-hour sunlight casting long warm shadows",
+        "Pedestrians and cyclists in natural, peaceful interaction",
+        "Cozy architectural storefronts (bakeries, bookshops, cafes)"
+      ],
+      "mustAvoid": [
+        "Gridlock traffic, honking cars, or stressful crowds",
+        "Billboard advertisements, commercial brand logos, or neon signs",
+        "Gloomy, derelict, or depressed urban decay",
+        "Text on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic illustration in wide 16:9 format. Subject: The human warmth and shared connection of daily neighborhood life. Setting: A vibrant, charming tree-lined urban neighborhood street at golden hour. Composition: Expansive street-level vista capturing friendly, peaceful neighborhood rhythms; open sidewalk cafe terraces, a cozy bookstore entrance, leafy street trees casting long shadows, and diverse neighbors walking, conversing, and riding classic commuter bicycles; the composition maintains open sidewalk and street space in the foreground for UI text readability. Lighting: Warm amber golden-hour sun flooding the street with welcoming, optimistic warmth. Mood: Cozy, authentic, heartwarming, celebrating the beauty of ordinary moments. Style: Contemporary editorial illustration, rich human detail, warm inviting color palette. Strictly no text on storefronts, no typography, no traffic jams, no billboard ads, no modern smartphones, no cartoon styling."
+    },
+    {
+      "collectionSlug": "curious-minds-inventions",
+      "collectionTitle": "Curious Minds & Inventions",
+      "assetKey": "collections/curious-minds-inventions/hero.webp",
+      "imageSpec": {
+        "type": "COLLECTION_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Inspiring wide interior of a classical inventor and scholar's workshop filled with instruments of discovery. A large drafting table sits beside a tall arched window catching morning light, covered with hand-drawn mechanical blueprints, brass navigational compasses, prisms splitting light into rainbows, an early astronomical telescope, and glowing vacuum tubes.",
+      "mustInclude": [
+        "Historic inventor's studio with drafting table and blueprints",
+        "Scientific instruments (brass telescope, compass, glass prism, lenses)",
+        "Warm, luminous daylight creating highlights on polished brass and wood",
+        "Atmosphere of boundless human curiosity and intellectual breakthrough"
+      ],
+      "mustAvoid": [
+        "Science-fiction laser weapons or cartoon robots",
+        "Chaotic garbage or dangerous messy explosions",
+        "Modern digital laptops or tablets",
+        "Text or formulas written in English on image"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic illustration in wide 16:9 format. Subject: The history of human curiosity, scientific breakthrough, and invention. Setting: A grand, atmospheric workshop and study of a classical scientist and innovator. Composition: Wide-angle interior of an inventor's sunlit study with tall arched windows; a large wooden drafting table is thoughtfully arranged with hand-drawn mechanical blueprints, polished brass navigational instruments, glass optical prisms splitting sunlight into rainbows, an antique celestial telescope, and early electrical dynamo components; spacious desk surface in the lower center allows clear space for UI typography. Lighting: Abundant morning sunlight streaming through the windows, casting bright specular highlights on brass, glass, and aged parchment. Mood: Inspiring, visionary, intellectual wonder and creative discovery. Style: Classical editorial illustration, tactile textures, rich scholarly warmth. Strictly no text or formulas readable on paper, no typography, no sci-fi lasers, no modern computer screens, no cartoon styling."
+    },
+    {
+      "collectionSlug": "five-minute-micro-reads",
+      "collectionTitle": "Five-Minute Micro Reads",
+      "assetKey": "collections/five-minute-micro-reads/hero.webp",
+      "imageSpec": {
+        "type": "COLLECTION_HERO",
+        "aspectRatio": "16:9",
+        "targetWidth": 1600,
+        "targetHeight": 900,
+        "format": "webp",
+        "targetMaxBytes": 450000
+      },
+      "artDirection": "Elegant, conceptual editorial illustration celebrating the joy of brief reading escapes. A beautiful open hardcover book rests on a warm wooden surface next to an elegant glass hourglass with golden sand trickling through and a steaming porcelain cup of tea. Soft morning light creates a peaceful, timeless retreat for the reader's mind.",
+      "mustInclude": [
+        "Open hardcover book with gently turned pages",
+        "Graceful glass hourglass measuring a fleeting moment of time",
+        "Steaming warm beverage in ceramic mug on natural wood",
+        "Warm, inviting, tranquil reading sanctuary lighting"
+      ],
+      "mustAvoid": [
+        "Digital smartphone notifications or ticking digital timers",
+        "Stressful alarm clocks or frantic office calendars",
+        "Text or printed sentences readable on the open book pages",
+        "Messy clutter"
+      ],
+      "textOnImage": false,
+      "generationPrompt": "Editorial cinematic panoramic illustration in wide 16:9 format. Subject: The delight of brief, engaging reading moments in a busy day. Setting: A cozy, tranquil reading nook beside a warm wooden table. Composition: Conceptual wide still life featuring a beautifully bound open book resting on a warm oak surface; beside it sits an elegant glass hourglass with golden sand gently trickling, a steaming ceramic mug of coffee, and a fountain pen; subtle, luminous story elements and miniature illustrated landscapes rise gently like wisps of warm light from the book's pages, with the open surface providing clean breathing space for UI overlays. Lighting: Soft, comforting morning daylight creating gentle shadows and inviting warmth. Mood: Peaceful, accessible, inviting, rewarding brief reading habits. Style: Elegant editorial conceptual illustration, tactile textures, tranquil atmosphere. Strictly no readable text or words on book pages, no typography, no digital smartphones with notifications, no ticking alarm clocks, no cartoon styling."
+    }
+  ]
+}
