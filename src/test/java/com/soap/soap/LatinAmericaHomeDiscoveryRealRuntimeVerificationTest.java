@@ -93,7 +93,8 @@ class LatinAmericaHomeDiscoveryRealRuntimeVerificationTest {
     assertThat(mexico.countryCode()).isEqualTo("MX");
     assertThat(mexico.displayName()).isEqualTo("México");
     assertThat(mexico.readingCount()).isEqualTo(5);
-    assertThat(mexico.heroImages()).hasSize(2);
+    assertThat(mexico.heroImages()).hasSize(1);
+    assertThat(mexico.heroImages().getFirst().assetKey()).isEqualTo("countries/MX/hero.webp");
     assertThat(mexico.topics()).hasSize(5);
 
     System.out.println(

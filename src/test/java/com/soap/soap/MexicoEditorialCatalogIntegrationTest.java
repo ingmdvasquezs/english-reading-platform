@@ -139,6 +139,14 @@ class MexicoEditorialCatalogIntegrationTest {
     assertThat(result.latinAmerica().countries()).hasSize(2);
     assertThat(result.latinAmerica().defaultCountryCode()).isEqualTo("CO");
 
+    var mxCountry =
+        result.latinAmerica().countries().stream()
+            .filter(c -> "MX".equals(c.countryCode()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(mxCountry.heroImages()).hasSize(1);
+    assertThat(mxCountry.heroImages().getFirst().assetKey()).isEqualTo("countries/MX/hero.webp");
+
     // All Mexican and Colombian readings belong to the specialized regional block
     // and must NOT appear in any general Home shelves (including dynamic "new" shelf)
     var newShelf = result.shelves().stream().filter(s -> "new".equals(s.key())).findFirst();
