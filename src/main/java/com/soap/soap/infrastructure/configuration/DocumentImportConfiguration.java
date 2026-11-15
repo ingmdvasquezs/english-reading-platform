@@ -22,7 +22,8 @@ public class DocumentImportConfiguration {
       @Value("${app.documents.max-cover-bytes:10485760}") long maxCoverBytes,
       @Value("${app.documents.max-cover-pixels:25000000}") int maxCoverPixels,
       @Value("${app.documents.max-pdf-pages:1000}") int maxPdfPages,
-      @Value("${app.documents.max-extracted-characters:5000000}") int maxExtractedCharacters) {
+      @Value("${app.documents.max-extracted-characters:5000000}") int maxExtractedCharacters,
+      @Value("${app.documents.max-processing-time:120s}") java.time.Duration maxProcessingTime) {
     return new DocumentImportLimits(
         maxSourceBytes,
         maxZipEntries,
@@ -32,7 +33,8 @@ public class DocumentImportConfiguration {
         maxCoverBytes,
         maxCoverPixels,
         maxPdfPages,
-        maxExtractedCharacters);
+        maxExtractedCharacters,
+        maxProcessingTime);
   }
 
   @Bean

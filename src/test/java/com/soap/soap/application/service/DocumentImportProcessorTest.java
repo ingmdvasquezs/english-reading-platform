@@ -495,6 +495,62 @@ class DocumentImportProcessorTest {
   }
 
   @Test
+  @DisplayName(
+      "Case L2 (BACK-002): resource limit / processing timeout on first attempt -> permanent, no retry")
+  void caseL2_resourceLimitViolationIsPermanentWithoutRetry() {
+    for (var message :
+        new String[] {
+          "EPUB actual uncompressed bytes exceed limit (read=157351936, limit=157286400)",
+          "Extracted characters exceed limit (extracted=5000042, limit=5000000)",
+          "Document processing time limit exceeded during XHTML extraction (limit=PT2M)"
+        }) {
+      UUID jobId = UUID.randomUUID();
+      UUID docId = UUID.randomUUID();
+      UUID leaseToken = UUID.randomUUID();
+      ImportJob job = createJob(jobId, docId, ImportJobStatus.PROCESSING, 1);
+
+      when(importJobs.claim(eq(jobId), eq(WORKER_ID), any()))
+          .thenReturn(WorkerClaim.acquired(job, leaseToken));
+      when(importedDocuments.findDocumentById(docId)).thenReturn(Optional.of(createDoc(docId)));
+      doThrow(new DocumentImportException(Reason.SECURITY_LIMIT_EXCEEDED, message))
+          .when(documentParser)
+          .parse(any(), eq(DocumentFormat.EPUB));
+
+      ImportExecutionOutcome outcome = processor.processImport(jobId, "receipt-l2");
+
+      assertThat(outcome.type()).isEqualTo(OutcomeType.TERMINAL_FAILED);
+      verify(failUseCase)
+          .failFinal(
+              eq(jobId), eq(leaseToken), eq(WORKER_ID), eq("SECURITY_LIMIT_EXCEEDED"), eq(message));
+      verify(importJobs, never()).releaseForRetry(eq(jobId), any(), any(), any(), any(), any());
+    }
+  }
+
+  @Test
+  @DisplayName("Case L3 (BACK-002): worker interrupted during EPUB validation -> transient retry")
+  void caseL3_interruptedValidationIsTransient() {
+    UUID jobId = UUID.randomUUID();
+    UUID docId = UUID.randomUUID();
+    UUID leaseToken = UUID.randomUUID();
+    ImportJob job = createJob(jobId, docId, ImportJobStatus.PROCESSING, 1);
+
+    when(importJobs.claim(eq(jobId), eq(WORKER_ID), any()))
+        .thenReturn(WorkerClaim.acquired(job, leaseToken));
+    when(importedDocuments.findDocumentById(docId)).thenReturn(Optional.of(createDoc(docId)));
+    doThrow(
+            new com.soap.soap.infrastructure.document.EpubDocumentParserAdapter
+                .ParsingInterruptedException(new InterruptedException("shutdown")))
+        .when(documentParser)
+        .parse(any(), eq(DocumentFormat.EPUB));
+
+    ImportExecutionOutcome outcome = processor.processImport(jobId, "receipt-l3");
+
+    assertThat(outcome.type()).isEqualTo(OutcomeType.RETRY_SCHEDULED);
+    verify(failUseCase, never()).failFinal(eq(jobId), any(), any(), any(), any());
+    verify(sqsClient, never()).deleteMessage(any(DeleteMessageRequest.class));
+  }
+
+  @Test
   @DisplayName("Case M: DB persistence failure -> message NOT deleted")
   void caseM_dbPersistenceFailure_messageNotDeleted() {
     UUID jobId = UUID.randomUUID();

@@ -11,6 +11,7 @@ import com.soap.soap.application.port.out.DocumentParserPort;
 import com.soap.soap.domain.model.DocumentFormat;
 import com.soap.soap.domain.service.DocumentSectionTitleSanitizer;
 import java.io.ByteArrayInputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -26,37 +27,59 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.LongSupplier;
 import javax.imageio.ImageIO;
 import javax.xml.parsers.DocumentBuilderFactory;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.commons.compress.archivers.zip.ZipMethod;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 
 @Component
-@RequiredArgsConstructor
 public class EpubDocumentParserAdapter implements DocumentParserPort {
   private static final String CONTAINER = "META-INF/container.xml";
   private static final String ENCRYPTION = "META-INF/encryption.xml";
   private static final Set<String> BLOCK_TAGS =
       Set.of("h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote", "li");
+  private static final int STREAM_BUFFER_BYTES = 64 * 1024;
+  private static final int DEADLINE_CHECK_INTERVAL = 256;
 
   private final DocumentImportLimits limits;
+  private final LongSupplier nanoTime;
+
+  @Autowired
+  public EpubDocumentParserAdapter(DocumentImportLimits limits) {
+    this(limits, System::nanoTime);
+  }
+
+  /** Visible for deterministic deadline tests: {@code nanoTime} must be monotonic. */
+  EpubDocumentParserAdapter(DocumentImportLimits limits, LongSupplier nanoTime) {
+    this.limits = limits;
+    this.nanoTime = nanoTime;
+  }
 
   @Override
   public ParsedDocument parse(Path source, DocumentFormat format) {
     if (format != DocumentFormat.EPUB) {
       throw new DocumentImportException(Reason.INVALID_EPUB, "Unsupported document format");
     }
+    var budget = new DocumentParseBudget(limits, nanoTime);
     try {
       validateSource(source);
       try (var zip = ZipFile.builder().setPath(source).get()) {
         validateEntries(zip);
+        // BACK-002: declared sizes can be forged, so measure what decompression really produces
+        // before any entry is parsed. This also bounds the input EpubCheck reads later.
+        verifyActualEntrySizes(zip, budget);
         validateMimetype(zip);
         var packagePath = packagePath(readRequired(zip, CONTAINER));
         var opf = parseXml(readRequired(zip, packagePath));
@@ -64,20 +87,56 @@ public class EpubDocumentParserAdapter implements DocumentParserPort {
         var spine = spine(opf);
         if (spine.isEmpty()) throw invalid("OPF spine is empty");
         rejectDrm(zip, manifest, spine);
-        var sections = sections(zip, manifest, spine);
+        var sections = sections(zip, manifest, spine, budget);
         if (sections.isEmpty()) throw invalid("Spine contains no XHTML content");
-        validateOfficially(source);
+        validateOfficially(source, budget);
+        var cover = extractCover(zip, opf, manifest).orElse(null);
+        budget.checkDeadline("cover extraction");
         return new ParsedDocument(
             firstText(opf, "title").orElse("Untitled document"),
             firstText(opf, "creator").orElse(null),
             firstText(opf, "language").map(this::normalizeLanguage).orElse(null),
             sections,
-            extractCover(zip, opf, manifest).orElse(null));
+            cover);
       }
-    } catch (DocumentImportException exception) {
+    } catch (DocumentImportException | ParsingInterruptedException exception) {
       throw exception;
     } catch (IOException | RuntimeException exception) {
       throw new DocumentImportException(Reason.INVALID_EPUB, "Invalid EPUB", exception);
+    }
+  }
+
+  /**
+   * Streams every ZIP entry through a fixed buffer, without retaining its content, and enforces on
+   * the bytes really produced by decompression: the declared size, the per-entry limit, the total
+   * uncompressed limit and the processing deadline. A forged central directory is rejected after at
+   * most one buffer beyond the declared size of the first lying entry.
+   */
+  private void verifyActualEntrySizes(ZipFile zip, DocumentParseBudget budget) throws IOException {
+    var buffer = new byte[STREAM_BUFFER_BYTES];
+    var entries = zip.getEntriesInPhysicalOrder();
+    while (entries.hasMoreElements()) {
+      var entry = entries.nextElement();
+      if (entry.isDirectory()) continue;
+      var declared = entry.getSize();
+      long actual = 0;
+      try (InputStream input = zip.getInputStream(entry)) {
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+          actual += read;
+          if (actual > declared) {
+            throw security(
+                "ZIP entry is larger than its declared size (declared="
+                    + declared
+                    + ", read>="
+                    + actual
+                    + ")");
+          }
+          if (actual > limits.maxEntryBytes()) throw security("ZIP entry exceeds byte limit");
+          budget.addUncompressedBytes(read);
+          budget.checkDeadline("ZIP size verification");
+        }
+      }
     }
   }
 
@@ -209,13 +268,18 @@ public class EpubDocumentParserAdapter implements DocumentParserPort {
   }
 
   private List<ParsedDocumentSection> sections(
-      ZipFile zip, Map<String, ManifestItem> manifest, List<String> spine) throws IOException {
+      ZipFile zip,
+      Map<String, ManifestItem> manifest,
+      List<String> spine,
+      DocumentParseBudget budget)
+      throws IOException {
     var result = new ArrayList<ParsedDocumentSection>();
     for (var id : spine) {
+      budget.checkDeadline("XHTML extraction");
       var item = manifest.get(id);
       if (item == null) throw invalid("Spine references a missing manifest item");
       if (!isXhtml(item.mediaType())) continue;
-      var content = xhtml(readRequired(zip, item.path()));
+      var content = xhtml(zip, item.path(), budget);
       if (!content.blocks().isEmpty()) {
         result.add(new ParsedDocumentSection(content.title(), item.path(), content.blocks()));
       }
@@ -223,17 +287,35 @@ public class EpubDocumentParserAdapter implements DocumentParserPort {
     return result;
   }
 
-  private ParsedXhtml xhtml(byte[] xhtml) {
-    var document = Jsoup.parse(new String(xhtml, StandardCharsets.UTF_8), "", Parser.xmlParser());
+  /**
+   * Parses one spine document straight from the decompressing stream (no intermediate byte[] or
+   * String copy of the markup) and counts extracted characters block by block, so extraction stops
+   * as soon as the document-wide character limit is crossed.
+   */
+  private ParsedXhtml xhtml(ZipFile zip, String path, DocumentParseBudget budget)
+      throws IOException {
+    var entry = zip.getEntry(safeName(path));
+    if (entry == null || entry.isDirectory()) throw invalid("Missing EPUB entry");
+    org.jsoup.nodes.Document document;
+    try (InputStream input =
+        new EntryByteLimitInputStream(zip.getInputStream(entry), limits.maxEntryBytes())) {
+      document = Jsoup.parse(input, StandardCharsets.UTF_8.name(), "", Parser.xmlParser());
+    }
+    budget.checkDeadline("XHTML parsing");
     document
         .select("script,style,iframe,frame,object,embed,form,input,button,video,audio,svg")
         .remove();
     document.select("*").forEach(this::removeUnsafeAttributes);
     var result = new ArrayList<String>();
+    int visited = 0;
     for (var element : document.getAllElements()) {
+      if (++visited % DEADLINE_CHECK_INTERVAL == 0) budget.checkDeadline("XHTML extraction");
       if (!BLOCK_TAGS.contains(element.normalName()) || hasBlockAncestor(element)) continue;
       var text = element.text().strip();
-      if (!text.isEmpty()) result.add(text);
+      if (!text.isEmpty()) {
+        budget.addCharacters(text.length());
+        result.add(text);
+      }
     }
     var heading = document.selectFirst("h1,h2,h3,h4,h5,h6");
     var headTitle = document.selectFirst("head > title");
@@ -368,11 +450,40 @@ public class EpubDocumentParserAdapter implements DocumentParserPort {
     return littleEndian24(bytes, offset) | ((bytes[offset + 3] & 0xff) << 24);
   }
 
-  private void validateOfficially(Path source) {
+  private void validateOfficially(Path source, DocumentParseBudget budget) {
     // EPUBCheck is an additional standards diagnostic. Some safely recoverable inputs (for
     // example a missing language later supplied by the caller, or hostile markup that we strip)
     // are intentionally accepted after the security and structural checks above.
-    new EpubCheck(source.toFile()).doValidate();
+    //
+    // It runs inside the remaining processing budget on a separate daemon thread because it does
+    // not check for interruption. Its input is already bounded by verifyActualEntrySizes (every
+    // entry and the archive total measured on real decompressed bytes), so a validation thread
+    // abandoned after a timeout still has a bounded amount of work left.
+    budget.checkDeadline("EPUB validation");
+    var task =
+        new FutureTask<Void>(
+            () -> {
+              new EpubCheck(source.toFile()).doValidate();
+              return null;
+            });
+    var thread = new Thread(task, "epubcheck-validation");
+    thread.setDaemon(true);
+    thread.start();
+    try {
+      task.get(Math.max(0, budget.remainingNanos()), TimeUnit.NANOSECONDS);
+    } catch (TimeoutException exception) {
+      task.cancel(true);
+      throw budget.timeout("EPUB validation");
+    } catch (InterruptedException exception) {
+      task.cancel(true);
+      Thread.currentThread().interrupt();
+      throw new ParsingInterruptedException(exception);
+    } catch (ExecutionException exception) {
+      var cause = exception.getCause();
+      if (cause instanceof RuntimeException runtime) throw runtime;
+      if (cause instanceof Error error) throw error;
+      throw new IllegalStateException("EPUB validation failed", cause);
+    }
   }
 
   private byte[] readRequired(ZipFile zip, String name) throws IOException {
@@ -460,4 +571,45 @@ public class EpubDocumentParserAdapter implements DocumentParserPort {
   private record ManifestItem(String path, String mediaType, String properties) {}
 
   private record ParsedXhtml(String title, List<String> blocks) {}
+
+  /**
+   * The worker was interrupted (for example during shutdown) while waiting for EpubCheck. This is
+   * not a property of the document, so it is not a permanent import failure: the processor treats
+   * it as a transient error and the job is retried.
+   */
+  public static final class ParsingInterruptedException extends RuntimeException {
+    public ParsingInterruptedException(InterruptedException cause) {
+      super("Interrupted while validating EPUB", cause);
+    }
+  }
+
+  /** Defense in depth: fails as soon as a single entry stream produces more than the limit. */
+  private final class EntryByteLimitInputStream extends FilterInputStream {
+    private final long limit;
+    private long count;
+
+    EntryByteLimitInputStream(InputStream input, long limit) {
+      super(input);
+      this.limit = limit;
+    }
+
+    @Override
+    public int read() throws IOException {
+      var value = super.read();
+      if (value != -1) count(1);
+      return value;
+    }
+
+    @Override
+    public int read(byte[] buffer, int offset, int length) throws IOException {
+      var read = super.read(buffer, offset, length);
+      if (read > 0) count(read);
+      return read;
+    }
+
+    private void count(long read) {
+      count += read;
+      if (count > limit) throw security("ZIP entry exceeds byte limit");
+    }
+  }
 }

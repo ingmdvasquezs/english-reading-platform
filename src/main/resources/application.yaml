@@ -124,13 +124,22 @@ app:
     storage-root: ${DOCUMENT_STORAGE_ROOT:.private-assets}
     max-source-bytes: ${DOCUMENT_MAX_SOURCE_BYTES:52428800}
     max-zip-entries: ${DOCUMENT_MAX_ZIP_ENTRIES:2000}
+    # Per ZIP entry, enforced on declared sizes and on the bytes actually decompressed.
     max-entry-bytes: ${DOCUMENT_MAX_ENTRY_BYTES:10485760}
+    # Total EPUB uncompressed bytes (150 MiB), enforced on declared sizes AND on the bytes really
+    # produced by decompression, so forged ZIP metadata cannot bypass it. Entries are streamed and
+    # released one at a time, so heap use is bounded by max-entry-bytes; this total bounds CPU work
+    # and EpubCheck input. Normal books are 1-30 MiB uncompressed, image-heavy ones up to ~100 MiB.
     max-expanded-bytes: ${DOCUMENT_MAX_EXPANDED_BYTES:157286400}
     max-compression-ratio: ${DOCUMENT_MAX_COMPRESSION_RATIO:100}
     max-cover-bytes: ${DOCUMENT_MAX_COVER_BYTES:10485760}
     max-cover-pixels: ${DOCUMENT_MAX_COVER_PIXELS:25000000}
     max-pdf-pages: ${DOCUMENT_MAX_PDF_PAGES:1000}
+    # Total extracted text for EPUB and PDF (about 15-20 full novels); counted while extracting.
     max-extracted-characters: ${DOCUMENT_MAX_EXTRACTED_CHARACTERS:5000000}
+    # Wall-clock budget for parsing one EPUB, EpubCheck included. Exceeding it is a permanent
+    # SECURITY_LIMIT_EXCEEDED failure (deterministic for a given document), never retried.
+    max-processing-time: ${DOCUMENT_MAX_PROCESSING_TIME:120s}
     executor-core-size: ${DOCUMENT_EXECUTOR_CORE_SIZE:2}
     executor-max-size: ${DOCUMENT_EXECUTOR_MAX_SIZE:4}
     executor-queue-capacity: ${DOCUMENT_EXECUTOR_QUEUE_CAPACITY:20}
