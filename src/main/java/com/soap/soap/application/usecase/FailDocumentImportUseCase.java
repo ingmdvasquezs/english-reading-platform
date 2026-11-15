@@ -2,9 +2,7 @@ package com.soap.soap.application.usecase;
 
 import com.soap.soap.application.port.out.ImportJobRepositoryPort;
 import com.soap.soap.application.port.out.ImportedDocumentRepositoryPort;
-import com.soap.soap.domain.model.DocumentImportStatus;
 import com.soap.soap.domain.model.ImportJob;
-import com.soap.soap.domain.model.ImportedDocument;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -42,24 +40,7 @@ public class FailDocumentImportUseCase {
             doc -> {
               LocalDateTime now = LocalDateTime.now();
               String failureReason = sanitizeDocumentFailureReason(errorCode);
-              ImportedDocument failedDoc =
-                  new ImportedDocument(
-                      doc.id(),
-                      doc.ownerId(),
-                      doc.title(),
-                      doc.author(),
-                      doc.language(),
-                      doc.format(),
-                      doc.coverAssetKey(),
-                      doc.sourceAssetKey(),
-                      doc.originalFilename(),
-                      doc.sourceSha256(),
-                      DocumentImportStatus.FAILED,
-                      failureReason,
-                      doc.chunkingVersion(),
-                      doc.createdAt(),
-                      now);
-              importedDocuments.saveDocument(failedDoc);
+              importedDocuments.saveDocument(doc.markFailed(failureReason, now));
             });
 
     return true;
@@ -90,24 +71,7 @@ public class FailDocumentImportUseCase {
             doc -> {
               LocalDateTime now = LocalDateTime.now();
               String failureReason = sanitizeDocumentFailureReason(errorCode);
-              ImportedDocument failedDoc =
-                  new ImportedDocument(
-                      doc.id(),
-                      doc.ownerId(),
-                      doc.title(),
-                      doc.author(),
-                      doc.language(),
-                      doc.format(),
-                      doc.coverAssetKey(),
-                      doc.sourceAssetKey(),
-                      doc.originalFilename(),
-                      doc.sourceSha256(),
-                      DocumentImportStatus.FAILED,
-                      failureReason,
-                      doc.chunkingVersion(),
-                      doc.createdAt(),
-                      now);
-              importedDocuments.saveDocument(failedDoc);
+              importedDocuments.saveDocument(doc.markFailed(failureReason, now));
             });
 
     return true;

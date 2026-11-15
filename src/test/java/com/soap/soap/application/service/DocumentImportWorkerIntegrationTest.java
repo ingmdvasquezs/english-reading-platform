@@ -213,6 +213,8 @@ class DocumentImportWorkerIntegrationTest {
     assertThat(updatedDoc.title()).isEqualTo("Pride and Prejudice");
     assertThat(updatedDoc.author()).isEqualTo("Jane Austen");
     assertThat(updatedDoc.language()).isEqualTo("en");
+    // BACK-010: the READY transition must keep the original S3 source storage provider.
+    assertThat(updatedDoc.sourceStorageProvider()).isEqualTo(StorageProvider.S3);
 
     // Verify DB state: Sections and units were atomically persisted
     List<com.soap.soap.domain.model.DocumentSection> sections =
@@ -278,6 +280,7 @@ class DocumentImportWorkerIntegrationTest {
     ImportedDocument updatedDoc = importedDocuments.findDocumentById(testDoc.id()).orElseThrow();
     assertThat(updatedDoc.importStatus()).isEqualTo(DocumentImportStatus.FAILED);
     assertThat(updatedDoc.failureReason()).isEqualTo("INVALID_EPUB");
+    assertThat(updatedDoc.sourceStorageProvider()).isEqualTo(StorageProvider.S3);
 
     // Verify DB state: Job is now FAILED
     ImportJob updatedJob = importJobs.findById(jobId).orElseThrow();
@@ -515,6 +518,7 @@ class DocumentImportWorkerIntegrationTest {
     ImportedDocument updatedDoc = importedDocuments.findDocumentById(testDoc.id()).orElseThrow();
     assertThat(updatedDoc.importStatus()).isEqualTo(DocumentImportStatus.FAILED);
     assertThat(updatedDoc.failureReason()).isEqualTo("IMPORT_FAILURE");
+    assertThat(updatedDoc.sourceStorageProvider()).isEqualTo(StorageProvider.S3);
 
     // Verify SQS message was deleted
     verify(sqsClient).deleteMessage(any(DeleteMessageRequest.class));

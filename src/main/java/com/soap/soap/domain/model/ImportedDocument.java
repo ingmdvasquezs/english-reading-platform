@@ -62,6 +62,59 @@ public record ImportedDocument(
     originalFilename = optionalText(originalFilename, "Document original filename");
   }
 
+  /**
+   * Transition to READY with the metadata extracted during import. Identity, source location and
+   * {@link #sourceStorageProvider()} are preserved.
+   */
+  public ImportedDocument markReady(
+      String title, String author, String language, String coverAssetKey, LocalDateTime updatedAt) {
+    return new ImportedDocument(
+        id,
+        ownerId,
+        title,
+        author,
+        language,
+        format,
+        coverAssetKey,
+        sourceAssetKey,
+        sourceStorageProvider,
+        originalFilename,
+        sourceSha256,
+        DocumentImportStatus.READY,
+        null,
+        chunkingVersion,
+        createdAt,
+        updatedAt);
+  }
+
+  /**
+   * Transition to FAILED with a failure reason. Every other field, including {@link
+   * #sourceStorageProvider()}, is preserved.
+   */
+  public ImportedDocument markFailed(String failureReason, LocalDateTime updatedAt) {
+    return new ImportedDocument(
+        id,
+        ownerId,
+        title,
+        author,
+        language,
+        format,
+        coverAssetKey,
+        sourceAssetKey,
+        sourceStorageProvider,
+        originalFilename,
+        sourceSha256,
+        DocumentImportStatus.FAILED,
+        failureReason,
+        chunkingVersion,
+        createdAt,
+        updatedAt);
+  }
+
+  /**
+   * Legacy filesystem-only creation constructor: it always sets {@link StorageProvider#FILESYSTEM}.
+   * Never use it to transition an existing document; use {@link #markReady} or {@link #markFailed}.
+   */
   public ImportedDocument(
       UUID id,
       UUID ownerId,
@@ -97,6 +150,7 @@ public record ImportedDocument(
         updatedAt);
   }
 
+  /** Legacy filesystem-only creation constructor; see the failure-reason variant above. */
   public ImportedDocument(
       UUID id,
       UUID ownerId,

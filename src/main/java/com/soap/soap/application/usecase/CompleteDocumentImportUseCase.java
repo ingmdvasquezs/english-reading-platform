@@ -80,23 +80,9 @@ public class CompleteDocumentImportUseCase {
     String coverAssetKey =
         command.coverAssetKey() != null ? command.coverAssetKey() : document.coverAssetKey();
 
+    // markReady preserves the original source storage provider (S3 or FILESYSTEM).
     ImportedDocument readyDocument =
-        new ImportedDocument(
-            document.id(),
-            document.ownerId(),
-            title,
-            author,
-            language,
-            document.format(),
-            coverAssetKey,
-            document.sourceAssetKey(),
-            document.originalFilename(),
-            document.sourceSha256(),
-            DocumentImportStatus.READY,
-            null,
-            document.chunkingVersion(),
-            document.createdAt(),
-            now);
+        document.markReady(title, author, language, coverAssetKey, now);
     importedDocuments.saveDocument(readyDocument);
 
     // 3. Mark job as COMPLETED

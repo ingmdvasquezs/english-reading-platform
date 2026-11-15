@@ -87,6 +87,8 @@ class S3DirectDocumentUploadIntegrationTest {
     registry.add("app.document-storage.s3.region", LOCALSTACK::getRegion);
     registry.add("app.document-storage.s3.path-style-access", () -> "true");
     registry.add("app.document-storage.s3.bucket", () -> BUCKET_NAME);
+    // Activates the S3 provider so the startup bucket validation runs with a valid bucket.
+    registry.add("app.document-storage.provider", () -> "S3");
   }
 
   @Autowired private S3Client s3Client;

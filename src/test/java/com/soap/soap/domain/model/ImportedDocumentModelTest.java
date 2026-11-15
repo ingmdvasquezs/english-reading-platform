@@ -13,6 +13,48 @@ class ImportedDocumentModelTest {
   private static final LocalDateTime NOW = LocalDateTime.parse("2026-09-07T10:00:00");
 
   @Test
+  void readyAndFailedTransitionsPreserveTheSourceStorageProvider() {
+    for (var provider : StorageProvider.values()) {
+      var processing =
+          new ImportedDocument(
+              UUID.randomUUID(),
+              UUID.randomUUID(),
+              "Placeholder",
+              null,
+              "en",
+              DocumentFormat.EPUB,
+              null,
+              "documents/u/d/source.epub",
+              provider,
+              "book.epub",
+              HASH,
+              DocumentImportStatus.PROCESSING,
+              null,
+              5,
+              NOW,
+              NOW);
+
+      var ready = processing.markReady("Book", "Ada", "en-GB", "covers/c.jpg", NOW.plusMinutes(1));
+      assertThat(ready.importStatus()).isEqualTo(DocumentImportStatus.READY);
+      assertThat(ready.sourceStorageProvider()).isEqualTo(provider);
+      assertThat(ready.failureReason()).isNull();
+      assertThat(ready.title()).isEqualTo("Book");
+      assertThat(ready.language()).isEqualTo("en-GB");
+      assertThat(ready.coverAssetKey()).isEqualTo("covers/c.jpg");
+      assertThat(ready.id()).isEqualTo(processing.id());
+      assertThat(ready.sourceAssetKey()).isEqualTo(processing.sourceAssetKey());
+      assertThat(ready.createdAt()).isEqualTo(NOW);
+      assertThat(ready.updatedAt()).isEqualTo(NOW.plusMinutes(1));
+
+      var failed = processing.markFailed("INVALID_EPUB", NOW.plusMinutes(2));
+      assertThat(failed.importStatus()).isEqualTo(DocumentImportStatus.FAILED);
+      assertThat(failed.sourceStorageProvider()).isEqualTo(provider);
+      assertThat(failed.failureReason()).isEqualTo("INVALID_EPUB");
+      assertThat(failed.title()).isEqualTo("Placeholder");
+    }
+  }
+
+  @Test
   void createsValidDocumentsWithoutRestrictingLanguageToEnglish() {
     var document = document("fr-CA", 1);
 

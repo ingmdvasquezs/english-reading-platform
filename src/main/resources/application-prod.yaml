@@ -43,6 +43,9 @@ logging:
 
 app:
   document-storage:
+    # Production always uses S3 direct uploads; startup fails fast if the bucket is missing,
+    # blank or left as an unresolved placeholder (S3DocumentStorageStartupValidator).
+    provider: S3
     s3:
       bucket: ${DOCUMENT_STORAGE_S3_BUCKET}
       region: ${DOCUMENT_STORAGE_S3_REGION:us-east-1}

@@ -53,6 +53,7 @@ class ConfigurationProfilesTest {
         .isEqualTo("logstash");
     var s3Bucket = property("application-prod.yaml", "app.document-storage.s3.bucket");
     assertThat(s3Bucket).isEqualTo("${DOCUMENT_STORAGE_S3_BUCKET}");
+    assertThat(property("application-prod.yaml", "app.document-storage.provider")).isEqualTo("S3");
     assertThatThrownBy(
             () ->
                 new PropertyPlaceholderHelper("${", "}", ":", null, false)

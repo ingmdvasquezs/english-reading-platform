@@ -14,3 +14,10 @@ security:
   jwt:
     # Development-only value. Production has no fallback.
     secret: ${JWT_SECRET:local-development-secret-change-before-production}
+
+app:
+  document-storage:
+    # Local development does not require AWS. Set DOCUMENT_STORAGE_PROVIDER=S3 together with
+    # DOCUMENT_STORAGE_S3_BUCKET (and an endpoint override for LocalStack) to exercise direct S3
+    # uploads; the bucket is then validated at startup like in production.
+    provider: ${DOCUMENT_STORAGE_PROVIDER:FILESYSTEM}

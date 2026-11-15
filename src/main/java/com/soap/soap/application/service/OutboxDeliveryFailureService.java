@@ -4,7 +4,6 @@ import com.soap.soap.application.port.out.ImportJobRepositoryPort;
 import com.soap.soap.application.port.out.ImportedDocumentRepositoryPort;
 import com.soap.soap.application.port.out.OutboxEventRepositoryPort;
 import com.soap.soap.domain.model.DocumentImportStatus;
-import com.soap.soap.domain.model.ImportedDocument;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -63,24 +62,7 @@ public class OutboxDeliveryFailureService {
                       .ifPresent(
                           doc -> {
                             LocalDateTime now = LocalDateTime.now();
-                            ImportedDocument failedDoc =
-                                new ImportedDocument(
-                                    doc.id(),
-                                    doc.ownerId(),
-                                    doc.title(),
-                                    doc.author(),
-                                    doc.language(),
-                                    doc.format(),
-                                    doc.coverAssetKey(),
-                                    doc.sourceAssetKey(),
-                                    doc.originalFilename(),
-                                    doc.sourceSha256(),
-                                    DocumentImportStatus.FAILED,
-                                    "IMPORT_FAILURE",
-                                    doc.chunkingVersion(),
-                                    doc.createdAt(),
-                                    now);
-                            importedDocuments.saveDocument(failedDoc);
+                            importedDocuments.saveDocument(doc.markFailed("IMPORT_FAILURE", now));
                           });
                 });
       } else {

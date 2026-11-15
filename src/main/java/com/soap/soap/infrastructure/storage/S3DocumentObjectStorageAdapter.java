@@ -74,10 +74,7 @@ public class S3DocumentObjectStorageAdapter implements DocumentObjectStoragePort
     byte[] checksumBytes = HexFormat.of().parseHex(normalizedHex);
     String checksumBase64 = Base64.getEncoder().encodeToString(checksumBytes);
 
-    String bucket = properties.s3().bucket();
-    if (bucket == null || bucket.isBlank()) {
-      bucket = "english-reading-documents";
-    }
+    String bucket = S3BucketNames.requireValid(properties.s3().bucket());
 
     PutObjectRequest putObjectRequest =
         PutObjectRequest.builder()
@@ -110,10 +107,7 @@ public class S3DocumentObjectStorageAdapter implements DocumentObjectStoragePort
   @Override
   public StoredObjectAttributes inspectObject(String storageKey) {
     Objects.requireNonNull(storageKey, "storageKey must not be null");
-    String bucket = properties.s3().bucket();
-    if (bucket == null || bucket.isBlank()) {
-      bucket = "english-reading-documents";
-    }
+    String bucket = S3BucketNames.requireValid(properties.s3().bucket());
 
     try {
       GetObjectAttributesRequest request =
@@ -205,10 +199,7 @@ public class S3DocumentObjectStorageAdapter implements DocumentObjectStoragePort
   public void downloadObject(String storageKey, Path destinationPath) {
     Objects.requireNonNull(storageKey, "storageKey must not be null");
     Objects.requireNonNull(destinationPath, "destinationPath must not be null");
-    String bucket = properties.s3().bucket();
-    if (bucket == null || bucket.isBlank()) {
-      bucket = "english-reading-documents";
-    }
+    String bucket = S3BucketNames.requireValid(properties.s3().bucket());
 
     try {
       Path parent = destinationPath.getParent();
@@ -242,10 +233,7 @@ public class S3DocumentObjectStorageAdapter implements DocumentObjectStoragePort
   @Override
   public void deleteObject(String storageKey) {
     Objects.requireNonNull(storageKey, "storageKey must not be null");
-    String bucket = properties.s3().bucket();
-    if (bucket == null || bucket.isBlank()) {
-      bucket = "english-reading-documents";
-    }
+    String bucket = S3BucketNames.requireValid(properties.s3().bucket());
 
     try {
       s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(storageKey).build());
