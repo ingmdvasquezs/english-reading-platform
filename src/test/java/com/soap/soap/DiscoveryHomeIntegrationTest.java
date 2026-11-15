@@ -75,8 +75,8 @@ class DiscoveryHomeIntegrationTest {
     assertThat(result.latinAmerica().defaultCountryCode()).isEqualTo("CO");
     assertThat(result.latinAmerica().defaultTopicKey()).isEqualTo("MYTHS_AND_LEGENDS");
 
-    // Real DB countries: CO (15 readings, 1 topic, 2 hero images) and MX (5 readings, 5 topics, 2
-    // hero images)
+    // Real DB countries: CO (15 readings, 1 topic, 2 hero images) and MX (5 readings, 5 topics, 1
+    // canonical hero image persisted by V41)
     assertThat(result.latinAmerica().countries()).hasSize(2);
     var co = result.latinAmerica().countries().get(0);
     assertThat(co.countryCode()).isEqualTo("CO");
@@ -89,7 +89,8 @@ class DiscoveryHomeIntegrationTest {
     assertThat(mx.countryCode()).isEqualTo("MX");
     assertThat(mx.readingCount()).isEqualTo(5);
     assertThat(mx.topics()).hasSize(5);
-    assertThat(mx.heroImages()).hasSize(2);
+    assertThat(mx.heroImages()).hasSize(1);
+    assertThat(mx.heroImages().getFirst().assetKey()).isEqualTo("countries/MX/hero.webp");
 
     // Default country preview: exactly 8 readings from Colombia
     assertThat(result.latinAmerica().readings()).hasSize(8);
