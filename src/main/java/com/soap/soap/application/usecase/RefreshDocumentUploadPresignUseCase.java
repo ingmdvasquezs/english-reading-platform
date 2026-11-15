@@ -1,5 +1,6 @@
 package com.soap.soap.application.usecase;
 
+import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.exception.UploadAbortedException;
 import com.soap.soap.application.exception.UploadExpiredException;
 import com.soap.soap.application.exception.UploadNotFoundException;
@@ -49,7 +50,7 @@ public class RefreshDocumentUploadPresignUseCase {
     }
 
     if (upload.isConfirmed()) {
-      throw new IllegalArgumentException("Upload is already confirmed");
+      throw new InvalidApplicationArgumentException("Upload is already confirmed");
     }
 
     LocalDateTime now = LocalDateTime.now(clock);

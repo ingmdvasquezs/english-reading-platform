@@ -10,16 +10,26 @@ import com.soap.soap.application.exception.DocumentUnitNotFoundException;
 import com.soap.soap.application.exception.ImportCapacityExceededException;
 import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice(basePackages = "com.soap.soap.infrastructure.rest")
 public class RestExceptionHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RestExceptionHandler.class);
+
   @ExceptionHandler(DocumentAlreadyImportedException.class)
   ResponseEntity<ApiError> duplicate(DocumentAlreadyImportedException exception) {
     return error(
@@ -130,15 +140,34 @@ public class RestExceptionHandler {
         "Document import capacity is temporarily exhausted.");
   }
 
+  /**
+   * Explicit client errors: application validation, bean validation, missing parameters, malformed
+   * or unreadable JSON bodies and non-convertible path/query values (for example a malformed UUID).
+   * Parser details are never echoed to the client.
+   */
   @ExceptionHandler({
-    IllegalArgumentException.class,
     InvalidApplicationArgumentException.class,
     MethodArgumentNotValidException.class,
-    org.springframework.web.multipart.support.MissingServletRequestPartException.class,
-    org.springframework.web.bind.MissingServletRequestParameterException.class
+    MissingServletRequestPartException.class,
+    MissingServletRequestParameterException.class,
+    HttpMessageNotReadableException.class,
+    MethodArgumentTypeMismatchException.class
   })
   ResponseEntity<ApiError> badRequest(Exception exception) {
-    return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "The request is invalid.");
+    LOGGER.debug("rest.bad_request type={}", exception.getClass().getSimpleName());
+    return invalidRequest();
+  }
+
+  /**
+   * Raw {@link IllegalArgumentException}s still map to 400 because some domain invariants validate
+   * client input (for example BCP 47 language overrides). They are logged with their stack trace so
+   * that internal defects surfacing as {@code IllegalArgumentException} are no longer silent. New
+   * client validations should throw {@link InvalidApplicationArgumentException} instead.
+   */
+  @ExceptionHandler(IllegalArgumentException.class)
+  ResponseEntity<ApiError> unclassifiedIllegalArgument(IllegalArgumentException exception) {
+    LOGGER.warn("rest.bad_request category=unclassified_illegal_argument", exception);
+    return invalidRequest();
   }
 
   @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -148,11 +177,35 @@ public class RestExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   ResponseEntity<ApiError> unexpected(Exception exception) {
+    if (exception instanceof ErrorResponse errorResponse
+        && errorResponse.getStatusCode().is4xxClientError()) {
+      // Framework-level client errors (unknown route, unsupported method or media type) keep their
+      // HTTP status instead of being reported as internal failures.
+      LOGGER.debug("rest.client_error type={}", exception.getClass().getSimpleName());
+      return frameworkClientError(errorResponse.getStatusCode());
+    }
+    // The correlation id is already in the MDC, so this line is linked to the response requestId.
+    LOGGER.error("rest.unexpected_error type={}", exception.getClass().getName(), exception);
     return error(
         HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "The request could not be completed.");
   }
 
-  private ResponseEntity<ApiError> error(HttpStatus status, String code, String message) {
+  private ResponseEntity<ApiError> invalidRequest() {
+    return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "The request is invalid.");
+  }
+
+  private ResponseEntity<ApiError> frameworkClientError(HttpStatusCode status) {
+    return switch (status.value()) {
+      case 404 -> error(status, "NOT_FOUND", "The requested resource was not found.");
+      case 405 -> error(status, "METHOD_NOT_ALLOWED", "The request method is not supported.");
+      case 406 -> error(status, "NOT_ACCEPTABLE", "The requested representation is not available.");
+      case 415 ->
+          error(status, "UNSUPPORTED_MEDIA_TYPE", "The request media type is not supported.");
+      default -> error(status, "INVALID_REQUEST", "The request is invalid.");
+    };
+  }
+
+  private ResponseEntity<ApiError> error(HttpStatusCode status, String code, String message) {
     return ResponseEntity.status(status)
         .body(new ApiError(code, message, Instant.now(), MDC.get("correlationId")));
   }

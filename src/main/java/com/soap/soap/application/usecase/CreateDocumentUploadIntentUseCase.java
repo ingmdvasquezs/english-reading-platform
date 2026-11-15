@@ -1,6 +1,7 @@
 package com.soap.soap.application.usecase;
 
 import com.soap.soap.application.command.CreateDocumentUploadIntentCommand;
+import com.soap.soap.application.exception.InvalidApplicationArgumentException;
 import com.soap.soap.application.model.DocumentImportLimits;
 import com.soap.soap.application.model.DocumentUploadIntentResult;
 import com.soap.soap.application.port.out.DocumentObjectStoragePort;
@@ -49,7 +50,8 @@ public class CreateDocumentUploadIntentUseCase {
 
     String rawFilename = command.fileName().strip();
     if (rawFilename.isEmpty() || rawFilename.length() > 500) {
-      throw new IllegalArgumentException("fileName must be non-blank and at most 500 characters");
+      throw new InvalidApplicationArgumentException(
+          "fileName must be non-blank and at most 500 characters");
     }
 
     String safeFilename = Path.of(rawFilename.replace('\\', '/')).getFileName().toString().strip();
@@ -67,14 +69,14 @@ public class CreateDocumentUploadIntentUseCase {
       canonicalContentType = "application/pdf";
       extension = "pdf";
     } else {
-      throw new IllegalArgumentException("Only .epub and .pdf files are supported");
+      throw new InvalidApplicationArgumentException("Only .epub and .pdf files are supported");
     }
 
     if (command.contentType() != null && !command.contentType().isBlank()) {
       String hint = command.contentType().strip();
       if (!hint.equals("application/octet-stream")
           && !hint.equalsIgnoreCase(canonicalContentType)) {
-        throw new IllegalArgumentException(
+        throw new InvalidApplicationArgumentException(
             "Content-Type '"
                 + hint
                 + "' does not match extension expected type '"
@@ -84,11 +86,11 @@ public class CreateDocumentUploadIntentUseCase {
     }
 
     if (command.sizeBytes() <= 0) {
-      throw new IllegalArgumentException("sizeBytes must be strictly positive");
+      throw new InvalidApplicationArgumentException("sizeBytes must be strictly positive");
     }
 
     if (command.sizeBytes() > limits.maxSourceBytes()) {
-      throw new IllegalArgumentException(
+      throw new InvalidApplicationArgumentException(
           "sizeBytes ("
               + command.sizeBytes()
               + ") exceeds maximum limit: "
@@ -97,7 +99,7 @@ public class CreateDocumentUploadIntentUseCase {
 
     String normalizedChecksum = command.checksumSha256().strip().toLowerCase(Locale.ROOT);
     if (!SHA256_PATTERN.matcher(normalizedChecksum).matches()) {
-      throw new IllegalArgumentException(
+      throw new InvalidApplicationArgumentException(
           "checksumSha256 must contain exactly 64 lowercase hexadecimal characters");
     }
 

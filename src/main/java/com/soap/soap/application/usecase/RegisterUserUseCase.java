@@ -31,6 +31,11 @@ public class RegisterUserUseCase implements RegisterUserPort {
     if (command.password() == null || command.password().length() < 8)
       throw new InvalidApplicationArgumentException("Password must contain at least 8 characters");
     requireMaximum(command.password(), limits.maxPasswordCharacters(), "Password");
+    if (InputLimits.exceedsPasswordHashingLimit(command.password()))
+      throw new InvalidApplicationArgumentException(
+          "Password must contain at most "
+              + InputLimits.MAX_PASSWORD_UTF8_BYTES
+              + " bytes when encoded as UTF-8");
     if (users.findByEmail(email).isPresent()) throw new EmailAlreadyRegisteredException();
     return users.save(new User(null, name, email, passwords.encode(command.password()), null));
   }

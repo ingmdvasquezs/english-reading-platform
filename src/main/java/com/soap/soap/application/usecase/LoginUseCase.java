@@ -26,7 +26,9 @@ public class LoginUseCase implements LoginPort {
         || command.email() == null
         || command.password() == null
         || command.email().length() > limits.maxEmailCharacters()
-        || command.password().length() > limits.maxPasswordCharacters())
+        || command.password().length() > limits.maxPasswordCharacters()
+        // Checked before the user lookup so the outcome never depends on whether the email exists.
+        || InputLimits.exceedsPasswordHashingLimit(command.password()))
       throw new InvalidCredentialsException();
     var user =
         users
