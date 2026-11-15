@@ -2,10 +2,12 @@ package com.soap.soap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.soap.soap.application.command.UpdateReadingProgressCommand;
 import com.soap.soap.application.model.PageRequest;
 import com.soap.soap.application.port.in.GetReadingReaderDataPort;
 import com.soap.soap.application.port.in.ListContinueReadingPort;
 import com.soap.soap.application.port.in.ListPlatformReadingHistoryPort;
+import com.soap.soap.application.port.in.UpdateReadingProgressPort;
 import com.soap.soap.application.port.out.ReadingProgressRepositoryPort;
 import com.soap.soap.application.port.out.ReadingRepositoryPort;
 import com.soap.soap.application.port.out.UserRepositoryPort;
@@ -47,6 +49,7 @@ class PlatformReadingHistoryIntegrationTest {
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
   @Autowired private ListPlatformReadingHistoryPort historyPort;
+  @Autowired private UpdateReadingProgressPort updateProgressPort;
   @Autowired private ListContinueReadingPort continueReadingPort;
   @Autowired private GetReadingReaderDataPort readerDataPort;
   @Autowired private ReadingRepositoryPort readings;
@@ -130,6 +133,58 @@ class PlatformReadingHistoryIntegrationTest {
                 LocalDateTime.now()));
     entityManager.flush();
     return r;
+  }
+
+  @Test
+  @DisplayName(
+      "V-1: re-reading a COMPLETED PLATFORM reading keeps COMPLETED, moves the ordinal and keeps completed_at")
+  void reopeningACompletedPlatformReadingKeepsItCompletedInPostgres() {
+    var reading =
+        createPlatformReading(
+            "Completed reread " + UUID.randomUUID(), EditorialStatus.PUBLISHED, EditorialLevel.B1);
+
+    updateProgressPort.updateReadingProgress(
+        new UpdateReadingProgressCommand(reading.id(), ReadingProgressStatus.IN_PROGRESS, 2, 1));
+    updateProgressPort.updateReadingProgress(
+        new UpdateReadingProgressCommand(
+            reading.id(), ReadingProgressStatus.COMPLETED, null, null));
+    var completedAt = completedAt(reading.id());
+    assertThat(completedAt).isNotNull();
+
+    var reopened =
+        updateProgressPort.updateReadingProgress(
+            new UpdateReadingProgressCommand(
+                reading.id(), ReadingProgressStatus.IN_PROGRESS, 4, 1));
+
+    assertThat(reopened.status()).isEqualTo(ReadingProgressStatus.COMPLETED);
+    assertThat(reopened.currentPartOrdinal()).isEqualTo(4);
+    var row =
+        jdbc.queryForMap(
+            "SELECT status, current_part_ordinal, pagination_version FROM reading_progress"
+                + " WHERE user_id = ? AND reading_id = ?",
+            testUser.id(),
+            reading.id());
+    assertThat(row.get("status")).isEqualTo("COMPLETED");
+    assertThat(row.get("current_part_ordinal")).isEqualTo(4);
+    assertThat(row.get("pagination_version")).isEqualTo(1);
+    assertThat(completedAt(reading.id())).isEqualTo(completedAt);
+
+    // A legacy IN_PROGRESS request without a position keeps both status and position.
+    var legacy =
+        updateProgressPort.updateReadingProgress(
+            new UpdateReadingProgressCommand(
+                reading.id(), ReadingProgressStatus.IN_PROGRESS, null, null));
+    assertThat(legacy.status()).isEqualTo(ReadingProgressStatus.COMPLETED);
+    assertThat(legacy.currentPartOrdinal()).isEqualTo(4);
+    assertThat(completedAt(reading.id())).isEqualTo(completedAt);
+  }
+
+  private java.sql.Timestamp completedAt(UUID readingId) {
+    return jdbc.queryForObject(
+        "SELECT completed_at FROM reading_progress WHERE user_id = ? AND reading_id = ?",
+        java.sql.Timestamp.class,
+        testUser.id(),
+        readingId);
   }
 
   @Test
