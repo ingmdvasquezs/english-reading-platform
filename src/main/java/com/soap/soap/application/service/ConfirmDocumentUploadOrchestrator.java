@@ -126,7 +126,16 @@ public class ConfirmDocumentUploadOrchestrator {
     if (mismatchReason != null) {
       LOG.error("Integrity mismatch on uploadId={}: {}", uploadId, mismatchReason);
       documentUploads.abort(uploadId, userId);
-      storagePort.deleteObject(upload.storageKey());
+      try {
+        // Best-effort: the upload is already ABORTED, so a failure here must not hide the
+        // integrity mismatch from the client.
+        storagePort.deleteObject(upload.storageKey());
+      } catch (RuntimeException deletionFailure) {
+        LOG.warn(
+            "Best-effort deletion of aborted upload object failed for uploadId={}: {}",
+            uploadId,
+            deletionFailure.getMessage());
+      }
       throw new UploadIntegrityMismatchException(uploadId, mismatchReason);
     }
 

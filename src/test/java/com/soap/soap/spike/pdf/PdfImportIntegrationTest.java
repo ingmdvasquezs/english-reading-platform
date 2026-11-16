@@ -177,7 +177,13 @@ class PdfImportIntegrationTest {
         storage.locate(
             documents.findDocumentById(accepted.documentId()).orElseThrow().sourceAssetKey());
     var deletions =
-        new DeleteDocumentUseCase(currentUser, documents, storage, new SimpleMeterRegistry());
+        new DeleteDocumentUseCase(
+            currentUser,
+            documents,
+            storage,
+            org.mockito.Mockito.mock(
+                com.soap.soap.application.port.out.DocumentObjectStoragePort.class),
+            new SimpleMeterRegistry());
     deletions.delete(accepted.documentId());
 
     assertThat(documents.findDocumentById(accepted.documentId())).isEmpty();

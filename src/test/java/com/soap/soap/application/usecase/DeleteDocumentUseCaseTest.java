@@ -29,6 +29,7 @@ class DeleteDocumentUseCaseTest {
   @Mock CurrentUserPort currentUser;
   @Mock ImportedDocumentRepositoryPort documents;
   @Mock DocumentAssetStoragePort storage;
+  @Mock com.soap.soap.application.port.out.DocumentObjectStoragePort objectStorage;
   private UUID userId;
   private SimpleMeterRegistry meters;
   private DeleteDocumentUseCase useCase;
@@ -37,7 +38,7 @@ class DeleteDocumentUseCaseTest {
   void setUp() {
     userId = UUID.randomUUID();
     meters = new SimpleMeterRegistry();
-    useCase = new DeleteDocumentUseCase(currentUser, documents, storage, meters);
+    useCase = new DeleteDocumentUseCase(currentUser, documents, storage, objectStorage, meters);
     when(currentUser.requireUserId()).thenReturn(userId);
   }
 
@@ -116,6 +117,60 @@ class DeleteDocumentUseCaseTest {
     verify(documents).deleteDocument(document.id());
     assertThat(meters.find("documents.deletes").tag("outcome", "cleanup_failed").counter().count())
         .isEqualTo(1);
+  }
+
+  @Test
+  void s3SourceIsDeletedBeforeTheDatabaseRowAndCoverAfterIt() {
+    var document = s3Document(userId, "covers/cover.jpg");
+    when(documents.findDocumentById(document.id())).thenReturn(Optional.of(document));
+
+    useCase.delete(document.id());
+
+    var order = org.mockito.Mockito.inOrder(objectStorage, documents, storage);
+    order.verify(objectStorage).deleteObject(document.sourceAssetKey());
+    order.verify(documents).deleteDocument(document.id());
+    order.verify(storage).delete("covers/cover.jpg");
+    verify(storage, never()).delete(document.sourceAssetKey());
+  }
+
+  @Test
+  void s3DeleteFailureLeavesTheDocumentForAnIdempotentRetry() {
+    var document = s3Document(userId, null);
+    when(documents.findDocumentById(document.id())).thenReturn(Optional.of(document));
+    org.mockito.Mockito.doThrow(
+            new com.soap.soap.application.exception.TransientStorageException(
+                "S3 unavailable", new RuntimeException("timeout")))
+        .when(objectStorage)
+        .deleteObject(document.sourceAssetKey());
+
+    assertThatThrownBy(() -> useCase.delete(document.id()))
+        .isInstanceOf(com.soap.soap.application.exception.TransientStorageException.class);
+
+    verify(documents, never()).deleteDocument(document.id());
+    assertThat(meters.find("document.cleanup.failure").tag("type", "document_source").counter())
+        .isNotNull();
+  }
+
+  private ImportedDocument s3Document(UUID owner, String cover) {
+    var now = LocalDateTime.now();
+    var id = UUID.randomUUID();
+    return new ImportedDocument(
+        id,
+        owner,
+        "Book",
+        null,
+        "en",
+        DocumentFormat.EPUB,
+        cover,
+        "documents/" + owner + "/" + id + "/source.epub",
+        com.soap.soap.domain.model.StorageProvider.S3,
+        "book.epub",
+        "a".repeat(64),
+        DocumentImportStatus.READY,
+        null,
+        5,
+        now,
+        now);
   }
 
   private ImportedDocument document(

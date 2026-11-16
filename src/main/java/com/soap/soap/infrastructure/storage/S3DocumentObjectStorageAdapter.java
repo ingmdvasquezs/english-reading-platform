@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.ChecksumMode;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -236,9 +237,22 @@ public class S3DocumentObjectStorageAdapter implements DocumentObjectStoragePort
     String bucket = S3BucketNames.requireValid(properties.s3().bucket());
 
     try {
+      // S3 DeleteObject already succeeds (204) for a missing key; 404s are tolerated as well so
+      // the operation stays idempotent across S3-compatible implementations.
       s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(storageKey).build());
-    } catch (Exception e) {
-      LOG.warn("Failed best-effort deletion of S3 object: bucket={} key={}", bucket, storageKey, e);
+    } catch (NoSuchKeyException e) {
+      LOG.debug("S3 object already absent: bucket={} key={}", bucket, storageKey);
+    } catch (S3Exception e) {
+      var errorCode = e.awsErrorDetails() == null ? null : e.awsErrorDetails().errorCode();
+      // A missing bucket is a configuration problem, never "object already absent".
+      if (e.statusCode() == 404 && !"NoSuchBucket".equals(errorCode)) {
+        LOG.debug("S3 object already absent: bucket={} key={}", bucket, storageKey);
+        return;
+      }
+      throw new TransientStorageException(
+          "S3 object deletion failed with status " + e.statusCode() + " for key " + storageKey, e);
+    } catch (SdkException e) {
+      throw new TransientStorageException("S3 object deletion failed for key " + storageKey, e);
     }
   }
 }

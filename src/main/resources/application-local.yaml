@@ -21,3 +21,7 @@ app:
     # DOCUMENT_STORAGE_S3_BUCKET (and an endpoint override for LocalStack) to exercise direct S3
     # uploads; the bucket is then validated at startup like in production.
     provider: ${DOCUMENT_STORAGE_PROVIDER:FILESYSTEM}
+  # Periodic lifecycle maintenance is off locally (and in local-profile tests, which call the
+  # services directly); enable with DOCUMENT_LIFECYCLE_ENABLED=true.
+  document-lifecycle:
+    enabled: ${DOCUMENT_LIFECYCLE_ENABLED:false}
