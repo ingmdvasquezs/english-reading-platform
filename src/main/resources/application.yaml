@@ -155,6 +155,11 @@ app:
     batch-size: ${DOCUMENT_LIFECYCLE_BATCH_SIZE:100}
     # A never-confirmed PENDING upload is cleaned up this long after its expires_at (24h intent).
     expired-upload-grace: ${DOCUMENT_LIFECYCLE_EXPIRED_UPLOAD_GRACE:1h}
+    # Legacy multipart imports have no lease: PROCESSING this long after submission is treated as
+    # interrupted (parsing is bounded to 120s and the in-memory queue to minutes).
+    legacy-processing-stale-after: ${DOCUMENT_LIFECYCLE_LEGACY_PROCESSING_STALE_AFTER:1h}
+    # Durable jobs: PROCESSING with a lease that ended this long ago (live workers renew every 20s).
+    durable-lease-stale-after: ${DOCUMENT_LIFECYCLE_DURABLE_LEASE_STALE_AFTER:30m}
   languages:
     enabled-learning: ${LANGUAGES_ENABLED_LEARNING:en}
     enabled-content: ${LANGUAGES_ENABLED_CONTENT:en}

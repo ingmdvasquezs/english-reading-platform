@@ -1,6 +1,7 @@
 package com.soap.soap.infrastructure.storage;
 
 import com.soap.soap.application.service.ExpiredUploadCleanupService;
+import com.soap.soap.application.service.StaleImportRecoveryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -22,9 +23,12 @@ public class DocumentLifecycleMaintenanceJob {
   private static final Logger LOG = LoggerFactory.getLogger(DocumentLifecycleMaintenanceJob.class);
 
   private final ExpiredUploadCleanupService expiredUploads;
+  private final StaleImportRecoveryService staleImports;
 
-  public DocumentLifecycleMaintenanceJob(ExpiredUploadCleanupService expiredUploads) {
+  public DocumentLifecycleMaintenanceJob(
+      ExpiredUploadCleanupService expiredUploads, StaleImportRecoveryService staleImports) {
     this.expiredUploads = expiredUploads;
+    this.staleImports = staleImports;
   }
 
   @Scheduled(
@@ -37,6 +41,19 @@ public class DocumentLifecycleMaintenanceJob {
     } catch (RuntimeException exception) {
       LOG.warn(
           "document_lifecycle_run_failed category=expired_uploads reason={}",
+          exception.getClass().getSimpleName());
+    }
+    try {
+      var recovered = staleImports.recoverStaleImports();
+      if (recovered.legacyRecovered() + recovered.durableRecovered() > 0) {
+        LOG.info(
+            "document_lifecycle_run staleLegacy={} staleDurable={}",
+            recovered.legacyRecovered(),
+            recovered.durableRecovered());
+      }
+    } catch (RuntimeException exception) {
+      LOG.warn(
+          "document_lifecycle_run_failed category=stale_imports reason={}",
           exception.getClass().getSimpleName());
     }
   }

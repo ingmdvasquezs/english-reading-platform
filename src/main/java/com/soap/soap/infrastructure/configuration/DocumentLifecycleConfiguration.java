@@ -13,7 +13,12 @@ public class DocumentLifecycleConfiguration {
   @Bean
   DocumentLifecyclePolicy documentLifecyclePolicy(
       @Value("${app.document-lifecycle.batch-size:100}") int batchSize,
-      @Value("${app.document-lifecycle.expired-upload-grace:1h}") Duration expiredUploadGrace) {
-    return new DocumentLifecyclePolicy(batchSize, expiredUploadGrace);
+      @Value("${app.document-lifecycle.expired-upload-grace:1h}") Duration expiredUploadGrace,
+      @Value("${app.document-lifecycle.legacy-processing-stale-after:1h}")
+          Duration legacyProcessingStaleAfter,
+      @Value("${app.document-lifecycle.durable-lease-stale-after:30m}")
+          Duration durableLeaseStaleAfter) {
+    return new DocumentLifecyclePolicy(
+        batchSize, expiredUploadGrace, legacyProcessingStaleAfter, durableLeaseStaleAfter);
   }
 }
